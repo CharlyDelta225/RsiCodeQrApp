@@ -1,0 +1,32 @@
+# Dépendances
+node_modules/
+
+# Fichiers d'environnement
+.env
+.env.local
+.env.production
+
+# Logs
+npm-debug.log*
+*.log
+server-out.txt
+server-err.txt
+prisma-*.txt
+
+# Fichiers générés par Prisma
+prisma/migrations/dev/
+prisma/dev.db
+
+# Badges QR générés (à n'importe quelle profondeur, ex: backend/public/badges/)
+**/public/badges/
+**/output/
+**/dist/
+
+# Fichiers générés par l'IDE (types auto-installés)
+*.tsbuildinfo
+
+# Éditeurs / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

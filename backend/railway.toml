@@ -1,0 +1,14 @@
+# Configuration Railway pour le backend RsiCodeQrApp.
+# Railway détecte automatiquement Node.js ; ce fichier fixe le port et
+# le healthcheck. La base PostgreSQL est un service Railway séparé dont
+# la variable d'environnement DATABASE_URL est injectée automatiquement.
+
+[build]
+  builder = "NIXPACKS"
+
+[deploy]
+  startCommand = "npx prisma migrate deploy && npm start"
+  healthcheckPath = "/api/health"
+  healthcheckTimeout = 300
+  restartPolicyType = "ON_FAILURE"
+  restartPolicyMaxRetries = 5

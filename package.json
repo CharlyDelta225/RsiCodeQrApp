@@ -1,0 +1,12 @@
+{
+  "name": "rsi-code-qr-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo RsiCodeQrApp — backend (Express/Prisma) + frontend (dashboard & terminal) + docs",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "start:backend": "npm --prefix backend start",
+    "test:backend": "npm --prefix backend test",
+    "seed:backend": "npm --prefix backend run seed"
+  }
+}

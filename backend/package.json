@@ -1,0 +1,44 @@
+{
+  "name": "rsi-code-qr-app-backend",
+  "version": "1.0.0",
+  "description": "Backend Node.js/Express/Prisma pour le badgeage QR des ouvriers de l'Église",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "prisma generate && node src/server.js",
+    "prisma:deploy": "set PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma&& prisma migrate deploy",
+    "test": "node --test \"tests/*.test.js\"",
+    "prisma:migrate": "set PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma&& prisma migrate dev",
+    "prisma:generate": "set PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma&& prisma generate",
+    "seed": "node src/scripts/seed.js",
+    "badges:generate": "node src/scripts/generate-badges.js",
+    "import:csv": "node src/scripts/import-csv.js"
+  },
+  "keywords": [
+    "api",
+    "express",
+    "prisma",
+    "postgresql",
+    "qrcode"
+  ],
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.0"
+  },
+"allowScripts": {
+    "@prisma/engines@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "prisma@6.19.3": true
+  }
+}

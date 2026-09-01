@@ -1,0 +1,26 @@
+# Blueprint de déploiement Render pour le backend RsiCodeQrApp.
+# Deux façons : importer ce fichier (New > Blueprint) ou créer un "Web Service"
+# manuellement avec les mêmes valeurs. Le PostgreSQL est fourni par Render
+# (New > PostgreSQL), ou Railway, et sa URL va dans la variable DATABASE_URL.
+
+services:
+  - type: web
+    name: rsi-code-qr-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npx prisma migrate deploy && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: DATABASE_URL
+        sync: false            # à remplir dans le dashboard Render (lien DB)
+      - key: JWT_SECRET
+        sync: false            # générer via : node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false            # ex : https://rsi-code-qr-api.onrender.com

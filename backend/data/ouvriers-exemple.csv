@@ -1,0 +1,6 @@
+matricule,nom,prenom,departement,actif
+RSI-A100,KOFFI,Jean-Marc,Louange,true
+RSI-A101,DIABATE,Safiatou,Accueil,true
+RSI-A102,ASSEMIAN,Emmanuel,Tech son,true
+,KEITA,Aminata,Enfant,true
+RSI-A104,SORO,Paul,Intercession,false
