@@ -2,8 +2,13 @@ import { Router } from "express";
 import QRCode from "qrcode";
 import prisma from "../lib/prisma.js";
 import { genererMatricule } from "../lib/matricule.js";
+import { requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
+
+// Seuls ADMIN et SUPER_ADMIN peuvent modifier/supprimer des ouvriers.
+// La lecture (GET) reste ouverte à tous les rôles authentifiés (dont LECTEUR).
+const ECRITURE = requireRole("ADMIN", "SUPER_ADMIN");
 
 // Compare les champs autorisés :
 // - sans champ "matricule" => généré automatiquement
@@ -87,7 +92,7 @@ router.get("/:id", async (req, res) => {
  * Champs requis : nom, prenom, departement.
  * Matricule généré automatiquement si absent.
  */
-router.post("/", async (req, res) => {
+router.post("/", ECRITURE, async (req, res) => {
   try {
     const { nom, prenom, departement } = req.body ?? {};
 
@@ -120,7 +125,7 @@ router.post("/", async (req, res) => {
  * PATCH /api/ouvriers/:id
  * Met à jour un ouvrier (tous champs optionnels). Permet de désactiver un badge : { "actif": false }.
  */
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", ECRITURE, async (req, res) => {
   try {
     const donnees = extraireChamps(req.body);
     if (Object.keys(donnees).length === 0) {
@@ -137,6 +142,50 @@ router.patch("/:id", async (req, res) => {
       return res.status(409).json({ ok: false, code: "MATRICULE_EXISTANT", message: "Ce matricule existe déjà" });
     }
     console.error("[OUVRIERS/MAJ]", err);
+    return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
+  }
+});
+
+/**
+ * PATCH /api/ouvriers/:id/activer
+ * Active un badge (ouvrier). Endpoint dédié et explicite :
+ * équivaut à PATCH /api/ouvriers/:id avec { "actif": true }.
+ * Réservé à ADMIN/SUPER_ADMIN (middleware ECRITURE).
+ */
+router.patch("/:id/activer", ECRITURE, async (req, res) => {
+  try {
+    const ouvrier = await prisma.ouvrier.update({
+      where: { id: req.params.id },
+      data: { actif: true },
+    });
+    return res.json({ ok: true, actif: true, ouvrier });
+  } catch (err) {
+    if (err.code === "P2025") {
+      return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
+    }
+    console.error("[OUVRIERS/ACTIVER]", err);
+    return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
+  }
+});
+
+/**
+ * PATCH /api/ouvriers/:id/desactiver
+ * Désactive un badge (ouvrier) : le badgeage de ce matricule répondra ensuite
+ * 403 BADGE_DESACTIVE. Endpoint dédié et explicite.
+ * Réservé à ADMIN/SUPER_ADMIN (middleware ECRITURE).
+ */
+router.patch("/:id/desactiver", ECRITURE, async (req, res) => {
+  try {
+    const ouvrier = await prisma.ouvrier.update({
+      where: { id: req.params.id },
+      data: { actif: false },
+    });
+    return res.json({ ok: true, actif: false, ouvrier });
+  } catch (err) {
+    if (err.code === "P2025") {
+      return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
+    }
+    console.error("[OUVRIERS/DESACTIVER]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -171,7 +220,7 @@ router.get("/:id/badge", async (req, res) => {
  * DELETE /api/ouvriers/:id
  * Supprime un ouvrier et ses pointages (onDelete: Cascade).
  */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", ECRITURE, async (req, res) => {
   try {
     await prisma.ouvrier.delete({ where: { id: req.params.id } });
     return res.json({ ok: true });

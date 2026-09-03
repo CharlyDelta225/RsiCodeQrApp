@@ -29,16 +29,19 @@ async function main() {
   console.log(`✓ Seed terminé. ${crees}/${ouvriersExemples.length} ouvriers traités. Total en base : ${total}`);
 
   // Admin par défaut (étape 7) — email/mot de passe depuis .env
+  // Rôle SUPER_ADMIN : c'est le seul qui peut créer d'autres comptes admin.
   const email = process.env.ADMIN_EMAIL;
   const motDePasse = process.env.ADMIN_PASSWORD;
   if (email && motDePasse) {
     const hash = await bcrypt.hash(motDePasse, 10);
     await prisma.admin.upsert({
       where: { email },
-      update: {},
-      create: { email, motDePasse: hash },
+      // update : on réaffirme le rôle SUPER_ADMIN même si le compte existe déjà
+      // (il a pu être créé avant l'ajout du champ rôle, ou rétrogradé).
+      update: { role: "SUPER_ADMIN" },
+      create: { email, motDePasse: hash, role: "SUPER_ADMIN" },
     });
-    console.log(`✓ Admin par défaut prêt : ${email}`);
+    console.log(`✓ Admin par défaut prêt : ${email} (SUPER_ADMIN)`);
   }
 }
 

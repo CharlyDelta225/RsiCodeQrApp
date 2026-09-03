@@ -7,6 +7,8 @@ import ouvriersRoutes from "./routes/ouvriers.routes.js";
 import pointagesRoutes from "./routes/pointages.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import requireAuth from "./middleware/auth.middleware.js";
+import importRoutes from "./routes/import.routes.js";
+import adminsRoutes from "./routes/admins.routes.js";
 
 dotenv.config();
 
@@ -32,8 +34,14 @@ app.use("/api/badgeage", badgeageRoutes);
 // Authentification admin — voir routes/auth.routes.js
 app.use("/api/auth", authRoutes);
 
+// Gestion des comptes admin (rôles) — PROTÉGÉ SUPER_ADMIN (voir routes/admins.routes.js)
+app.use("/api/admins", requireAuth, adminsRoutes);
+
 // CRUD ouvriers (utilisé par le dashboard) — PROTÉGÉ (JWT admin requis)
 app.use("/api/ouvriers", requireAuth, ouvriersRoutes);
+
+// Import massif d'ouvriers (.csv/.xlsx) + génération QR — PROTÉGÉ
+app.use("/api/ouvriers", requireAuth, importRoutes);
 
 // Historique des pointages (dashboard) — PROTÉGÉ (JWT admin requis)
 app.use("/api/pointages", requireAuth, pointagesRoutes);

@@ -20,6 +20,16 @@ enum TypePointage {
   SORTIR
 }
 
+// Rôle d'un admin. Hiérarchie :
+//   SUPER_ADMIN : gestion des admins (register) + tout le reste
+//   ADMIN       : gestion complète des ouvriers/pointages (pas les admins)
+//   LECTEUR     : lecture seule du dashboard
+enum RoleAdmin {
+  SUPER_ADMIN
+  ADMIN
+  LECTEUR
+}
+
 model Ouvrier {
   id          String  @id @default(uuid())
   matricule   String  @unique // encodé dans le QR code
@@ -47,10 +57,11 @@ model Pointage {
 }
 
 model Admin {
-  id         String   @id @default(uuid())
-  email      String   @unique
+  id         String    @id @default(uuid())
+  email      String    @unique
   motDePasse String // haché avec bcrypt (étape 7)
-  createdAt  DateTime @default(now())
+  role       RoleAdmin @default(ADMIN) // hiérarchie SUPER_ADMIN > ADMIN > LECTEUR
+  createdAt  DateTime  @default(now())
 
   @@map("Admin")
 }

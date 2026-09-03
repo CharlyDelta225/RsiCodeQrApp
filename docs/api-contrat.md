@@ -59,15 +59,23 @@ Appelé à chaque scan du QR par le terminal.
 
 ---
 
-## 2. Authentification (PUBLIC)
+## 2. Authentification
 
-### `POST /api/auth/login`
+### Rôles admin (`RoleAdmin`)
+Hiérarchie : `SUPER_ADMIN` > `ADMIN` > `LECTEUR`
+| Rôle | Ouvriers (lecture) | Ouvriers (écriture/import) | Pointages | Gérer les rôles (`/api/admins`) |
+|---|---|---|---|---|
+| `LECTEUR` | ✅ | ❌ | ✅ | ❌ |
+| `ADMIN` | ✅ | ✅ | ✅ | ❌ |
+| `SUPER_ADMIN` | ✅ | ✅ | ✅ | ✅ |
+
+### `POST /api/auth/login` (PUBLIC)
 ```json
 // Body
 { "email": "admin@example.com", "motDePasse": "change-moi" }
 
 // Réponse 200
-{ "ok": true, "token": "<JWT>", "admin": { "id": "...", "email": "..." } }
+{ "ok": true, "token": "<JWT>", "admin": { "id": "...", "email": "...", "role": "SUPER_ADMIN" } }
 
 // Erreurs
 // 401 { "ok": false, "code": "IDENTIFIANTS_INVALIDES", ... }
@@ -75,10 +83,44 @@ Appelé à chaque scan du QR par le terminal.
 ```
 
 ### `GET /api/auth/me` (protégé)
-Renvoie l'admin connecté : `{ "ok": true, "admin": { "id", "email", "createdAt" } }`
+Renvoie l'admin connecté : `{ "ok": true, "admin": { "id", "email", "role", "createdAt" } }`
 
-### `POST /api/auth/register` (phase de mise en place uniquement)
-Crée un premier admin. Body `{ "email", "motDePasse" }`, mot de passe ≥ 8 caractères.
+### `POST /api/auth/register` (PUBLIC)
+Création d'un compte. Tout nouveau compte naît **`LECTEUR`** (aucun pouvoir d'écriture). L'élévation vers `ADMIN`/`SUPER_ADMIN` se fait ensuite par un `SUPER_ADMIN` via `PATCH /api/admins/:id/role`.
+```json
+// Body
+{ "email": "lambda@eglise.com", "motDePasse": "lambda123" }
+// (rôle NON accepté ici : tout inscrit est LECTEUR, le rôle fourni est ignoré)
+
+// Réponse 201
+{ "ok": true, "admin": { "id": "...", "email": "...", "role": "LECTEUR", "createdAt": "..." } }
+
+// Erreurs
+// 400 motDePasse < 8 → MOT_DE_PASSE_TROP_COURT
+// 409 email déjà pris → EMAIL_EXISTANT
+```
+
+### `GET /api/admins` (protégé — **SUPER_ADMIN uniquement**)
+Liste tous les comptes admin (pour la gestion des rôles côté dashboard).
+```json
+{ "ok": true, "admins": [ { "id": "...", "email": "...", "role": "LECTEUR", "createdAt": "..." } ] }
+```
+
+### `PATCH /api/admins/:id/role` (protégé — **SUPER_ADMIN uniquement**)
+Change le rôle d'un compte admin.
+```json
+// Body
+{ "role": "ADMIN" }   // valeurs : ADMIN | LECTEUR | SUPER_ADMIN
+
+// Réponse 200
+{ "ok": true, "admin": { "id": "...", "email": "...", "role": "ADMIN", "createdAt": "..." } }
+
+// Erreurs
+// 400 rôle invalide       → ROLE_INVALIDE
+// 404 compte introuvable  → ADMIN_INCONNU
+// 403 auto-rétrogradation → ACTION_IMPOSSIBLE (on ne peut pas modifier son propre rôle)
+```
+> Garde-fou : un `SUPER_ADMIN` ne peut **pas** se modifier lui-même (anti-verrouillage).
 
 ---
 
@@ -107,11 +149,44 @@ Détail complet d'un ouvrier.
 ### `PATCH /api/ouvriers/:id`
 Met à jour tout ou partie. **Désactivation d'un badge** : `{ "actif": false }`.
 
+### `PATCH /api/ouvriers/:id/activer` (protégé — ADMIN/SUPER_ADMIN)
+Active le badge d'un ouvrier. Réponse : `{ "ok": true, "actif": true, "ouvrier": {...} }`.
+
+### `PATCH /api/ouvriers/:id/desactiver` (protégé — ADMIN/SUPER_ADMIN)
+Désactive le badge : le badgeage de ce matricule répondra `403 BADGE_DESACTIVE`. Réponse : `{ "ok": true, "actif": false, "ouvrier": {...} }`.
+
 ### `DELETE /api/ouvriers/:id`
 Supprime l'ouvrier et ses pointages (cascade).
 
 ### `GET /api/ouvriers/:id/badge`
 Renvoie le **PNG du QR code** du badge (type `image/png`) — pour prévisualiser/imprimer.
+
+### `POST /api/ouvriers/import` (protégé)
+Import **massif** d'ouvriers depuis un fichier `.csv` ou `.xlsx` (multipart/form-data, champ `fichier`). Crée automatiquement un matricule et un QR badge par ouvrier.
+
+Colonnes **obligatoires** dans le fichier (1re ligne = en-tête) :
+```
+Nom,Prénom,Département
+KEITA,Awa,Chorale
+```
+
+Règles :
+- Extension autres que `.csv`/`.xlsx` → `400 TYPE_FICHIER_NON_SUPPORTE`
+- Colonnes manquantes → `400 COLONNES_MANQUANTES`
+- Fichier vide / illisible → `400 FICHIER_VIDE` ou `FORMAT_INVALIDE`
+- Doublon (même Nom+Prénom+Département) → ligne **ignorée**
+- Champ requis vide → ligne marquée en **erreur**
+
+```json
+{
+  "ok": true, "creees": 2, "ignorees": 1, "erreurs": 1,
+  "detail": [
+    { "nom": "KEITA", "prenom": "Awa", "departement": "Chorale", "matricule": "RSI-671C", "statut": "cree" },
+    { "nom": "KOUAME", "prenom": "Jean", "departement": "Louange", "statut": "ignore", "raison": "doublon" },
+    { "nom": "", "prenom": "X", "departement": "Y", "statut": "erreur", "raison": "nom manquant" }
+  ]
+}
+```
 
 ---
 
@@ -141,7 +216,7 @@ Query optionnels :
 
 ---
 
-## 5. Divers
+## 6. Divers
 
 - `GET /api/health` — public, `{ "status": "ok", ... }`. Utilisé par les healthcheck Railway/Render.
 - Toute route inconnue → `404 { "ok": false, "code": "ROUTE_INCONNUE", ... }`
@@ -152,4 +227,8 @@ Query optionnels :
 
 | Date | Changement |
 |---|---|
+| 2026-09-03 | Ajout de `POST /api/ouvriers/import` (import massif .csv/.xlsx + QR auto) |
+| 2026-09-03 | Ajout des rôles (`RoleAdmin`) : login/me renvoient `role`, register réservé au SUPER_ADMIN, écritures ouvriers/import réservées à ADMIN/SUPER_ADMIN |
+| 2026-09-03 | Register rendu **public** (tout inscrit = `LECTEUR`) + ajout de `GET /api/admins` et `PATCH /api/admins/:id/role` (gestion des rôles par SUPER_ADMIN, auto-rétrogradation bloquée) |
+| 2026-09-03 | Ajout de `PATCH /api/ouvriers/:id/activer` et `PATCH /api/ouvriers/:id/desactiver` (endpoints dédiés actif/inactif) |
 | 2026-09-01 | Création du document (v1) — badgeage, auth, ouvriers, pointages |
