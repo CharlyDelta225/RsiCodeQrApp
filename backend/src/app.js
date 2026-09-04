@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import badgeageRoutes from "./routes/badgeage.routes.js";
 import ouvriersRoutes from "./routes/ouvriers.routes.js";
@@ -12,11 +14,20 @@ import adminsRoutes from "./routes/admins.routes.js";
 
 dotenv.config();
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const app = express();
 
 // Middlewares globaux
 app.use(cors()); // autorise le terminal (mode kiosque) et le dashboard à appeler l'API
 app.use(express.json()); // parse le body JSON des requêtes
+
+// --- Terminal de scan (kiosque) ---
+// Servi par le backend lui-même (et non un serveur statique séparé) car
+// terminal.html appelle l'API via `window.location.origin` : il doit donc
+// être chargé depuis la même origine que l'API, que ce soit en local
+// (http://localhost:3000/terminal), sur le réseau local, ou via ngrok.
+app.use("/terminal", express.static(path.join(__dirname, "../../frontend/terminal")));
 
 // --- Routes publiques ---
 app.get("/api/health", (_req, res) => {

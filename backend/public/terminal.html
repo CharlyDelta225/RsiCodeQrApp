@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Terminal — Scan Badge</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  body {
+    margin: 0;
+    background: linear-gradient(160deg, #5A0A0A 0%, #7B1515 55%, #3a0606 100%);
+    color: white;
+    font-family: system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  #logo { width: 88px; height: 88px; object-fit: contain; margin-bottom: 6px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
+  h1 { font-size: 18px; font-weight: 500; margin: 8px 0 16px; color: #F3E3B3; text-align: center; }
+  #reader { width: 100%; max-width: 400px; border-radius: 12px; overflow: hidden; border: 2px solid #D4A017; }
+  #resultat {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 400px;
+    padding: 16px;
+    border-radius: 12px;
+    text-align: center;
+    display: none;
+  }
+  .succes { background: #eaf3de; color: #27500a; }
+  .erreur { background: #fde2e2; color: #7a1a1a; }
+  #statut { font-size: 12px; color: #D4A017; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <img id="logo" src="rsi-logo.png" alt="RSI" />
+  <h1>Présentez le QR code du badge devant la caméra</h1>
+  <div id="reader"></div>
+  <div id="resultat"></div>
+  <div id="statut">Initialisation de la caméra…</div>
+
+  <div style="margin-top:24px; width:100%; max-width:400px; border-top:1px solid rgba(212,160,23,0.35); padding-top:16px;">
+    <p style="font-size:12px; color:#D4A017; margin:0 0 8px;">
+      Test sans caméra (comme le fera le vrai lecteur badge) : tape ou colle le matricule puis appuie sur Entrée.
+    </p>
+    <input id="saisieManuelle" type="text" placeholder="Ex: RSI-C9EA" autocomplete="off"
+      style="width:100%; padding:10px; border-radius:8px; border:1px solid #D4A017; font-size:16px; box-sizing:border-box; outline:none;" />
+  </div>
+
+<script>
+  // Utilise automatiquement la même adresse que celle utilisée pour charger cette page
+  // (localhost, IP locale, ou URL ngrok) — plus besoin de modifier ce fichier à la main.
+  const API_BASE = window.location.origin;
+
+  let enTraitement = false;
+
+  function afficherResultat(texte, succes) {
+    const el = document.getElementById("resultat");
+    el.textContent = texte;
+    el.className = succes ? "succes" : "erreur";
+    el.style.display = "block";
+    setTimeout(() => { el.style.display = "none"; }, 3500);
+  }
+
+  async function envoyerScan(matricule) {
+    if (enTraitement) return;
+    enTraitement = true;
+    document.getElementById("statut").textContent = "Envoi du badge " + matricule + "…";
+    try {
+      const res = await fetch(API_BASE + "/api/badgeage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matricule }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const o = data.ouvrier;
+        afficherResultat(`✓ Pointage enregistré : ${o.prenom} ${o.nom} (${o.departement})`, true);
+      } else {
+        afficherResultat(`✗ ${data.message || data.code}`, false);
+      }
+    } catch (e) {
+      afficherResultat("✗ Impossible de contacter le serveur : " + e.message, false);
+    } finally {
+      document.getElementById("statut").textContent = "Prêt pour le prochain scan…";
+      setTimeout(() => { enTraitement = false; }, 2000); // anti-double-scan
+    }
+  }
+
+  document.getElementById("saisieManuelle").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const valeur = e.target.value.trim();
+      e.target.value = "";
+      if (valeur) envoyerScan(valeur);
+    }
+  });
+
+  const scanner = new Html5Qrcode("reader");
+  scanner.start(
+    { facingMode: "environment" }, // caméra arrière du téléphone
+    { fps: 10, qrbox: 250 },
+    (texteDecode) => envoyerScan(texteDecode.trim()),
+    () => {} // erreurs de frame ignorées (normal, ça scanne en continu)
+  ).then(() => {
+    document.getElementById("statut").textContent = "Caméra prête.";
+  }).catch((err) => {
+    document.getElementById("statut").textContent = "Erreur caméra : " + err;
+  });
+</script>
+</body>
+</html>

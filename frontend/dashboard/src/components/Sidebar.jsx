@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { C, navItems } from "../theme";
 import rsiLogo from "../assets/rsi-logo.png";
+import { logout } from "../lib/auth";
 
 function initials(email) {
   if (!email) return "?";
@@ -71,10 +72,19 @@ function SidebarContent({ admin, onClose }) {
           >
             {initials(admin?.email)}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-white text-xs font-semibold truncate">{admin?.email || "…"}</p>
             <p className="text-white/50 text-[10px]">Administrateur</p>
           </div>
+          <button
+            onClick={() => {
+              if (window.confirm("Se déconnecter ?")) logout();
+            }}
+            title="Se déconnecter"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
+          >
+            <span className="text-sm leading-none">⏻</span>
+          </button>
         </div>
       </div>
     </>
@@ -94,13 +104,22 @@ export function Sidebar({ admin }) {
             <NavButton key={item.path} item={item} iconOnly />
           ))}
         </nav>
-        <div className="py-3 border-t border-white/10 flex justify-center flex-shrink-0">
+        <div className="py-3 border-t border-white/10 flex flex-col items-center gap-2 flex-shrink-0">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
             style={{ background: C.avatar }}
           >
             {initials(admin?.email)}
           </div>
+          <button
+            onClick={() => {
+              if (window.confirm("Se déconnecter ?")) logout();
+            }}
+            title="Se déconnecter"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <span className="text-sm leading-none">⏻</span>
+          </button>
         </div>
       </aside>
 

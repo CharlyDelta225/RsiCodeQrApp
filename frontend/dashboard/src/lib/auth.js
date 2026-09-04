@@ -25,3 +25,11 @@ export function clearSession() {
 export function isAuthenticated() {
   return !!getToken();
 }
+
+// Déconnexion volontaire (bouton "Se déconnecter") : on nettoie la session
+// et on réutilise l'événement "rsi:unauthorized" déjà écouté par
+// ProtectedRoute (voir lib/api.js) pour renvoyer proprement vers /login.
+export function logout() {
+  clearSession();
+  window.dispatchEvent(new CustomEvent("rsi:unauthorized"));
+}

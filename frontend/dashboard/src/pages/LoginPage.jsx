@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { setSession } from "../lib/auth";
+import { C } from "../theme";
+import rsiLogo from "../assets/rsi-logo.png";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -34,14 +36,38 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+    <div
+      className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
+      style={{ background: C.header }}
+    >
+      {/* Logo en grand filigrane derrière la carte — purement décoratif */}
+      <img
+        src={rsiLogo}
+        alt=""
+        aria-hidden="true"
+        className="absolute pointer-events-none select-none"
+        style={{
+          width: "min(120vw, 900px)",
+          opacity: 0.08,
+          filter: "grayscale(1) brightness(2)",
+        }}
+      />
+
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4"
+        className="w-full max-w-sm bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/20 p-7 space-y-5 relative z-10"
       >
-        <div>
-          <h1 className="text-lg font-bold text-slate-900">RSI — Dashboard présence</h1>
-          <p className="text-sm text-slate-500">Connexion administrateur</p>
+        <div className="flex flex-col items-center text-center gap-3 pb-1">
+          <img src={rsiLogo} alt="RSI" className="w-20 h-20 object-contain drop-shadow-md" />
+          <div>
+            <h1
+              className="text-lg font-bold text-slate-900"
+              style={{ fontFamily: "Poppins,sans-serif" }}
+            >
+              RSI — Dashboard présence
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">Connexion administrateur</p>
+          </div>
         </div>
 
         {erreur && (
@@ -58,7 +84,10 @@ export default function LoginPage() {
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow"
+            style={{ "--tw-ring-color": "#D4A017" }}
+            onFocus={(e) => (e.target.style.borderColor = "#C0392B")}
+            onBlur={(e) => (e.target.style.borderColor = "")}
             placeholder="admin@example.com"
           />
         </div>
@@ -71,7 +100,10 @@ export default function LoginPage() {
             autoComplete="current-password"
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow"
+            style={{ "--tw-ring-color": "#D4A017" }}
+            onFocus={(e) => (e.target.style.borderColor = "#C0392B")}
+            onBlur={(e) => (e.target.style.borderColor = "")}
             placeholder="••••••••"
           />
         </div>
@@ -79,7 +111,8 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-red-700 hover:bg-red-800 disabled:opacity-60 transition-colors"
+          className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60 transition-opacity hover:opacity-90"
+          style={{ background: C.btn }}
         >
           {loading ? "Connexion…" : "Se connecter"}
         </button>

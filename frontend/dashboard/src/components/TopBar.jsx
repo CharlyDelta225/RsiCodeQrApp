@@ -1,4 +1,5 @@
 import { C } from "../theme";
+import { logout } from "../lib/auth";
 
 function initials(email) {
   if (!email) return "?";
@@ -32,6 +33,15 @@ export default function TopBar({ title, subtitle, onMenuToggle, admin }) {
         >
           {initials(admin?.email)}
         </div>
+        <button
+          onClick={() => {
+            if (window.confirm("Se déconnecter ?")) logout();
+          }}
+          title="Se déconnecter"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
+        >
+          <span className="text-base leading-none">⏻</span>
+        </button>
       </div>
     </header>
   );
