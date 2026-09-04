@@ -77,9 +77,7 @@ function SidebarContent({ admin, onClose }) {
             <p className="text-white/50 text-[10px]">Administrateur</p>
           </div>
           <button
-            onClick={() => {
-              if (window.confirm("Se déconnecter ?")) logout();
-            }}
+            onClick={logout}
             title="Se déconnecter"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
           >
@@ -112,9 +110,7 @@ export function Sidebar({ admin }) {
             {initials(admin?.email)}
           </div>
           <button
-            onClick={() => {
-              if (window.confirm("Se déconnecter ?")) logout();
-            }}
+            onClick={logout}
             title="Se déconnecter"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
           >

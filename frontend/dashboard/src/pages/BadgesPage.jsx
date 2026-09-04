@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
+import { libelleDepartement } from "../lib/departement";
 
 export default function BadgesPage() {
   const [ouvriers, setOuvriers] = useState([]);
@@ -156,7 +157,7 @@ export default function BadgesPage() {
                 <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
                 <td className="px-3 py-2">{o.nom}</td>
                 <td className="px-3 py-2">{o.prenom}</td>
-                <td className="px-3 py-2">{o.departement}</td>
+                <td className="px-3 py-2">{libelleDepartement(o)}</td>
                 <td className="px-3 py-2">
                   <span
                     className={`text-xs px-2 py-1 rounded-full ${
@@ -186,6 +187,9 @@ export default function BadgesPage() {
             </h2>
             <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-64" />
             <p className="text-xs font-mono text-slate-500">{badgeOuvrier?.matricule}</p>
+            {badgeOuvrier && (
+              <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>
+            )}
             <div className="flex justify-center gap-3 pt-1">
               <button
                 onClick={handleTelechargerUnBadge}

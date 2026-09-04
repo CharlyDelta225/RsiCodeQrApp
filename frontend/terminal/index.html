@@ -42,17 +42,7 @@
   <div id="resultat"></div>
   <div id="statut">Initialisation de la caméra…</div>
 
-  <div style="margin-top:24px; width:100%; max-width:400px; border-top:1px solid rgba(212,160,23,0.35); padding-top:16px;">
-    <p style="font-size:12px; color:#D4A017; margin:0 0 8px;">
-      Test sans caméra (comme le fera le vrai lecteur badge) : tape ou colle le matricule puis appuie sur Entrée.
-    </p>
-    <input id="saisieManuelle" type="text" placeholder="Ex: RSI-C9EA" autocomplete="off"
-      style="width:100%; padding:10px; border-radius:8px; border:1px solid #D4A017; font-size:16px; box-sizing:border-box; outline:none;" />
-  </div>
-
 <script>
-  // Utilise automatiquement la même adresse que celle utilisée pour charger cette page
-  // (localhost, IP locale, ou URL ngrok) — plus besoin de modifier ce fichier à la main.
   const API_BASE = window.location.origin;
 
   let enTraitement = false;
@@ -90,20 +80,12 @@
     }
   }
 
-  document.getElementById("saisieManuelle").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const valeur = e.target.value.trim();
-      e.target.value = "";
-      if (valeur) envoyerScan(valeur);
-    }
-  });
-
   const scanner = new Html5Qrcode("reader");
   scanner.start(
-    { facingMode: "environment" }, // caméra arrière du téléphone
+    { facingMode: "environment" },
     { fps: 10, qrbox: 250 },
     (texteDecode) => envoyerScan(texteDecode.trim()),
-    () => {} // erreurs de frame ignorées (normal, ça scanne en continu)
+    () => {}
   ).then(() => {
     document.getElementById("statut").textContent = "Caméra prête.";
   }).catch((err) => {

@@ -1,8 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
+import { libelleDepartement } from "../lib/departement";
 
 const DEPARTEMENTS_SUGGESTIONS = [
   "Chorale", "Sécurité", "Accueil", "Intercession", "Jeunesse", "Média", "Protocole", "Logistique",
+  "Trompette", "Hôtesse", "Huissier", "Communication", "Informatique", "Restauration",
+  "Humanitaire", "Moniteur", "Interprète", "Décoration", "Transport", "Comptabilité", "Entretien",
 ];
 
 function LibelleStatutImport({ statut }) {
@@ -36,7 +39,8 @@ export default function OuvriersPage() {
     setChargement(true);
     setErreur(null);
     try {
-      const params = recherche ? { recherche } : {};
+      const params = { limit: 500 };
+      if (recherche) params.recherche = recherche;
       const data = await api.getOuvriers(params);
       setOuvriers(data.ouvriers);
       setTotal(data.total);
@@ -56,7 +60,11 @@ export default function OuvriersPage() {
     setEnvoi(true);
     setErreur(null);
     try {
-      await api.createOuvrier(form);
+      await api.createOuvrier({
+        nom: form.nom,
+        prenom: form.prenom,
+        departementNom: form.departement,
+      });
       setModalOuvert(false);
       setForm({ nom: "", prenom: "", departement: "" });
       charger();
@@ -81,7 +89,7 @@ export default function OuvriersPage() {
       setErreur(err instanceof ApiError ? err.message : "Erreur lors de l'import");
     } finally {
       setImportEnCours(false);
-      e.target.value = ""; // permet de réimporter le même fichier si besoin
+      e.target.value = "";
     }
   }
 
@@ -190,7 +198,7 @@ export default function OuvriersPage() {
                 <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
                 <td className="px-3 py-2">{o.nom}</td>
                 <td className="px-3 py-2">{o.prenom}</td>
-                <td className="px-3 py-2">{o.departement}</td>
+                <td className="px-3 py-2">{libelleDepartement(o)}</td>
                 <td className="px-3 py-2">
                   <span
                     className={`text-xs px-2 py-1 rounded-full ${
@@ -245,7 +253,9 @@ export default function OuvriersPage() {
               className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"
             />
             <datalist id="departements">
-              {DEPARTEMENTS_SUGGESTIONS.map((d) => <option key={d} value={d} />)}
+              {DEPARTEMENTS_SUGGESTIONS.map((d) => (
+                <option key={d} value={d} />
+              ))}
             </datalist>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setModalOuvert(false)} className="text-sm text-slate-500 px-3 py-2">
@@ -272,8 +282,15 @@ export default function OuvriersPage() {
             </h2>
             <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-64" />
             <p className="text-xs font-mono text-slate-500">{badgeOuvrier?.matricule}</p>
+            {badgeOuvrier && (
+              <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>
+            )}
             <button
-              onClick={() => { URL.revokeObjectURL(badgeUrl); setBadgeUrl(null); setBadgeOuvrier(null); }}
+              onClick={() => {
+                URL.revokeObjectURL(badgeUrl);
+                setBadgeUrl(null);
+                setBadgeOuvrier(null);
+              }}
               className="text-sm text-slate-600"
             >
               Fermer

@@ -69,6 +69,32 @@ router.post("/", async (req, res) => {
       });
     }
 
+        // 3bis. Un seul badgeage autorisé par jour civil
+    const debutJournee = new Date();
+    debutJournee.setHours(0, 0, 0, 0);
+    const finJournee = new Date();
+    finJournee.setHours(23, 59, 59, 999);
+
+    const dejaBadgeAujourdhui = await prisma.pointage.findFirst({
+      where: {
+        ouvrierId: ouvrier.id,
+        dateHeure: { gte: debutJournee, lte: finJournee },
+      },
+      orderBy: { dateHeure: "desc" },
+    });
+
+    if (dejaBadgeAujourdhui) {
+      const heure = dejaBadgeAujourdhui.dateHeure.toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return res.status(409).json({
+        ok: false,
+        code: "DEJA_BADGE_AUJOURDHUI",
+        message: `Vous avez déjà badgé aujourd'hui à ${heure}`,
+      });
+    }
+    
     // 4. Badge valide => on enregistre le pointage (dateHeure = heure serveur)
     //    L'heure vient du serveur, pas du terminal : évite les horloges déréglées.
     await prisma.pointage.create({

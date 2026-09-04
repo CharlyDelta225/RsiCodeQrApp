@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { isAuthenticated, clearSession } from "../lib/auth";
+import { isAuthenticated, clearSession, stopInactivityWatcher } from "../lib/auth";
 
 /**
  * Bloque l'accès si aucun token n'est stocké, et se désabonne proprement
@@ -12,6 +12,7 @@ export default function ProtectedRoute({ children }) {
 
   useEffect(() => {
     function handleUnauthorized() {
+      stopInactivityWatcher();
       clearSession();
       setAuthed(false);
     }

@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
+import { libelleDepartement } from "../lib/departement";
 
 const LIMIT = 50;
+const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
 function dateDuJour(decalageJours = 0) {
   const d = new Date();
@@ -22,7 +24,6 @@ function formatDateHeure(iso) {
   });
 }
 
-// Échappe une valeur pour l'insérer dans un CSV (guillemets doublés si présents).
 function csvValeur(v) {
   const s = String(v ?? "");
   return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -39,15 +40,13 @@ export default function HistoriquePage() {
   const [au, setAu] = useState(dateDuJour(0));
   const [ouvrierId, setOuvrierId] = useState("");
   const [ouvriers, setOuvriers] = useState([]);
+  const [jourSemaine, setJourSemaine] = useState("");
 
-  // Charge la liste des ouvriers une seule fois pour peupler le filtre.
   useEffect(() => {
     api
-      .getOuvriers({ limit: 200 })
+      .getOuvriers({ limit: 500 })
       .then((data) => setOuvriers(data.ouvriers))
-      .catch(() => {
-        /* le filtre par ouvrier reste juste vide en cas d'échec, non bloquant */
-      });
+      .catch(() => {});
   }, []);
 
   const charger = useCallback(async () => {
@@ -79,22 +78,33 @@ export default function HistoriquePage() {
   function handleExporterCsv() {
     const entete = ["Date/heure", "Matricule", "Nom", "Prénom", "Département"];
     const lignes = pointages.map((p) =>
-      [formatDateHeure(p.dateHeure), p.ouvrier?.matricule, p.ouvrier?.nom, p.ouvrier?.prenom, p.ouvrier?.departement]
+      [
+        formatDateHeure(p.dateHeure),
+        p.ouvrier?.matricule,
+        p.ouvrier?.nom,
+        p.ouvrier?.prenom,
+        libelleDepartement(p.ouvrier),
+      ]
         .map(csvValeur)
         .join(";")
     );
-    // BOM UTF-8 pour qu'Excel affiche correctement les accents
     const csv = "\uFEFF" + [entete.join(";"), ...lignes].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     telechargerBlob(blob, `historique-pointages_${du}_a_${au}_page${page}.csv`);
   }
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const pointagesAffiches =
+    jourSemaine === ""
+      ? pointages
+      : pointages.filter((p) => new Date(p.dateHeure).getDay() === Number(jourSemaine));
 
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-gray-700">{total} pointage(s) sur la période</h2>
+        <h2 className="text-sm font-semibold text-gray-700">
+          {pointagesAffiches.length} pointage(s) affiché(s) sur {total}
+        </h2>
         <button
           onClick={handleExporterCsv}
           disabled={pointages.length === 0}
@@ -105,10 +115,15 @@ export default function HistoriquePage() {
       </div>
 
       {erreur && (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erreur}</p>
+        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {erreur}
+        </p>
       )}
 
-      <form onSubmit={handleFiltrer} className="flex flex-wrap items-end gap-2 bg-white border border-slate-200 rounded-xl p-3">
+      <form
+        onSubmit={handleFiltrer}
+        className="flex flex-wrap items-end gap-2 bg-white border border-slate-200 rounded-xl p-3"
+      >
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-500">Du</label>
           <input
@@ -142,6 +157,21 @@ export default function HistoriquePage() {
             ))}
           </select>
         </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-500">Jour de la semaine</label>
+          <select
+            value={jourSemaine}
+            onChange={(e) => setJourSemaine(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"
+          >
+            <option value="">Tous les jours</option>
+            {JOURS.map((nom, index) => (
+              <option key={index} value={index}>
+                {nom}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           type="submit"
           className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 rounded-lg px-3 py-2"
@@ -163,18 +193,26 @@ export default function HistoriquePage() {
           </thead>
           <tbody>
             {chargement && (
-              <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-400">Chargement…</td></tr>
+              <tr>
+                <td colSpan={5} className="px-3 py-4 text-center text-slate-400">
+                  Chargement…
+                </td>
+              </tr>
             )}
-            {!chargement && pointages.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-400">Aucun pointage sur cette période</td></tr>
+            {!chargement && pointagesAffiches.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-3 py-4 text-center text-slate-400">
+                  Aucun pointage sur cette période
+                </td>
+              </tr>
             )}
-            {pointages.map((p) => (
+            {pointagesAffiches.map((p) => (
               <tr key={p.id} className="border-t border-slate-100">
                 <td className="px-3 py-2 text-xs">{formatDateHeure(p.dateHeure)}</td>
                 <td className="px-3 py-2 font-mono text-xs">{p.ouvrier?.matricule}</td>
                 <td className="px-3 py-2">{p.ouvrier?.nom}</td>
                 <td className="px-3 py-2">{p.ouvrier?.prenom}</td>
-                <td className="px-3 py-2">{p.ouvrier?.departement}</td>
+                <td className="px-3 py-2">{libelleDepartement(p.ouvrier)}</td>
               </tr>
             ))}
           </tbody>
@@ -190,7 +228,9 @@ export default function HistoriquePage() {
           >
             ← Précédent
           </button>
-          <span className="text-slate-500">Page {page} / {totalPages}</span>
+          <span className="text-slate-600">
+            Page {page} / {totalPages}
+          </span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}

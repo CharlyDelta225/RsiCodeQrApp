@@ -3,6 +3,9 @@
 const TOKEN_KEY = "rsi_token";
 const ADMIN_KEY = "rsi_admin";
 
+const INACTIVITY_MS = 10 * 60 * 1000; // 10 minutes
+let inactivityTimer = null;
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -26,10 +29,38 @@ export function isAuthenticated() {
   return !!getToken();
 }
 
-// Déconnexion volontaire (bouton "Se déconnecter") : on nettoie la session
-// et on réutilise l'événement "rsi:unauthorized" déjà écouté par
-// ProtectedRoute (voir lib/api.js) pour renvoyer proprement vers /login.
+// Déconnexion volontaire (bouton) ou forcée (inactivité)
 export function logout() {
+  stopInactivityWatcher();
   clearSession();
   window.dispatchEvent(new CustomEvent("rsi:unauthorized"));
+}
+
+function resetInactivityTimer() {
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(() => {
+    logout();
+  }, INACTIVITY_MS);
+}
+
+export function startInactivityWatcher() {
+  stopInactivityWatcher();
+
+  const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+  events.forEach((evt) =>
+    window.addEventListener(evt, resetInactivityTimer, { passive: true })
+  );
+
+  resetInactivityTimer();
+}
+
+export function stopInactivityWatcher() {
+  if (inactivityTimer) {
+    clearTimeout(inactivityTimer);
+    inactivityTimer = null;
+  }
+  const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+  events.forEach((evt) =>
+    window.removeEventListener(evt, resetInactivityTimer)
+  );
 }
