@@ -19,7 +19,7 @@ const router = Router();
  *       "matricule": "RSI-0001",
  *       "nom": "...",
  *       "prenom": "...",
- *       "departement": "..."
+ *       "departement": "..."   // premier département trouvé (ou null)
  *     }
  *   }
  *
@@ -43,6 +43,12 @@ router.post("/", async (req, res) => {
     // 1. Recherche de l'ouvrier par son matricule (unique en base)
     const ouvrier = await prisma.ouvrier.findUnique({
       where: { matricule },
+      include: {
+        departements: {
+          include: { departement: { select: { id: true, nom: true } } },
+          take: 1,
+        },
+      },
     });
 
     // 2. Badge inconnu => erreur explicite
@@ -80,7 +86,7 @@ router.post("/", async (req, res) => {
         matricule: ouvrier.matricule,
         nom: ouvrier.nom,
         prenom: ouvrier.prenom,
-        departement: ouvrier.departement,
+        departement: ouvrier.departements[0]?.departement?.nom ?? null,
       },
     });
   } catch (err) {

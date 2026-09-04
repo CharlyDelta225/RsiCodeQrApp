@@ -1,6 +1,6 @@
 # RsiCodeQrApp — Badgeage QR pour ouvriers d'église
 
-Système de **badgeage par QR code** : chaque ouvrier reçoit un badge avec un QR code ; une douchette scanne le QR au kiosque (terminal), le matricule est envoyé à l'API qui enregistre le pointage et renvoie les infos de l'ouvrier. Un dashboard permet à l'équipe de gérer les ouvriers et de consulter l'historique.
+Système de **badgeage par QR code** : chaque ouvrier reçoit un badge avec un QR code ; une douchette scanne le QR au kiosque (terminal), le matricule est envoyé à l'API qui enregistre le pointage et renvoie les infos de l'ouvrier. Un dashboard permet à l'équipe de gérer les ouvriers, les départements et de consulter l'historique.
 
 **Monorepo** : backend API (notre travail) + deux dossiers frontend réservés à l'équipe frontend.
 
@@ -8,15 +8,14 @@ Système de **badgeage par QR code** : chaque ouvrier reçoit un badge avec un Q
 RsiCodeQrApp/
 ├── backend/                ← API Node.js/Express + PostgreSQL/Prisma
 │   ├── src/                ← code applicatif
-│   │   ├── routes/         ← endpoints (badgeage, auth, ouvriers, pointages, admins, import)
-│   │   ├── middleware/     ← requAuth + requireRole
+│   │   ├── routes/         ← endpoints (badgeage, auth, ouvriers, pointages, admins, import, départements)
+│   │   ├── middleware/     ← requireAuth + requireRole
 │   │   ├── lib/            ← prisma client, générateur de matricule
-│   │   └── scripts/        ← seed, import CSV, génération de badges
+│   │   └── scripts/        ← seed, reset-admin-password
 │   ├── prisma/             ← schéma + migrations
 │   ├── tests/              ← tests d'intégration (node:test)
 │   ├── data/               ← exemple de fichier CSV
-│   ├── public/badges/      ← QR codes générés (à imprimer)
-│   └── docs/ → ../docs
+│   └── public/badges/      ← QR codes générés (à imprimer)
 ├── frontend/dashboard/     ← (équipe front) gestion + historique
 ├── frontend/terminal/      ← (équipe front) kiosque de badgeage
 └── docs/api-contrat.md     ← contrat d'API partagé avec l'équipe front
@@ -29,7 +28,7 @@ RsiCodeQrApp/
 - **Backend** : Node.js (ESM) + Express 5
 - **Base de données** : PostgreSQL 18 + Prisma ORM 6
 - **Auth** : JWT (jsonwebtoken) + bcryptjs
-- **QR codes** : `qrcode` (PNG)
+- **QR codes** : `qrcode` (PNG) + `archiver` (ZIP bulk)
 - **Import** : `multer` (upload) + `xlsx` (parse .csv et .xlsx)
 - **Déploiement** : préparation Railway (`railway.toml`) et Render (`render.yaml`)
 
@@ -59,6 +58,20 @@ npm start               # => http://localhost:3000
 
 Vérifier : `GET /api/health` → `{ "status": "ok", ... }`
 
+### Lancer le dashboard (frontend)
+
+```bash
+cd frontend/dashboard
+npm install
+npm run dev             # => http://localhost:5173
+```
+
+> Connexion avec le compte seed : `admin@example.com` / `change-moi`
+
+### Terminal kiosque
+
+Le terminal est servi directement par le backend : http://localhost:3000/terminal
+
 > Sur Windows, npm 11 bloque les scripts d'installation des moteurs Prisma : la config `allowScripts` dans `backend/package.json` règle ce point. Le miroir `registry.npmmirror.com` dans `.npmrc` facilite l'install si le réseau est instable.
 
 ---
@@ -77,27 +90,82 @@ Vérifier : `GET /api/health` → `{ "status": "ok", ... }`
 
 ---
 
+## Modèle de données — Départements
+
+Les ouvriers sont rattachés à un ou **plusieurs départements** via une table de jonction `OuvrierDepartement` avec un poste par département.
+
+```
+Ouvrier ──< OuvrierDepartement >── Departement
+                  roleDansDepartement
+                  (RESPONSABLE / ADJOINT / SECRETAIRE / MEMBRE)
+```
+
+- **Un seul RESPONSABLE** par département (vérif côté back).
+- **Un seul ADJOINT** par département (idem).
+- Un ouvrier peut être dans **plusieurs départements** (chorale + accueil par ex.).
+
+---
+
 ## Principaux endpoints
+
+### Badgeage (public)
+
+| Méthode | Route | Description |
+|---|---|---|
+| `POST` | `/api/badgeage` | Badgeage : `{ "matricule" }` → infos ouvrier + pointage |
+
+### Authentification
 
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
-| `POST` | `/api/badgeage` | public | Badgeage : `{ "matricule" }` → infos ouvrier + pointage |
 | `POST` | `/api/auth/login` | public | Connexion → token JWT |
 | `POST` | `/api/auth/register` | public | Créer un compte (LECTEUR) |
 | `GET` | `/api/auth/me` | authentifié | Infos du compte |
-| `GET` | `/api/admins` | SUPER_ADMIN | Liste des comptes |
-| `PATCH` | `/api/admins/:id/role` | SUPER_ADMIN | Changer un rôle |
+
+### Admins (SUPER_ADMIN)
+
+| Méthode | Route | Description |
+|---|---|---|
+| `GET` | `/api/admins` | Liste des comptes |
+| `PATCH` | `/api/admins/:id/role` | Changer un rôle |
+
+### Ouvriers
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
 | `GET` | `/api/ouvriers` | tous | Liste paginée + recherche |
-| `POST` | `/api/ouvriers` | ADMIN/SUPER | Créer un ouvrier |
+| `POST` | `/api/ouvriers` | ADMIN/SUPER | Créer (accepte `departementId` ou `departementNom`) |
 | `PATCH` | `/api/ouvriers/:id` | ADMIN/SUPER | Modifier |
 | `PATCH` | `/api/ouvriers/:id/activer` | ADMIN/SUPER | Activer le badge |
 | `PATCH` | `/api/ouvriers/:id/desactiver` | ADMIN/SUPER | Désactiver le badge |
-| `DELETE` | `/api/ouvriers/:id` | ADMIN/SUPER | Supprimer (+ pointages) |
+| `DELETE` | `/api/ouvriers/:id` | ADMIN/SUPER | Supprimer (+ pointages + liaisons) |
 | `GET` | `/api/ouvriers/:id/badge` | tous | PNG du QR code |
+| `GET` | `/api/ouvriers/badges/zip` | tous | ZIP de tous les badges QR |
 | `POST` | `/api/ouvriers/import` | ADMIN/SUPER | Import massif .csv/.xlsx + QR auto |
+
+### Départements
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| `GET` | `/api/departements` | tous | Liste avec compteurs membres |
+| `GET` | `/api/departements/:id` | tous | Détail + membres |
+| `GET` | `/api/departements/:id/membres` | tous | Membres détaillés |
+| `POST` | `/api/departements` | ADMIN/SUPER | Créer un département |
+| `PATCH` | `/api/departements/:id` | ADMIN/SUPER | Modifier |
+| `DELETE` | `/api/departements/:id` | ADMIN/SUPER | Supprimer |
+| `POST` | `/api/departements/:id/membres` | ADMIN/SUPER | Ajouter/affecter un ouvrier (avec poste) |
+| `PATCH` | `/api/departements/:id/membres/:ouvrierId` | ADMIN/SUPER | Changer le poste |
+| `DELETE` | `/api/departements/:id/membres/:ouvrierId` | ADMIN/SUPER | Retirer un membre |
+
+### Pointages
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
 | `GET` | `/api/pointages` | tous | Historique (filtres du/au, ouvrier, pagination) |
 
 Le contrat détaillé (formats de requête/réponse, codes d'erreur) est dans **`docs/api-contrat.md`**.
+
+---
 
 ### Import massif d'ouvriers
 
@@ -110,6 +178,8 @@ FOFANA,Ibrahim,Logistique
 ```
 
 - Le **matricule** est auto-généré (`RSI-XXXX`) et le **QR badge** créé automatiquement.
+- Le département est créé automatiquement s'il n'existe pas encore.
+- Si l'ouvrier (nom+prénom) existe déjà, on ajoute juste la liaison au département.
 - Doublons (même Nom+Prénom+Département) → ignorés ; champs vides → ligne en erreur.
 
 ```powershell

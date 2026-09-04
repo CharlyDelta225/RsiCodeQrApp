@@ -9,7 +9,7 @@ const router = Router();
  *   ?du=YYYY-MM-DD&au=YYYY-MM-DD   filtre par plage de dates
  *   ?ouvrierId=uuid                 filtre par ouvrier
  *   ?page=1&limit=50                pagination (défauts : page 1, limit 50)
- * Réponse : { ok: true, total, page, limit, pointages: [ { id, dateHeure, type, ouvrier: { id, matricule, nom, prenom, departement } } ] }
+ * Réponse : { ok: true, total, page, limit, pointages: [ { id, dateHeure, type, ouvrier: { id, matricule, nom, prenom, departements: [...] } } ] }
  */
 router.get("/", async (req, res) => {
   try {
@@ -45,7 +45,9 @@ router.get("/", async (req, res) => {
               matricule: true,
               nom: true,
               prenom: true,
-              departement: true,
+              departements: {
+                select: { departement: { select: { id: true, nom: true } } },
+              },
             },
           },
         },

@@ -19,7 +19,6 @@ function extraireChamps(body) {
   if (body.matricule !== undefined) donnees.matricule = String(body.matricule).trim();
   if (body.nom !== undefined) donnees.nom = String(body.nom).trim();
   if (body.prenom !== undefined) donnees.prenom = String(body.prenom).trim();
-  if (body.departement !== undefined) donnees.departement = String(body.departement).trim();
   if (body.photoUrl !== undefined) donnees.photoUrl = String(body.photoUrl).trim() || null;
   if (body.actif !== undefined) donnees.actif = Boolean(body.actif);
   return donnees;
@@ -29,7 +28,7 @@ function extraireChamps(body) {
  * GET /api/ouvriers
  * Liste les ouvriers. Query optionnels :
  *   ?actif=true|false     filtre par état
- *   ?recherche=texte      filtre sur nom/prenom/departement (insensible à la casse)
+ *   ?recherche=texte      filtre sur nom/prenom/matricule (insensible à la casse)
  *   ?page=1&limit=50      pagination (défauts : page 1, limit 50)
  * Réponse : { ok: true, total, page, limit, ouvriers: [...] }
  */
@@ -47,7 +46,6 @@ router.get("/", async (req, res) => {
       ou.OR = [
         { nom: { contains: recherche, mode: "insensitive" } },
         { prenom: { contains: recherche, mode: "insensitive" } },
-        { departement: { contains: recherche, mode: "insensitive" } },
         { matricule: { contains: recherche, mode: "insensitive" } },
       ];
     }
@@ -59,6 +57,11 @@ router.get("/", async (req, res) => {
         orderBy: { nom: "asc" },
         skip: (page - 1) * limit,
         take: limit,
+        include: {
+          departements: {
+            include: { departement: { select: { id: true, nom: true } } },
+          },
+        },
       }),
     ]);
 
@@ -75,7 +78,7 @@ router.get("/", async (req, res) => {
  * attribuer précisément un badge imprimé à chaque ouvrier avant impression.
  * Query optionnels :
  *   ?actif=true|false     filtre par état (défaut : tous)
- *   ?departement=texte    filtre par département (insensible à la casse)
+ *   ?departementId=uuid   filtre par département (via la table de jonction)
  * Nom de fichier dans le ZIP : "<matricule>_<NOM>_<Prenom>.png"
  * Placée avant "/:id" pour rester lisible, même si aucun conflit de route
  * réel (ce chemin a deux segments, "/:id" et "/:id/badge" n'interceptent
@@ -86,8 +89,8 @@ router.get("/badges/zip", async (req, res) => {
     const ou = {};
     if (req.query.actif === "true") ou.actif = true;
     if (req.query.actif === "false") ou.actif = false;
-    if (req.query.departement) {
-      ou.departement = { equals: String(req.query.departement), mode: "insensitive" };
+    if (req.query.departementId) {
+      ou.departements = { some: { departementId: req.query.departementId } };
     }
 
     const ouvriers = await prisma.ouvrier.findMany({ where: ou, orderBy: { nom: "asc" } });
@@ -144,7 +147,14 @@ router.get("/badges/zip", async (req, res) => {
  */
 router.get("/:id", async (req, res) => {
   try {
-    const ouvrier = await prisma.ouvrier.findUnique({ where: { id: req.params.id } });
+    const ouvrier = await prisma.ouvrier.findUnique({
+      where: { id: req.params.id },
+      include: {
+        departements: {
+          include: { departement: { select: { id: true, nom: true } } },
+        },
+      },
+    });
     if (!ouvrier) {
       return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
     }
@@ -158,19 +168,20 @@ router.get("/:id", async (req, res) => {
 /**
  * POST /api/ouvriers
  * Crée un ouvrier. Body :
- *   { "nom": "...", "prenom": "...", "departement": "...", "photoUrl": "..."?, "actif": true? }
- * Champs requis : nom, prenom, departement.
+ *   { "nom": "...", "prenom": "...", "departementId": "..."?, "departementNom": "..."?, "photoUrl": "..."?, "actif": true? }
+ * Champs requis : nom, prenom.
+ * Si departementId ou departementNom est fourni, une liaison OuvrierDepartement est créée (role MEMBRE par défaut).
  * Matricule généré automatiquement si absent.
  */
 router.post("/", ECRITURE, async (req, res) => {
   try {
-    const { nom, prenom, departement } = req.body ?? {};
+    const { nom, prenom, departementId, departementNom } = req.body ?? {};
 
-    if (!nom || !prenom || !departement) {
+    if (!nom || !prenom) {
       return res.status(400).json({
         ok: false,
         code: "CHAMPS_MANQUANTS",
-        message: "Les champs nom, prenom et departement sont requis",
+        message: "Les champs nom et prenom sont requis",
       });
     }
 
@@ -179,8 +190,36 @@ router.post("/", ECRITURE, async (req, res) => {
       donnees.matricule = await genererMatricule();
     }
 
+    // Créer l'ouvrier
     const ouvrier = await prisma.ouvrier.create({ data: donnees });
-    return res.status(201).json({ ok: true, ouvrier });
+
+    // Créer la liaison département si fourni
+    let departementIdFinal = departementId || null;
+    if (!departementIdFinal && departementNom) {
+      const dept = await prisma.departement.findUnique({ where: { nom: String(departementNom).trim() } });
+      if (dept) departementIdFinal = dept.id;
+    }
+    if (departementIdFinal) {
+      await prisma.ouvrierDepartement.create({
+        data: {
+          ouvrierId: ouvrier.id,
+          departementId: departementIdFinal,
+          roleDansDepartement: "MEMBRE",
+        },
+      });
+    }
+
+    // Recharger avec les départements
+    const ouvrierComplet = await prisma.ouvrier.findUnique({
+      where: { id: ouvrier.id },
+      include: {
+        departements: {
+          include: { departement: { select: { id: true, nom: true } } },
+        },
+      },
+    });
+
+    return res.status(201).json({ ok: true, ouvrier: ouvrierComplet });
   } catch (err) {
     // 2002 = unicité violée (matricule déjà pris)
     if (err.code === "P2002") {
@@ -202,7 +241,15 @@ router.patch("/:id", ECRITURE, async (req, res) => {
       return res.status(400).json({ ok: false, code: "AUCUNE_DONNEE", message: "Aucune donnée à mettre à jour" });
     }
 
-    const ouvrier = await prisma.ouvrier.update({ where: { id: req.params.id }, data: donnees });
+    const ouvrier = await prisma.ouvrier.update({
+      where: { id: req.params.id },
+      data: donnees,
+      include: {
+        departements: {
+          include: { departement: { select: { id: true, nom: true } } },
+        },
+      },
+    });
     return res.json({ ok: true, ouvrier });
   } catch (err) {
     if (err.code === "P2025") {
