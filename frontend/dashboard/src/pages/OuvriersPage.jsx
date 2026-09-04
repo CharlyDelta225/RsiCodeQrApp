@@ -8,10 +8,10 @@ const DEPARTEMENTS_SUGGESTIONS = [
 function LibelleStatutImport({ statut }) {
   const style = {
     cree: "text-green-700",
-    maj: "text-blue-700",
+    ignore: "text-slate-500",
     erreur: "text-red-700",
   }[statut] || "text-slate-600";
-  const libelle = { cree: "créé", maj: "mis à jour", erreur: "erreur" }[statut] || statut;
+  const libelle = { cree: "créé", ignore: "ignoré (doublon)", erreur: "erreur" }[statut] || statut;
   return <span className={style}>[{libelle}]</span>;
 }
 
@@ -139,15 +139,16 @@ export default function OuvriersPage() {
       {resultatImport && (
         <div className="text-sm bg-white border border-slate-200 rounded-lg p-4 space-y-2">
           <p className="font-medium text-slate-900">
-            Import terminé : {resultatImport.crees} créé(s), {resultatImport.maj} mis à jour,{" "}
+            Import terminé : {resultatImport.creees} créé(s), {resultatImport.ignorees} ignoré(s),{" "}
             {resultatImport.erreurs} en erreur.
           </p>
           <ul className="text-xs text-slate-600 space-y-1 max-h-40 overflow-y-auto">
-            {resultatImport.details.map((d, i) => (
+            {resultatImport.detail.map((d, i) => (
               <li key={i}>
-                <span className="text-slate-400">ligne {d.ligne} —</span> <LibelleStatutImport statut={d.statut} />
+                <span className="text-slate-400">{d.prenom} {d.nom} ({d.departement || "—"}) —</span>{" "}
+                <LibelleStatutImport statut={d.statut} />
                 {d.matricule ? ` ${d.matricule}` : ""}
-                {d.message ? ` (${d.message})` : ""}
+                {d.raison ? ` (${d.raison})` : ""}
               </li>
             ))}
           </ul>

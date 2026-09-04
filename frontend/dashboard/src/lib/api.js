@@ -76,13 +76,13 @@ export const api = {
   // (pas d'en-tête Authorization sur une balise <img>). On récupère le PNG en
   // blob authentifié, l'appelant fait URL.createObjectURL(blob) pour l'afficher.
   getOuvrierBadgeBlob: (id) => request(`/api/ouvriers/${id}/badge`),
-  // Import en masse depuis un fichier .xlsx (colonnes Nom/Prénom/Département,
-  // Matricule optionnel). Réponse réelle du backend (testée) :
-  // { ok, crees, maj, erreurs, details: [{ligne, statut, matricule?, message?}] }
+  // Import en masse depuis un fichier .csv/.xlsx (colonnes Nom/Prénom/Département,
+  // Matricule généré automatiquement). Réponse réelle du backend :
+  // { ok, creees, ignorees, erreurs, detail: [{nom, prenom, departement, matricule?, statut, raison?}] }
   importOuvriers: (fichier) => {
     const formData = new FormData();
     formData.append("fichier", fichier);
-    return request("/api/ouvriers/import-excel", { method: "POST", body: formData });
+    return request("/api/ouvriers/import", { method: "POST", body: formData });
   },
   // ZIP de tous les badges (ouvriers actifs par défaut) — pour impression en masse.
   getBadgesZipBlob: (params = {}) => {

@@ -161,6 +161,18 @@ Supprime l'ouvrier et ses pointages (cascade).
 ### `GET /api/ouvriers/:id/badge`
 Renvoie le **PNG du QR code** du badge (type `image/png`) — pour prévisualiser/imprimer.
 
+### `GET /api/ouvriers/badges/zip`
+Télécharge un **ZIP** contenant le QR code PNG de chaque ouvrier (un fichier par
+ouvrier, nommé `<matricule>_<NOM>_<Prenom>.png`) — pour attribuer précisément
+un badge imprimé à chaque ouvrier avant impression en masse.
+
+Query optionnels :
+- `actif=true|false` — filtre par état (défaut : tous)
+- `departement=texte` — filtre par département (insensible à la casse)
+
+Réponse 200 : `application/zip`. Réponse 404 si aucun ouvrier ne correspond
+aux filtres : `{ "ok": false, "code": "AUCUN_OUVRIER", ... }`.
+
 ### `POST /api/ouvriers/import` (protégé)
 Import **massif** d'ouvriers depuis un fichier `.csv` ou `.xlsx` (multipart/form-data, champ `fichier`). Crée automatiquement un matricule et un QR badge par ouvrier.
 
@@ -227,6 +239,7 @@ Query optionnels :
 
 | Date | Changement |
 |---|---|
+| 2026-09-04 | Ajout de `GET /api/ouvriers/badges/zip` (ZIP de tous les QR codes, filtrable par `actif`/`departement`) |
 | 2026-09-03 | Ajout de `POST /api/ouvriers/import` (import massif .csv/.xlsx + QR auto) |
 | 2026-09-03 | Ajout des rôles (`RoleAdmin`) : login/me renvoient `role`, register réservé au SUPER_ADMIN, écritures ouvriers/import réservées à ADMIN/SUPER_ADMIN |
 | 2026-09-03 | Register rendu **public** (tout inscrit = `LECTEUR`) + ajout de `GET /api/admins` et `PATCH /api/admins/:id/role` (gestion des rôles par SUPER_ADMIN, auto-rétrogradation bloquée) |

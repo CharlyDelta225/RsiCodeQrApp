@@ -26,6 +26,7 @@
   "private": true,
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import QRCode from "qrcode";
+import archiver from "archiver";
 import prisma from "../lib/prisma.js";
 import { genererMatricule } from "../lib/matricule.js";
 import { requireRole } from "../middleware/auth.middleware.js";
@@ -65,6 +66,75 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("[OUVRIERS/LISTE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
+  }
+});
+
+/**
+ * GET /api/ouvriers/badges/zip
+ * Télécharge un ZIP contenant le QR code (PNG) de chaque ouvrier — pour
+ * attribuer précisément un badge imprimé à chaque ouvrier avant impression.
+ * Query optionnels :
+ *   ?actif=true|false     filtre par état (défaut : tous)
+ *   ?departement=texte    filtre par département (insensible à la casse)
+ * Nom de fichier dans le ZIP : "<matricule>_<NOM>_<Prenom>.png"
+ * Placée avant "/:id" pour rester lisible, même si aucun conflit de route
+ * réel (ce chemin a deux segments, "/:id" et "/:id/badge" n'interceptent
+ * jamais "/badges/zip").
+ */
+router.get("/badges/zip", async (req, res) => {
+  try {
+    const ou = {};
+    if (req.query.actif === "true") ou.actif = true;
+    if (req.query.actif === "false") ou.actif = false;
+    if (req.query.departement) {
+      ou.departement = { equals: String(req.query.departement), mode: "insensitive" };
+    }
+
+    const ouvriers = await prisma.ouvrier.findMany({ where: ou, orderBy: { nom: "asc" } });
+
+    if (ouvriers.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        code: "AUCUN_OUVRIER",
+        message: "Aucun ouvrier ne correspond aux filtres fournis",
+      });
+    }
+
+    // Retire les caractères interdits dans un nom de fichier Windows/Unix
+    const nettoyer = (s) => String(s ?? "").replace(/[\\/:*?"<>|]/g, "").trim();
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="badges-qr-${new Date().toISOString().slice(0, 10)}.zip"`
+    );
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.on("error", (err) => {
+      console.error("[OUVRIERS/BADGES_ZIP]", err);
+      // Le flux a peut-être déjà commencé : on ne peut plus renvoyer de JSON,
+      // on coupe juste la réponse proprement.
+      res.end();
+    });
+    archive.pipe(res);
+
+    for (const o of ouvriers) {
+      const png = await QRCode.toBuffer(o.matricule, {
+        width: 600,
+        margin: 2,
+        errorCorrectionLevel: "Q",
+      });
+      const nomFichier = `${nettoyer(o.matricule)}_${nettoyer(o.nom)}_${nettoyer(o.prenom)}.png`;
+      archive.append(png, { name: nomFichier });
+    }
+
+    await archive.finalize();
+  } catch (err) {
+    console.error("[OUVRIERS/BADGES_ZIP]", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
+    }
+    res.end();
   }
 });
 
