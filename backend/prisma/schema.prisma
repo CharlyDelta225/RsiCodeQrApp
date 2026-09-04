@@ -30,17 +30,53 @@ enum RoleAdmin {
   LECTEUR
 }
 
+// Poste d'un ouvrier dans un département donné.
+// RESPONSABLE et ADJOINT sont uniques par département (vérif côté back).
+enum RoleDepartement {
+  RESPONSABLE
+  ADJOINT
+  SECRETAIRE
+  MEMBRE
+}
+
+model Departement {
+  id          String  @id @default(uuid())
+  nom         String  @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  membres OuvrierDepartement[]
+
+  @@map("Departement")
+}
+
+// Table de jonction Ouvrier ↔ Département (many-to-many) avec poste.
+model OuvrierDepartement {
+  id                String          @id @default(uuid())
+  ouvrierId         String
+  departementId     String
+  roleDansDepartement RoleDepartement @default(MEMBRE)
+  createdAt         DateTime        @default(now())
+
+  ouvrier     Ouvrier     @relation(fields: [ouvrierId], references: [id], onDelete: Cascade)
+  departement Departement @relation(fields: [departementId], references: [id], onDelete: Cascade)
+
+  @@unique([ouvrierId, departementId])
+  @@index([departementId])
+  @@map("OuvrierDepartement")
+}
+
 model Ouvrier {
   id          String  @id @default(uuid())
   matricule   String  @unique // encodé dans le QR code
   nom         String
   prenom      String
-  departement String
   photoUrl    String? // optionnel
   actif       Boolean @default(true) // badge valide tant qu'actif = true
   createdAt   DateTime @default(now())
 
-  pointages Pointage[]
+  pointages   Pointage[]
+  departements OuvrierDepartement[]
 
   @@map("Ouvrier")
 }

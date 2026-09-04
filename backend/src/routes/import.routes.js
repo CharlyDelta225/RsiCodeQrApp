@@ -57,6 +57,7 @@ async function genererBadge(ouvrier) {
  *   - Colonnes obligatoires : Nom, Prénom, Département
  *   - Lignes vides ignorées
  *   - Doublons (nom+prénom+département) : ligne ignorée
+ *   - Si l'ouvrier existe déjà (nom+prénom), on ajoute juste la liaison au département
  *
  * Réponse : compteur + détail par ligne (créé / ignoré / erreur)
  */
@@ -146,7 +147,7 @@ router.post(
       );
     }
 
-    // Construire une fonction "ligne tabulaire → objet {nom, prenom, departement}"
+    // Construire une fonction "ligne tabulaire → objet {nom, prenom, departementNom}"
     const idx = {
       nom: entete.indexOf("Nom"),
       prenom: entete.indexOf("Prénom"),
@@ -155,7 +156,7 @@ router.post(
     const ligneVersObjet = (l) => ({
       nom: String(l[idx.nom] ?? "").trim().toUpperCase(),
       prenom: String(l[idx.prenom] ?? "").trim(),
-      departement: String(l[idx.departement] ?? "").trim(),
+      departementNom: String(l[idx.departement] ?? "").trim(),
     });
 
     // --- 6. Traitement ligne par ligne ---
@@ -168,7 +169,7 @@ router.post(
       const donnees = ligneVersObjet(ligneBrute);
 
       // Validation : tous les champs requis présents
-      if (!donnees.nom || !donnees.prenom || !donnees.departement) {
+      if (!donnees.nom || !donnees.prenom || !donnees.departementNom) {
         erreurs++;
         detail.push({
           ...donnees,
@@ -182,23 +183,71 @@ router.post(
         continue;
       }
 
-      // Doublon : même nom + prénom + département
-      const doublon = await prisma.ouvrier.findFirst({
-        where: {
-          nom: donnees.nom,
-          prenom: donnees.prenom,
-          departement: donnees.departement,
-        },
+      // Vérifier si l'ouvrier (nom+prénom) existe déjà
+      const ouvrierExistant = await prisma.ouvrier.findFirst({
+        where: { nom: donnees.nom, prenom: donnees.prenom },
       });
 
-      if (doublon) {
-        ignorees++;
+      // Si l'ouvrier existe, vérifier s'il est déjà dans ce département
+      if (ouvrierExistant) {
+        const deptExistant = await prisma.departement.findUnique({ where: { nom: donnees.departementNom } });
+        if (deptExistant) {
+          const liaisonExistante = await prisma.ouvrierDepartement.findUnique({
+            where: {
+              ouvrierId_departementId: {
+                ouvrierId: ouvrierExistant.id,
+                departementId: deptExistant.id,
+              },
+            },
+          });
+          if (liaisonExistante) {
+            ignorees++;
+            detail.push({
+              nom: donnees.nom,
+              prenom: donnees.prenom,
+              departement: donnees.departementNom,
+              statut: "ignore",
+              raison: "doublon",
+            });
+            continue;
+          }
+        }
+
+        // L'ouvrier existe mais pas dans ce département : on ajoute juste la liaison
+        let dept = deptExistant;
+        if (!dept) {
+          dept = await prisma.departement.create({ data: { nom: donnees.departementNom } });
+        }
+        await prisma.ouvrierDepartement.create({
+          data: {
+            ouvrierId: ouvrierExistant.id,
+            departementId: dept.id,
+            roleDansDepartement: "MEMBRE",
+          },
+        });
+
+        // Générer le badge s'il n'en a pas encore
+        const BADGES_DIR_RESOLVED = path.resolve(process.cwd(), "public/badges");
+        const badgeExiste = fs.existsSync(path.join(BADGES_DIR_RESOLVED, `${ouvrierExistant.matricule}.png`));
+        if (!badgeExiste) {
+          await genererBadge(ouvrierExistant);
+        }
+
+        creees++;
         detail.push({
-          ...donnees,
-          statut: "ignore",
-          raison: "doublon",
+          nom: donnees.nom,
+          prenom: donnees.prenom,
+          departement: donnees.departementNom,
+          matricule: ouvrierExistant.matricule,
+          statut: "cree",
         });
         continue;
+      }
+
+      // Créer le département s'il n'existe pas
+      let departement = await prisma.departement.findUnique({ where: { nom: donnees.departementNom } });
+      if (!departement) {
+        departement = await prisma.departement.create({ data: { nom: donnees.departementNom } });
       }
 
       // Créer l'ouvrier (matricule auto-généré, actif par défaut)
@@ -208,7 +257,15 @@ router.post(
           matricule,
           nom: donnees.nom,
           prenom: donnees.prenom,
-          departement: donnees.departement,
+        },
+      });
+
+      // Créer la liaison OuvrierDepartement
+      await prisma.ouvrierDepartement.create({
+        data: {
+          ouvrierId: ouvrier.id,
+          departementId: departement.id,
+          roleDansDepartement: "MEMBRE",
         },
       });
 
@@ -219,7 +276,7 @@ router.post(
       detail.push({
         nom: donnees.nom,
         prenom: donnees.prenom,
-        departement: donnees.departement,
+        departement: donnees.departementNom,
         matricule: ouvrier.matricule,
         statut: "cree",
       });

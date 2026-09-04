@@ -11,6 +11,7 @@ import authRoutes from "./routes/auth.routes.js";
 import requireAuth from "./middleware/auth.middleware.js";
 import importRoutes from "./routes/import.routes.js";
 import adminsRoutes from "./routes/admins.routes.js";
+import departementsRoutes from "./routes/departements.routes.js";
 
 dotenv.config();
 
@@ -56,6 +57,9 @@ app.use("/api/ouvriers", requireAuth, importRoutes);
 
 // Historique des pointages (dashboard) — PROTÉGÉ (JWT admin requis)
 app.use("/api/pointages", requireAuth, pointagesRoutes);
+
+// Gestion des départements + affectation ouvriers — PROTÉGÉ (JWT admin requis)
+app.use("/api/departements", requireAuth, departementsRoutes);
 
 // --- 404 : toute route non déclarée ---
 app.use((req, res) => {
