@@ -12,14 +12,16 @@ export const C = {
   avatar: "linear-gradient(135deg,#D4A017,#C0392B)",
 };
 
-// Navigation adaptée à nos vraies entités (ouvriers/pointages/badges),
-// pas aux écrans de la maquette (rapports de cellules, départements, etc.)
+// Navigation adaptée à nos vraies entités (ouvriers/pointages/badges/
+// départements), pas aux écrans de la maquette (rapports de cellules, etc.)
 export const navItems = [
   { path: "/", label: "Tableau de bord", icon: "⊞", short: "Accueil" },
   { path: "/ouvriers", label: "Ouvriers", icon: "◎", short: "Ouvriers" },
   { path: "/badges", label: "Badges QR", icon: "⊛", short: "Badges" },
   { path: "/pointages", label: "Pointages du jour", icon: "⊕", short: "Pointages" },
   { path: "/historique", label: "Historique", icon: "⊡", short: "Historique" },
+  { path: "/departements", label: "Départements", icon: "▣", short: "Départ." },
+  { path: "/gestion-departements", label: "Gestion départements", icon: "◫", short: "Gest. dép." },
 ];
 
 // Titre/sous-titre de la TopBar selon la route active
@@ -29,4 +31,6 @@ export const pageTitles = {
   "/badges": { title: "Badges QR", subtitle: "Génération et impression" },
   "/pointages": { title: "Pointages du jour", subtitle: "Suivi en temps réel" },
   "/historique": { title: "Historique", subtitle: "Filtrable · Exportable" },
+  "/departements": { title: "Départements", subtitle: "Membres et postes" },
+  "/gestion-departements": { title: "Gestion des départements", subtitle: "Créer · Lister · Exporter" },
 };

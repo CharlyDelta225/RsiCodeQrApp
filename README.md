@@ -16,7 +16,7 @@ RsiCodeQrApp/
 │   ├── tests/              ← tests d'intégration (node:test)
 │   ├── data/               ← exemple de fichier CSV
 │   └── public/badges/      ← QR codes générés (à imprimer)
-├── frontend/dashboard/     ← (équipe front) gestion + historique
+├── frontend/dashboard/     ← gestion + historique (dashboard maintenu avec le backend)
 ├── frontend/terminal/      ← (équipe front) kiosque de badgeage
 └── docs/api-contrat.md     ← contrat d'API partagé avec l'équipe front
 ```
@@ -67,6 +67,17 @@ npm run dev             # => http://localhost:5173
 ```
 
 > Connexion avec le compte seed : `admin@example.com` / `change-moi`
+
+Pages du dashboard :
+
+| Route | Contenu |
+|---|---|
+| `/` | Tableau de bord : KPIs, pointages récents |
+| `/ouvriers` | Gestion des ouvriers (CRUD, import `.csv`/`.xlsx`) |
+| `/badges` | Badges QR (aperçu, ZIP d'impression) |
+| `/pointages` · `/historique` | Pointages du jour · historique filtrable/exportable |
+| `/departements` | Membres et postes par département |
+| `/gestion-departements` | Créer / lister / renommer / exporter les départements |
 
 ### Terminal kiosque
 
@@ -178,7 +189,11 @@ FOFANA,Ibrahim,Logistique
 ```
 
 - Le **matricule** est auto-généré (`RSI-XXXX`) et le **QR badge** créé automatiquement.
-- Le département est créé automatiquement s'il n'existe pas encore.
+- Le département doit **exister dans la base** (table `Departement`) : si le
+  fichier en référence un d'inconnu, **tout l'import est refusé**
+  (`400 DEPARTEMENT_INCONNU`) — aucun département n'est créé automatiquement.
+  La page « Gestion des départements » du dashboard permet de créer/renommer
+  la liste avant l'import.
 - Si l'ouvrier (nom+prénom) existe déjà, on ajoute juste la liaison au département.
 - Doublons (même Nom+Prénom+Département) → ignorés ; champs vides → ligne en erreur.
 

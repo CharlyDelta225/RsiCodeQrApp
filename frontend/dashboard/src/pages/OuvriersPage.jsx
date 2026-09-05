@@ -9,14 +9,23 @@ function peutEcrire() {
   return ROLE_ECRITURE.includes(getAdmin()?.role);
 }
 
-function LibelleStatutImport({ statut }) {
-  const style = {
-    cree: "text-green-700",
-    ignore: "text-slate-500",
-    erreur: "text-red-700",
-  }[statut] || "text-slate-600";
-  const libelle = { cree: "créé", ignore: "ignoré (doublon)", erreur: "erreur" }[statut] || statut;
-  return <span className={style}>[{libelle}]</span>;
+// Raison courte et compréhensible d'un échec, basée sur le code machine de
+// l'API (cf. api-contrat.md : le front se branche sur les codes, pas les messages).
+function raisonEchec(err, fallback) {
+  const raisons = {
+    DOUBLON_DEPARTEMENT: "Un ouvrier avec ce nom et ce prénom existe déjà dans ce département",
+    MATRICULE_EXISTANT: "Ce matricule existe déjà",
+    CHAMPS_MANQUANTS: "Des champs obligatoires sont manquants",
+    DEPARTEMENT_INCONNU: "Un ou plusieurs départements ne sont pas dans la liste. Veuillez choisir des départements corrects.",
+    ROLE_INVALIDE: "Poste invalide",
+    POSTE_DEJA_PRIS: "Ce poste est déjà occupé dans le département",
+    ACCES_REFUSE: "Vous n'avez pas les droits pour cette action",
+    EMAIL_EXISTANT: "Un compte existe déjà avec cet email",
+    ROLE_REQUIS: "Réseau non autorisé à effectuer cette action",
+    FICHIER_INVALIDE: "Le fichier fourni est invalide (formats acceptés : .csv ou .xlsx)",
+  };
+  if (err instanceof ApiError && raisons[err.code]) return raisons[err.code];
+  return fallback;
 }
 
 export default function OuvriersPage() {
@@ -24,14 +33,14 @@ export default function OuvriersPage() {
   const [total, setTotal] = useState(0);
   const [recherche, setRecherche] = useState("");
   const [chargement, setChargement] = useState(true);
-  const [erreur, setErreur] = useState(null);
+  const [alerte, setAlerte] = useState(null);
+  const [succes, setSucces] = useState(null);
 
   const [modalOuvert, setModalOuvert] = useState(false);
   const [form, setForm] = useState({ nom: "", prenom: "", departement: "" });
   const [envoi, setEnvoi] = useState(false);
 
   const [importEnCours, setImportEnCours] = useState(false);
-  const [resultatImport, setResultatImport] = useState(null);
 
   const [badgeUrl, setBadgeUrl] = useState(null);
   const [badgeOuvrier, setBadgeOuvrier] = useState(null);
@@ -40,7 +49,7 @@ export default function OuvriersPage() {
 
   const charger = useCallback(async () => {
     setChargement(true);
-    setErreur(null);
+    setAlerte(null);
     try {
       const params = { limit: 500 };
       if (recherche) params.recherche = recherche;
@@ -52,7 +61,7 @@ export default function OuvriersPage() {
       setTotal(data.total);
       setDepartements((dataDepts.departements || []).map((d) => d.nom));
     } catch (err) {
-      setErreur(err instanceof ApiError ? err.message : "Erreur de chargement");
+      setAlerte({ titre: "Une erreur est survenue", message: err instanceof ApiError ? err.message : "Erreur de chargement" });
     } finally {
       setChargement(false);
     }
@@ -65,7 +74,7 @@ export default function OuvriersPage() {
   async function handleCreer(e) {
     e.preventDefault();
     setEnvoi(true);
-    setErreur(null);
+    setAlerte(null);
     try {
       await api.createOuvrier({
         nom: form.nom,
@@ -74,9 +83,10 @@ export default function OuvriersPage() {
       });
       setModalOuvert(false);
       setForm({ nom: "", prenom: "", departement: "" });
+      setSucces({ titre: "Ajout réussi", message: `L'ouvrier ${form.prenom} ${form.nom} a bien été ajouté(e).` });
       charger();
     } catch (err) {
-      setErreur(err instanceof ApiError ? err.message : "Erreur lors de la création");
+      setAlerte({ titre: "Échec de l'ajout", message: raisonEchec(err, "La création de l'ouvrier a échoué") });
     } finally {
       setEnvoi(false);
     }
@@ -86,14 +96,24 @@ export default function OuvriersPage() {
     const fichier = e.target.files?.[0];
     if (!fichier) return;
     setImportEnCours(true);
-    setResultatImport(null);
-    setErreur(null);
+    setAlerte(null);
     try {
       const data = await api.importOuvriers(fichier);
-      setResultatImport(data);
+      const { creees = 0, ignorees = 0, erreurs = 0 } = data;
+      if (creees > 0) {
+        let message = `Import réussi : ${creees} nouvel(s) ouvrier(s) ajouté(s)${ignorees > 0 ? `, ${ignorees} doublon(s) déjà en base ignoré(s)` : ""}.`;
+        if (erreurs > 0) message += ` ${erreurs} ligne(s) en erreur.`;
+        setSucces({ titre: "Import réussi", message });
+      } else if (ignorees > 0) {
+        let message = "Import refusé : des doublons ont été trouvés en base.";
+        if (erreurs > 0) message += ` ${erreurs} ligne(s) en erreur.`;
+        setAlerte({ titre: "Import refusé", message });
+      } else {
+        setAlerte({ titre: "Import terminé", message: "Aucun ouvrier ajouté." });
+      }
       charger();
     } catch (err) {
-      setErreur(err instanceof ApiError ? err.message : "Erreur lors de l'import");
+      setAlerte({ titre: "Échec de l'import", message: raisonEchec(err, "L'import du fichier a échoué") });
     } finally {
       setImportEnCours(false);
       e.target.value = "";
@@ -105,7 +125,7 @@ export default function OuvriersPage() {
       await api.updateOuvrier(ouvrier.id, { actif: !ouvrier.actif });
       charger();
     } catch (err) {
-      setErreur(err instanceof ApiError ? err.message : "Erreur lors du changement de statut");
+      setAlerte({ titre: "Une erreur est survenue", message: err instanceof ApiError ? err.message : "Erreur lors du changement de statut" });
     }
   }
 
@@ -115,7 +135,7 @@ export default function OuvriersPage() {
       await api.deleteOuvrier(ouvrier.id);
       charger();
     } catch (err) {
-      setErreur(err instanceof ApiError ? err.message : "Erreur lors de la suppression");
+      setAlerte({ titre: "Une erreur est survenue", message: err instanceof ApiError ? err.message : "Erreur lors de la suppression" });
     }
   }
 
@@ -125,7 +145,7 @@ export default function OuvriersPage() {
       setBadgeUrl(URL.createObjectURL(blob));
       setBadgeOuvrier(ouvrier);
     } catch (err) {
-      setErreur(err instanceof ApiError ? err.message : "Erreur lors du chargement du badge");
+      setAlerte({ titre: "Une erreur est survenue", message: err instanceof ApiError ? err.message : "Erreur lors du chargement du badge" });
     }
   }
 
@@ -136,8 +156,8 @@ export default function OuvriersPage() {
         <div className="flex items-center gap-2">
           {peutEcrire() && (
             <label className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 rounded-lg px-3 py-2 cursor-pointer">
-              {importEnCours ? "Import en cours…" : "Importer Excel (.xlsx)"}
-              <input type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={importEnCours} />
+              {importEnCours ? "Import en cours…" : "Importer (.csv / .xlsx)"}
+              <input type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImport} disabled={importEnCours} />
             </label>
           )}
           {peutEcrire() && (
@@ -151,29 +171,55 @@ export default function OuvriersPage() {
         </div>
       </div>
 
-      {erreur && (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erreur}</p>
+      {alerte && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
+            <div
+              className="w-14 h-14 mx-auto rounded-full flex items-center justify-center text-2xl text-white"
+              style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)", boxShadow: "0 8px 20px rgba(244,63,94,.3)" }}
+            >
+              !
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
+                {alerte.titre}
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">{alerte.message}</p>
+            </div>
+            <button
+              onClick={() => setAlerte(null)}
+              className="w-full text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm transition"
+              style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)" }}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
       )}
 
-      {resultatImport && (
-        <div className="text-sm bg-white border border-slate-200 rounded-lg p-4 space-y-2">
-          <p className="font-medium text-slate-900">
-            Import terminé : {resultatImport.creees} créé(s), {resultatImport.ignorees} ignoré(s),{" "}
-            {resultatImport.erreurs} en erreur.
-          </p>
-          <ul className="text-xs text-slate-600 space-y-1 max-h-40 overflow-y-auto">
-            {resultatImport.detail.map((d, i) => (
-              <li key={i}>
-                <span className="text-slate-400">{d.prenom} {d.nom} ({d.departement || "—"}) —</span>{" "}
-                <LibelleStatutImport statut={d.statut} />
-                {d.matricule ? ` ${d.matricule}` : ""}
-                {d.raison ? ` (${d.raison})` : ""}
-              </li>
-            ))}
-          </ul>
-          <button onClick={() => setResultatImport(null)} className="text-xs text-slate-500 hover:text-slate-700">
-            Fermer ce résumé
-          </button>
+      {succes && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
+            <div
+              className="w-14 h-14 mx-auto rounded-full flex items-center justify-center text-2xl text-white"
+              style={{ background: "linear-gradient(135deg,#34d399,#10b981)", boxShadow: "0 8px 20px rgba(16,185,129,.3)" }}
+            >
+              ✓
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
+                {succes.titre}
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">{succes.message}</p>
+            </div>
+            <button
+              onClick={() => setSucces(null)}
+              className="w-full text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm transition"
+              style={{ background: "linear-gradient(135deg,#34d399,#10b981)" }}
+            >
+              Fermer
+            </button>
+          </div>
         </div>
       )}
 
@@ -220,16 +266,25 @@ export default function OuvriersPage() {
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right space-x-2 whitespace-nowrap">
-                  <button onClick={() => handleVoirBadge(o)} className="text-blue-700 hover:underline text-xs">
+                  <button
+                    onClick={() => handleVoirBadge(o)}
+                    className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition"
+                  >
                     Badge
                   </button>
                   {peutEcrire() && (
-                    <button onClick={() => handleToggleActif(o)} className="text-amber-700 hover:underline text-xs">
+                    <button
+                      onClick={() => handleToggleActif(o)}
+                      className="inline-flex items-center justify-center text-xs font-medium w-[92px] px-2 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 transition"
+                    >
                       {o.actif ? "Désactiver" : "Activer"}
                     </button>
                   )}
                   {peutEcrire() && (
-                    <button onClick={() => handleSupprimer(o)} className="text-red-700 hover:underline text-xs">
+                    <button
+                      onClick={() => handleSupprimer(o)}
+                      className="text-xs font-medium px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 transition"
+                    >
                       Supprimer
                     </button>
                   )}

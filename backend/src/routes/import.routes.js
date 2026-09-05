@@ -56,6 +56,8 @@ async function genererBadge(ouvrier) {
  *   - Extension .csv ou .xlsx uniquement
  *   - Colonnes obligatoires : Nom, Prénom, Département
  *   - Lignes vides ignorées
+ *   - Le département doit exister dans le référentiel : sinon tout l'import est
+ *     refusé (code DEPARTEMENT_INCONNU) — aucun département n'est créé
  *   - Doublons (nom+prénom+département) : ligne ignorée
  *   - Si l'ouvrier existe déjà (nom+prénom), on ajoute juste la liaison au département
  *
@@ -159,6 +161,26 @@ router.post(
       departementNom: String(l[idx.departement] ?? "").trim(),
     });
 
+    // --- 5-bis. Vérifier que tous les départements du fichier existent dans
+    // le référentiel (table Departement). Aucun département n'est créé : si le
+    // fichier en contient d'inconnus, tout l'import est refusé. ---
+    const nomsDepartementsFichier = [
+      ...new Set(
+        lignes.map((l) => ligneVersObjet(l).departementNom).filter((n) => n !== "")
+      ),
+    ];
+    const departementsEnBase = await prisma.departement.findMany({
+      where: { nom: { in: nomsDepartementsFichier } },
+    });
+    const nomsEnBase = new Set(departementsEnBase.map((d) => d.nom));
+    const introuvables = nomsDepartementsFichier.filter((n) => !nomsEnBase.has(n));
+    if (introuvables.length > 0) {
+      throw new AppError(
+        "DEPARTEMENT_INCONNU",
+        `Département(s) introuvable(s) dans la base : ${introuvables.join(", ")}. Veuillez choisir des départements de la liste existante.`
+      );
+    }
+
     // --- 6. Traitement ligne par ligne ---
     let creees = 0;
     let ignorees = 0;
@@ -217,14 +239,10 @@ router.post(
         }
 
         // L'ouvrier existe mais pas dans ce département : on ajoute juste la liaison
-        let dept = deptExistant;
-        if (!dept) {
-          dept = await prisma.departement.create({ data: { nom: donnees.departementNom } });
-        }
         await prisma.ouvrierDepartement.create({
           data: {
             ouvrierId: ouvrierExistant.id,
-            departementId: dept.id,
+            departementId: deptExistant.id,
             roleDansDepartement: "MEMBRE",
           },
         });
@@ -247,11 +265,8 @@ router.post(
         continue;
       }
 
-      // Créer le département s'il n'existe pas
-      let departement = await prisma.departement.findUnique({ where: { nom: donnees.departementNom } });
-      if (!departement) {
-        departement = await prisma.departement.create({ data: { nom: donnees.departementNom } });
-      }
+      // Le département existe (validé en 5-bis) => on ne le crée jamais
+      const departement = await prisma.departement.findUnique({ where: { nom: donnees.departementNom } });
 
       // Créer l'ouvrier (matricule auto-généré, actif par défaut)
       const matricule = await genererMatricule();

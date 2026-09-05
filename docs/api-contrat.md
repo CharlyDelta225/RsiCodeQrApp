@@ -214,12 +214,20 @@ Règles :
 - Extension autres que `.csv`/`.xlsx` → `400 TYPE_FICHIER_NON_SUPPORTE`
 - Colonnes manquantes → `400 COLONNES_MANQUANTES`
 - Fichier vide / illisible → `400 FICHIER_VIDE` ou `FORMAT_INVALIDE`
-- Le **département est créé automatiquement** s'il n'existe pas encore, puis
-  l'ouvrier y est rattaché (poste `MEMBRE` par défaut).
+- Le département doit **exister dans le référentiel** (table `Departement`).
+  Si le fichier en référence un d'inconnu → **tout l'import est refusé**
+  `400 DEPARTEMENT_INCONNU`. Aucun département n'est auto-créé.
 - Si un ouvrier (même Nom+Prénom) existe déjà **et** est déjà dans ce
   département → ligne **ignorée** (doublon). S'il existe mais pas dans ce
   département → on ajoute juste la liaison.
 - Champ requis vide → ligne marquée en **erreur**
+
+```json
+{
+  "ok": false, "code": "DEPARTEMENT_INCONNU",
+  "message": "Département(s) introuvable(s) dans la base : Media, Enfants. Veuillez choisir des départements de la liste existante."
+}
+```
 
 ```json
 {
@@ -379,6 +387,7 @@ Réponse : `{ "ok": true }`. Erreurs : `404 DEPARTEMENT_INCONNU` / `404 MEMBRE_I
 
 | Date | Changement |
 |---|---|
+| 2026-09-05 | **Import strict sur les départements** : l'import refuse tout fichier contenant au moins un département absent du référentiel → `400 DEPARTEMENT_INCONNU` (l'auto-création de département est supprimée) |
 | 2026-09-05 | **Anti doublon** : `POST /api/ouvriers` refuse toute création dont le nom+prénom existent déjà dans le département ciblé (comparaison insensible à la casse, aligné sur l'import) → `409 DOUBLON_DEPARTEMENT` ; l'import applique désormais aussi une comparaison insensible à la casse ; contournement volontaire : `{"force": true}` (deux vraies personnes homonymes) |
 | 2026-09-04 | **Départements** : ajout de la section 4-bis (`/api/departements` CRUD + membres + postes `RESPONSABLE/ADJOINT/SECRETAIRE/MEMBRE`) ; `GET /api/ouvriers` et `GET /api/ouvriers/:id` renvoient la relation `departements` (plus de champ string) ; `POST /api/ouvriers` accepte `departementId`/`departementNom` ; import : le département est créé automatiquement + rattachement ; `GET /api/ouvriers/badges/zip` filtre désormais par `departementId` |
 | 2026-09-04 | Badgeage : ajout du **anti double-badge** (une fois par jour civil) → `409 DEJA_BADGE_AUJOURDHUI` |

@@ -101,6 +101,21 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/api/departements${qs ? `?${qs}` : ""}`);
   },
+  getDepartement: (id) => request(`/api/departements/${id}`),
+  // PATCH /api/departements/:id/membres/:ouvrierId — change le poste d'un membre.
+  // Rôles : RESPONSABLE, ADJOINT, SECRETAIRE, MEMBRE. 409 POSTE_DEJA_PRIS si le
+  // département a déjà un responsable (resp.) ou un adjoint.
+  changerRoleMembre: (departementId, ouvrierId, roleDansDepartement) =>
+    request(`/api/departements/${departementId}/membres/${ouvrierId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ roleDansDepartement }),
+    }),
+  retirerMembre: (departementId, ouvrierId) =>
+    request(`/api/departements/${departementId}/membres/${ouvrierId}`, { method: "DELETE" }),
+  // CRUD département (POST → 409 DEPARTEMENT_EXISTANT si nom déjà pris)
+  createDepartement: (data) => request("/api/departements", { method: "POST", body: JSON.stringify(data) }),
+  updateDepartement: (id, data) => request(`/api/departements/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteDepartement: (id) => request(`/api/departements/${id}`, { method: "DELETE" }),
 
   // Santé (public, pas de token nécessaire mais request() n'en ajoute pas si absent)
   health: () => request("/api/health"),
