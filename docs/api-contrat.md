@@ -45,6 +45,8 @@ Appelé à chaque scan du QR par le terminal.
   }
 }
 ```
+> `departement` = nom du premier département trouvé pour cet ouvrier, ou `null`
+> s'il n'appartient à aucun département.
 
 **Réponses d'erreur** :
 | HTTP | code | message |
@@ -52,8 +54,13 @@ Appelé à chaque scan du QR par le terminal.
 | 400 | `MATRICULE_MANQUANT` | Le champ matricule est requis |
 | 404 | `BADGE_INCONNU` | Badge inconnu |
 | 403 | `BADGE_DESACTIVE` | Badge désactivé |
+| 409 | `DEJA_BADGE_AUJOURDHUI` | Vous avez déjà badgé aujourd'hui à HH:MM |
 | 500 | `ERREUR_INTERNE` | Erreur interne |
 
+> **Anti double-badge** : un ouvrier ne peut badger qu'**une seule fois par jour
+> civil** (heure serveur). Le second scan renvoie `409 DEJA_BADGE_AUJOURDHUI` avec
+> l'heure du premier badgeage — le terminal doit l'afficher (ex : fond orange).
+>
 > Le terminal affiche nom/prénom/département sur fond vert ; sur `BADGE_INCONNU`
 > ou `BADGE_DESACTIVE`, il affiche le `message` sur fond rouge.
 
@@ -126,10 +133,21 @@ Change le rôle d'un compte admin.
 
 ## 3. Ouvriers (PROTÉGÉ — header `Authorization: Bearer <token>`)
 
+> **Modèle des départements (depuis le 2026-09-04)** : un ouvrier n'a plus de
+> champ `departement` (string). Il est rattaché à un ou plusieurs départements
+> via la relation `departements` (table de jonction `OuvrierDepartement` avec un
+> poste par département). Voir la section 4‑bis « Départements ».
+>
+> Dans les réponses `ouvrier`, la relation apparaît sous la forme :
+> ```json
+> "departements": [ { "id": "...", "departementId": "...", "roleDansDepartement": "MEMBRE",
+>                     "departement": { "id": "...", "nom": "Louange" } } ]
+> ```
+
 ### `GET /api/ouvriers`
 Query optionnels :
 - `actif=true|false` — filtre par état
-- `recherche=texte` — nom, prénom, département, matricule (insensible à la casse)
+- `recherche=texte` — nom, prénom, matricule (insensible à la casse)
 - `page=1&limit=50` — pagination (défauts : `page=1`, `limit=50`, max `limit=200`)
 
 ```json
@@ -139,15 +157,25 @@ Query optionnels :
 ### `POST /api/ouvriers`
 ```json
 // Body (matricule optionnel — généré automatiquement)
-{ "nom": "YAO", "prenom": "Esther", "departement": "Média", "photoUrl": null, "actif": true }
-// Réponse 201 : { "ok": true, "ouvrier": { ... } }
+// Pour rattacher dès la création : departementId (uuid) OU departementNom (texte).
+// Sans lien : on omet les deux champs.
+{ "nom": "YAO", "prenom": "Esther", "departementId": "3fa8...", "photoUrl": null, "actif": true }
+// Réponse 201 : { "ok": true, "ouvrier": { ... , departements: [...] } }
+// Erreurs : 400 CHAMPS_MANQUANTS (nom/prenom manquant), 409 MATRICULE_EXISTANT
+//           409 DOUBLON_DEPARTEMENT (même nom+prénom déjà rattaché à ce département,
+//           comparaison insensible à la casse — aligné sur l'import)
+// Contournement voluntaire : body { "force": true } → crée quand même (deux vraies
+// personnes homonymes dans le même département).
 ```
 
 ### `GET /api/ouvriers/:id`
-Détail complet d'un ouvrier.
+Détail complet d'un ouvrier (avec `departements`).
 
 ### `PATCH /api/ouvriers/:id`
-Met à jour tout ou partie. **Désactivation d'un badge** : `{ "actif": false }`.
+Met à jour tout ou partie (nom, prenom, photoUrl, actif, matricule).
+**Désactivation d'un badge** : `{ "actif": false }`.
+> Le rattachement à un département ne se fait **pas** ici : utiliser les
+> endpoints de la section 4‑bis (`/api/departements/:id/membres`).
 
 ### `PATCH /api/ouvriers/:id/activer` (protégé — ADMIN/SUPER_ADMIN)
 Active le badge d'un ouvrier. Réponse : `{ "ok": true, "actif": true, "ouvrier": {...} }`.
@@ -156,7 +184,7 @@ Active le badge d'un ouvrier. Réponse : `{ "ok": true, "actif": true, "ouvrier"
 Désactive le badge : le badgeage de ce matricule répondra `403 BADGE_DESACTIVE`. Réponse : `{ "ok": true, "actif": false, "ouvrier": {...} }`.
 
 ### `DELETE /api/ouvriers/:id`
-Supprime l'ouvrier et ses pointages (cascade).
+Supprime l'ouvrier, ses pointages et ses liaisons départements (cascade).
 
 ### `GET /api/ouvriers/:id/badge`
 Renvoie le **PNG du QR code** du badge (type `image/png`) — pour prévisualiser/imprimer.
@@ -168,7 +196,7 @@ un badge imprimé à chaque ouvrier avant impression en masse.
 
 Query optionnels :
 - `actif=true|false` — filtre par état (défaut : tous)
-- `departement=texte` — filtre par département (insensible à la casse)
+- `departementId=uuid` — filtre par département (relation)
 
 Réponse 200 : `application/zip`. Réponse 404 si aucun ouvrier ne correspond
 aux filtres : `{ "ok": false, "code": "AUCUN_OUVRIER", ... }`.
@@ -186,7 +214,11 @@ Règles :
 - Extension autres que `.csv`/`.xlsx` → `400 TYPE_FICHIER_NON_SUPPORTE`
 - Colonnes manquantes → `400 COLONNES_MANQUANTES`
 - Fichier vide / illisible → `400 FICHIER_VIDE` ou `FORMAT_INVALIDE`
-- Doublon (même Nom+Prénom+Département) → ligne **ignorée**
+- Le **département est créé automatiquement** s'il n'existe pas encore, puis
+  l'ouvrier y est rattaché (poste `MEMBRE` par défaut).
+- Si un ouvrier (même Nom+Prénom) existe déjà **et** est déjà dans ce
+  département → ligne **ignorée** (doublon). S'il existe mais pas dans ce
+  département → on ajoute juste la liaison.
 - Champ requis vide → ligne marquée en **erreur**
 
 ```json
@@ -218,13 +250,121 @@ Query optionnels :
       "id": "...",
       "dateHeure": "2026-09-01T10:54:12.246Z",
       "type": "ENTRER",
-      "ouvrier": { "id": "...", "matricule": "RSI-0001", "nom": "KOUAME", "prenom": "Aya", "departement": "Louange" }
+      "ouvrier": {
+        "id": "...", "matricule": "RSI-0001", "nom": "KOUAME", "prenom": "Aya",
+        "departements": [ { "departement": { "id": "...", "nom": "Louange" } } ]
+      }
     }
   ]
 }
 ```
 
 > `type` est présent mais **non utilisé** pour l'instant (toujours `ENTRER`).
+
+---
+
+## 4-bis. Départements (PROTÉGÉ — header `Authorization: Bearer <token>`)
+
+### Modèle
+
+Chaque ouvrier peut appartenir à **un ou plusieurs départements** avec un poste
+par département (`roleDansDepartement`) :
+
+| Poste | Nom (enum `RoleDepartement`) |
+|---|---|
+| Responsable | `RESPONSABLE` |
+| Adjoint | `ADJOINT` |
+| Secrétaire | `SECRETAIRE` |
+| Simple membre | `MEMBRE` (défaut) |
+
+**Contraintes** :
+- Un seul `RESPONSABLE` et un seul `ADJOINT` par département → `409 POSTE_DEJA_PRIS`.
+- Un ouvrier ne peut pas être deux fois dans le même département (unicité `ouvrierId + departementId`).
+
+### `GET /api/departements`
+Liste les départements (triée par nom). Query optionnels : `page=1&limit=50`.
+```json
+{
+  "ok": true, "total": 15, "page": 1, "limit": 50,
+  "departements": [
+    { "id": "...", "nom": "Louange", "description": null, "createdAt": "...",
+      "_count": { "membres": 5 } }
+  ]
+}
+```
+Lectures ouvertes à **tous les rôles authentifiés** (y compris `LECTEUR`).
+
+### `GET /api/departements/:id`
+Détail du département **avec ses membres** (chaque membre inclut l'ouvrier et son poste).
+```json
+{
+  "ok": true,
+  "departement": {
+    "id": "...", "nom": "Louange", "description": null,
+    "membres": [
+      { "id": "...", "roleDansDepartement": "RESPONSABLE",
+        "ouvrier": { "id": "...", "matricule": "RSI-0001", "nom": "KOUAME", "prenom": "Aya", "actif": true } }
+    ]
+  }
+}
+```
+Erreurs : `404 DEPARTEMENT_INCONNU`.
+
+### `GET /api/departements/:id/membres`
+Identique à `GET /:id` mais réponse allégée :
+```json
+{ "ok": true, "departement": { "id": "...", "nom": "Louange" },
+  "membres": [ { "id": "...", "roleDansDepartement": "MEMBRE", "ouvrier": {...} } ] }
+```
+
+### `POST /api/departements` (écriture — **ADMIN/SUPER_ADMIN**)
+```json
+// Body
+{ "nom": "Louange", "description": "Musique et chants" }
+// Réponse 201 : { "ok": true, "departement": { "id", "nom", "description", "createdAt" } }
+// Erreurs : 400 CHAMPS_MANQUANTS (nom requis), 409 DEPARTEMENT_EXISTANT
+```
+
+### `PATCH /api/departements/:id` (écriture — **ADMIN/SUPER_ADMIN**)
+Change `nom` et/ou `description`.
+Erreurs : `404 DEPARTEMENT_INCONNU`, `409 DEPARTEMENT_EXISTANT`, `400 AUCUNE_DONNEE`.
+
+### `DELETE /api/departements/:id` (écriture — **ADMIN/SUPER_ADMIN**)
+Supprime le département et toutes ses liaisons (cascade).
+Erreur : `404 DEPARTEMENT_INCONNU`.
+
+### `POST /api/departements/:id/membres` (écriture — **ADMIN/SUPER_ADMIN**)
+Ajoute un ouvrier **existant** à un département (ou modifie son poste s'il y est déjà). Upsert.
+```json
+// Body
+{ "ouvrierId": "uuid", "roleDansDepartement": "RESPONSABLE" }
+// roleDansDepartement optionnel (défaut : MEMBRE)
+// Réponse 201 : { "ok": true, "liaison": { "id", "ouvrierId", "departementId", "roleDansDepartement",
+//                 "ouvrier": {...}, "departement": {...} } }
+// Erreurs : 400 CHAMPS_MANQUANTS / ROLE_INVALIDE, 404 DEPARTEMENT_INCONNU / OUVRIER_INCONNU,
+//           409 POSTE_DEJA_PRIS
+```
+
+### `PATCH /api/departements/:id/membres/:ouvrierId` (écriture — **ADMIN/SUPER_ADMIN**)
+Change le poste d'un membre dans le département.
+```json
+// Body
+{ "roleDansDepartement": "ADJOINT" }
+// Réponse 200 : { "ok": true, "liaison": {...} }
+// Erreurs : 400 CHAMPS_MANQUANTS / ROLE_INVALIDE, 404 DEPARTEMENT_INCONNU / MEMBRE_INCONNU,
+//           409 POSTE_DEJA_PRIS
+```
+
+### `DELETE /api/departements/:id/membres/:ouvrierId` (écriture — **ADMIN/SUPER_ADMIN**)
+Retire un ouvrier du département.
+Réponse : `{ "ok": true }`. Erreurs : `404 DEPARTEMENT_INCONNU` / `404 MEMBRE_INCONNU`.
+
+> **Filtres par département pour l'équipe front** : pour afficher « les membres
+> d'un département », utiliser `GET /api/departements/:id` (ou `/membres`).
+> Pour filtrer la liste des ouvriers par département, deux options :
+> 1. Côté backend : `GET /api/ouvriers/badges/zip?departementId=...` (export),
+> 2. Côté front : récupérer les membres du département puis afficher.
+> Un filtre `GET /api/ouvriers?departementId=...` est prévu si l'équipe le juge utile.
 
 ---
 
@@ -239,6 +379,9 @@ Query optionnels :
 
 | Date | Changement |
 |---|---|
+| 2026-09-05 | **Anti doublon** : `POST /api/ouvriers` refuse toute création dont le nom+prénom existent déjà dans le département ciblé (comparaison insensible à la casse, aligné sur l'import) → `409 DOUBLON_DEPARTEMENT` ; l'import applique désormais aussi une comparaison insensible à la casse ; contournement volontaire : `{"force": true}` (deux vraies personnes homonymes) |
+| 2026-09-04 | **Départements** : ajout de la section 4-bis (`/api/departements` CRUD + membres + postes `RESPONSABLE/ADJOINT/SECRETAIRE/MEMBRE`) ; `GET /api/ouvriers` et `GET /api/ouvriers/:id` renvoient la relation `departements` (plus de champ string) ; `POST /api/ouvriers` accepte `departementId`/`departementNom` ; import : le département est créé automatiquement + rattachement ; `GET /api/ouvriers/badges/zip` filtre désormais par `departementId` |
+| 2026-09-04 | Badgeage : ajout du **anti double-badge** (une fois par jour civil) → `409 DEJA_BADGE_AUJOURDHUI` |
 | 2026-09-04 | Ajout de `GET /api/ouvriers/badges/zip` (ZIP de tous les QR codes, filtrable par `actif`/`departement`) |
 | 2026-09-03 | Ajout de `POST /api/ouvriers/import` (import massif .csv/.xlsx + QR auto) |
 | 2026-09-03 | Ajout des rôles (`RoleAdmin`) : login/me renvoient `role`, register réservé au SUPER_ADMIN, écritures ouvriers/import réservées à ADMIN/SUPER_ADMIN |

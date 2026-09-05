@@ -175,7 +175,7 @@ router.get("/:id", async (req, res) => {
  */
 router.post("/", ECRITURE, async (req, res) => {
   try {
-    const { nom, prenom, departementId, departementNom } = req.body ?? {};
+    const { nom, prenom, departementId, departementNom, force } = req.body ?? {};
 
     if (!nom || !prenom) {
       return res.status(400).json({
@@ -190,15 +190,37 @@ router.post("/", ECRITURE, async (req, res) => {
       donnees.matricule = await genererMatricule();
     }
 
-    // Créer l'ouvrier
-    const ouvrier = await prisma.ouvrier.create({ data: donnees });
-
-    // Créer la liaison département si fourni
+    // Déterminer le département cible (rattachement créé après la création)
     let departementIdFinal = departementId || null;
     if (!departementIdFinal && departementNom) {
       const dept = await prisma.departement.findUnique({ where: { nom: String(departementNom).trim() } });
       if (dept) departementIdFinal = dept.id;
     }
+
+    // Anti doublon (aligné sur l'import) : un ouvrier portant le même nom +
+    // prénom déjà rattaché à ce département => refus.
+    // Contournement : `force: true` (deux vraies personnes homonymes).
+    if (departementIdFinal && !force) {
+      const doublon = await prisma.ouvrier.findFirst({
+        where: {
+          nom: { equals: donnees.nom, mode: "insensitive" },
+          prenom: { equals: donnees.prenom, mode: "insensitive" },
+          departements: { some: { departementId: departementIdFinal } },
+        },
+      });
+      if (doublon) {
+        return res.status(409).json({
+          ok: false,
+          code: "DOUBLON_DEPARTEMENT",
+          message: "Un ouvrier du même nom et prénom existe déjà dans ce département",
+        });
+      }
+    }
+
+    // Créer l'ouvrier
+    const ouvrier = await prisma.ouvrier.create({ data: donnees });
+
+    // Créer la liaison département si fourni
     if (departementIdFinal) {
       await prisma.ouvrierDepartement.create({
         data: {

@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { libelleDepartement } from "../lib/departement";
+import { getAdmin } from "../lib/auth";
 
-const DEPARTEMENTS_SUGGESTIONS = [
-  "Chorale", "Sécurité", "Accueil", "Intercession", "Jeunesse", "Média", "Protocole", "Logistique",
-  "Trompette", "Hôtesse", "Huissier", "Communication", "Informatique", "Restauration",
-  "Humanitaire", "Moniteur", "Interprète", "Décoration", "Transport", "Comptabilité", "Entretien",
-];
+const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
+
+function peutEcrire() {
+  return ROLE_ECRITURE.includes(getAdmin()?.role);
+}
 
 function LibelleStatutImport({ statut }) {
   const style = {
@@ -35,15 +36,21 @@ export default function OuvriersPage() {
   const [badgeUrl, setBadgeUrl] = useState(null);
   const [badgeOuvrier, setBadgeOuvrier] = useState(null);
 
+  const [departements, setDepartements] = useState([]);
+
   const charger = useCallback(async () => {
     setChargement(true);
     setErreur(null);
     try {
       const params = { limit: 500 };
       if (recherche) params.recherche = recherche;
-      const data = await api.getOuvriers(params);
+      const [data, dataDepts] = await Promise.all([
+        api.getOuvriers(params),
+        api.getDepartements({ limit: 200 }),
+      ]);
       setOuvriers(data.ouvriers);
       setTotal(data.total);
+      setDepartements((dataDepts.departements || []).map((d) => d.nom));
     } catch (err) {
       setErreur(err instanceof ApiError ? err.message : "Erreur de chargement");
     } finally {
@@ -127,16 +134,20 @@ export default function OuvriersPage() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm font-semibold text-gray-700">{total} ouvrier(s)</h2>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 rounded-lg px-3 py-2 cursor-pointer">
-            {importEnCours ? "Import en cours…" : "Importer Excel (.xlsx)"}
-            <input type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={importEnCours} />
-          </label>
-          <button
-            onClick={() => setModalOuvert(true)}
-            className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 rounded-lg px-3 py-2"
-          >
-            + Ajouter un ouvrier
-          </button>
+          {peutEcrire() && (
+            <label className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 rounded-lg px-3 py-2 cursor-pointer">
+              {importEnCours ? "Import en cours…" : "Importer Excel (.xlsx)"}
+              <input type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={importEnCours} />
+            </label>
+          )}
+          {peutEcrire() && (
+            <button
+              onClick={() => setModalOuvert(true)}
+              className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 rounded-lg px-3 py-2"
+            >
+              + Ajouter un ouvrier
+            </button>
+          )}
         </div>
       </div>
 
@@ -212,12 +223,16 @@ export default function OuvriersPage() {
                   <button onClick={() => handleVoirBadge(o)} className="text-blue-700 hover:underline text-xs">
                     Badge
                   </button>
-                  <button onClick={() => handleToggleActif(o)} className="text-amber-700 hover:underline text-xs">
-                    {o.actif ? "Désactiver" : "Activer"}
-                  </button>
-                  <button onClick={() => handleSupprimer(o)} className="text-red-700 hover:underline text-xs">
-                    Supprimer
-                  </button>
+                  {peutEcrire() && (
+                    <button onClick={() => handleToggleActif(o)} className="text-amber-700 hover:underline text-xs">
+                      {o.actif ? "Désactiver" : "Activer"}
+                    </button>
+                  )}
+                  {peutEcrire() && (
+                    <button onClick={() => handleSupprimer(o)} className="text-red-700 hover:underline text-xs">
+                      Supprimer
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -253,7 +268,7 @@ export default function OuvriersPage() {
               className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"
             />
             <datalist id="departements">
-              {DEPARTEMENTS_SUGGESTIONS.map((d) => (
+              {departements.map((d) => (
                 <option key={d} value={d} />
               ))}
             </datalist>

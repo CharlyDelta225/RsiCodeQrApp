@@ -67,7 +67,11 @@ export default function DashboardPage() {
           total: dataOuvriers.total ?? liste.length,
           actifs,
           desactives: (dataOuvriers.total ?? liste.length) - actifs,
-          departements: new Set(liste.map((o) => o.departement).filter(Boolean)).size,
+          departements: new Set(
+            liste.flatMap((o) =>
+              (o.departements || []).map((l) => l?.departement?.nom).filter(Boolean)
+            ) || []
+          ).size,
           presentsAuj: (dataAuj.pointages || []).length,
         });
       } catch (err) {
@@ -116,7 +120,7 @@ export default function DashboardPage() {
   const dataParDept = useMemo(() => {
     const map = {};
     for (const p of pointagesAuj) {
-      const dept = p.ouvrier?.departement || "Non renseigné";
+      const dept = p.ouvrier?.departements?.[0]?.departement?.nom || "Non renseigné";
       map[dept] = (map[dept] || 0) + 1;
     }
     return Object.entries(map)

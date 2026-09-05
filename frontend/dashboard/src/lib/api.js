@@ -96,6 +96,12 @@ export const api = {
     return request(`/api/pointages${qs ? `?${qs}` : ""}`);
   },
 
+  // Départements
+  getDepartements: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/departements${qs ? `?${qs}` : ""}`);
+  },
+
   // Santé (public, pas de token nécessaire mais request() n'en ajoute pas si absent)
   health: () => request("/api/health"),
 };

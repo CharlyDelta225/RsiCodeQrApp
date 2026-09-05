@@ -24,6 +24,7 @@ async function main() {
   const ouvriers = await prisma.ouvrier.findMany({
     where: { actif: true },
     orderBy: { matricule: "asc" },
+    include: { departements: { take: 1, include: { departement: true } } },
   });
 
   if (ouvriers.length === 0) {
@@ -43,7 +44,7 @@ async function main() {
 
   console.log(`✓ ${ouvriers.length} badge(s) généré(s) dans public/badges/ :`);
   for (const o of ouvriers) {
-    console.log(`  - ${o.matricule}.png  (${o.prenom} ${o.nom} — ${o.departement})`);
+    console.log(`  - ${o.matricule}.png  (${o.prenom} ${o.nom} — ${o.departements[0]?.departement?.nom ?? "sans département"})`);
   }
 }
 

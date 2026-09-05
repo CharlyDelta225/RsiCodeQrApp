@@ -185,7 +185,10 @@ router.post(
 
       // Vérifier si l'ouvrier (nom+prénom) existe déjà
       const ouvrierExistant = await prisma.ouvrier.findFirst({
-        where: { nom: donnees.nom, prenom: donnees.prenom },
+        where: {
+          nom: { equals: donnees.nom, mode: "insensitive" },
+          prenom: { equals: donnees.prenom, mode: "insensitive" },
+        },
       });
 
       // Si l'ouvrier existe, vérifier s'il est déjà dans ce département
