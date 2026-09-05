@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { libelleDepartement } from "../lib/departement";
+import PaginationBar from "../components/PaginationBar";
 
-const LIMIT = 50;
+const LIMIT = 17;
 const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
 function dateDuJour(decalageJours = 0) {
@@ -219,27 +220,7 @@ export default function HistoriquePage() {
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 text-sm">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            className="px-3 py-1.5 rounded-lg border border-slate-300 disabled:opacity-40"
-          >
-            ← Précédent
-          </button>
-          <span className="text-slate-600">
-            Page {page} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-            className="px-3 py-1.5 rounded-lg border border-slate-300 disabled:opacity-40"
-          >
-            Suivant →
-          </button>
-        </div>
-      )}
+      <PaginationBar page={page} totalPages={totalPages} onPage={setPage} total={total} label="pointage(s)" />
     </div>
   );
 }

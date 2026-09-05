@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api, ApiError } from "../lib/api";
 import { libelleDepartement } from "../lib/departement";
+import { usePagination } from "../lib/pagination";
+import PaginationBar from "../components/PaginationBar";
 
 const INTERVALLE_ACTUALISATION_MS = 15000;
 
@@ -32,6 +34,8 @@ export default function PointagesJourPage() {
   const [au, setAu] = useState(dateDuJour(0));
   const [ouvrierId, setOuvrierId] = useState("");
   const [ouvriers, setOuvriers] = useState([]);
+
+  const pagination = usePagination(pointages);
 
   useEffect(() => {
     api
@@ -167,7 +171,7 @@ export default function PointagesJourPage() {
                 </td>
               </tr>
             )}
-            {pointages.map((p) => (
+            {pagination.elementsPage.map((p) => (
               <tr key={p.id} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-mono text-xs">{formatHeure(p.dateHeure)}</td>
                 <td className="px-3 py-2 font-mono text-xs">{p.ouvrier?.matricule}</td>
@@ -179,6 +183,14 @@ export default function PointagesJourPage() {
           </tbody>
         </table>
       </div>
+
+      <PaginationBar
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        onPage={pagination.setPage}
+        total={pointages.length}
+        label="pointage(s)"
+      />
     </div>
   );
 }

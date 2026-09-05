@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { libelleDepartement } from "../lib/departement";
+import { usePagination } from "../lib/pagination";
+import PaginationBar from "../components/PaginationBar";
 
 export default function BadgesPage() {
   const [ouvriers, setOuvriers] = useState([]);
@@ -16,6 +18,8 @@ export default function BadgesPage() {
   const [badgeUrl, setBadgeUrl] = useState(null);
   const [badgeOuvrier, setBadgeOuvrier] = useState(null);
   const [telechargementUnite, setTelechargementUnite] = useState(false);
+
+  const pagination = usePagination(ouvriers);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -99,7 +103,7 @@ export default function BadgesPage() {
         <button
           onClick={handleTelechargerZip}
           disabled={telechargementZip}
-          className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 disabled:opacity-60 rounded-lg px-3 py-2"
+          className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 disabled:opacity-50 transition"
         >
           {telechargementZip ? "Préparation du ZIP…" : "⬇ Télécharger tous les QR (ZIP)"}
         </button>
@@ -152,7 +156,7 @@ export default function BadgesPage() {
             {!chargement && ouvriers.length === 0 && (
               <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400">Aucun badge trouvé</td></tr>
             )}
-            {ouvriers.map((o) => (
+            {pagination.elementsPage.map((o) => (
               <tr key={o.id} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
                 <td className="px-3 py-2">{o.nom}</td>
@@ -168,7 +172,10 @@ export default function BadgesPage() {
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
-                  <button onClick={() => handleVoirBadge(o)} className="text-blue-700 hover:underline text-xs">
+                  <button
+                    onClick={() => handleVoirBadge(o)}
+                    className="text-xs font-medium px-2.5 py-1 rounded-full bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-100 transition"
+                  >
                     Voir le badge
                   </button>
                 </td>
@@ -177,6 +184,14 @@ export default function BadgesPage() {
           </tbody>
         </table>
       </div>
+
+      <PaginationBar
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        onPage={pagination.setPage}
+        total={ouvriers.length}
+        label="badge(s)"
+      />
 
       {/* Modal badge individuel */}
       {badgeUrl && (
@@ -194,11 +209,14 @@ export default function BadgesPage() {
               <button
                 onClick={handleTelechargerUnBadge}
                 disabled={telechargementUnite}
-                className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 disabled:opacity-60 rounded-lg px-3 py-2"
+                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 disabled:opacity-50 transition"
               >
                 {telechargementUnite ? "Téléchargement…" : "⬇ Télécharger ce badge"}
               </button>
-              <button onClick={fermerModal} className="text-sm text-slate-600 px-3 py-2">
+              <button
+                onClick={fermerModal}
+                className="text-sm font-medium px-4 py-2 rounded-full bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition"
+              >
                 Fermer
               </button>
             </div>

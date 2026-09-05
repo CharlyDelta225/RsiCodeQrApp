@@ -27,9 +27,10 @@ RsiCodeQrApp/
 
 - **Backend** : Node.js (ESM) + Express 5
 - **Base de données** : PostgreSQL 18 + Prisma ORM 6
-- **Auth** : JWT (jsonwebtoken) + bcryptjs
+- **Auth** : JWT (jsonwebtoken) + bcryptjs + `express-rate-limit` (anti brute-force)
 - **QR codes** : `qrcode` (PNG) + `archiver` (ZIP bulk)
 - **Import** : `multer` (upload) + `xlsx` (parse .csv et .xlsx)
+- **Sécurité** : CORS restreint, limites de corps/fichier, rôles (moindre privilège)
 - **Déploiement** : préparation Railway (`railway.toml`) et Render (`render.yaml`)
 
 ---
@@ -63,8 +64,12 @@ Vérifier : `GET /api/health` → `{ "status": "ok", ... }`
 ```bash
 cd frontend/dashboard
 npm install
-npm run dev             # => http://localhost:5173
+npm run dev             # => http://localhost:5174
 ```
+
+> En dev, `VITE_API_URL` est vide : le dashboard appelle `/api/...` via le
+> proxy Vite vers `http://localhost:3000` (voir `vite.config.js`). En prod,
+> renseigner `VITE_API_URL` avec l'URL du backend.
 
 > Connexion avec le compte seed : `admin@example.com` / `change-moi`
 
@@ -78,6 +83,10 @@ Pages du dashboard :
 | `/pointages` · `/historique` | Pointages du jour · historique filtrable/exportable |
 | `/departements` | Membres et postes par département |
 | `/gestion-departements` | Créer / lister / renommer / exporter les départements |
+
+> Les listes du dashboard sont **paginées à 17 éléments par page** ; la
+> suppression d'un département et la déconnexion passent par un popup de
+> confirmation.
 
 ### Terminal kiosque
 
@@ -98,6 +107,22 @@ Le terminal est servi directement par le backend : http://localhost:3000/termina
 - **Inscription** (`POST /api/auth/register`) est **publique** : tout compte naît `LECTEUR`.
 - **Élévation de rôle** : un `SUPER_ADMIN` change le rôle via `PATCH /api/admins/:id/role` depuis le dashboard.
 - **Anti-verrouillage** : un `SUPER_ADMIN` ne peut pas modifier son propre rôle.
+
+---
+
+## Sécurité
+
+| Protection | Détail |
+|---|---|
+| **Anti brute-force** | `login` / `register` limités à **5 tentatives/min/IP** → `429 TROP_DE_TENTATIVES` |
+| **CORS restreint** | seules origines dashboard (dev 5173/5174) + même origine acceptée (terminal) ; autre → `403 ORIGINE_NON_AUTORISEE` |
+| **Corps JSON limité** | 100 ko max → `413 CORPS_TROP_GROS` |
+| **Import borné** | fichier ≤ 5 Mo (`413 FICHIER_TROP_GROS`) et ≤ 2000 lignes (`400 TROP_DE_LIGNES`) |
+| **Matricule unique** | génération avec **retry** sur collision `P2002` (2 requêtes simultanées ne produisent plus `409 MATRICULE_EXISTANT` pour un matricule auto) |
+| **Réponses d'erreur** | jamais de stack technique ; code machine `{ ok, code, message }` |
+| **Moindre privilège** | rôle `LECTEUR` par défaut à l'inscription, écritures réservées `ADMIN`/`SUPER_ADMIN` |
+
+En production (hébergement), définir `CORS_ORIGINES` avec le/les domaine(s) du dashboard (voir `backend/.env.example`).
 
 ---
 
@@ -189,6 +214,7 @@ FOFANA,Ibrahim,Logistique
 ```
 
 - Le **matricule** est auto-généré (`RSI-XXXX`) et le **QR badge** créé automatiquement.
+- **Limites** : fichier ≤ 5 Mo et ≤ 2000 lignes de données.
 - Le département doit **exister dans la base** (table `Departement`) : si le
   fichier en référence un d'inconnu, **tout l'import est refusé**
   (`400 DEPARTEMENT_INCONNU`) — aucun département n'est créé automatiquement.
@@ -225,6 +251,8 @@ Variables d'environnement requises :
 - `DATABASE_URL` (PostgreSQL fourni par la plateforme)
 - `JWT_SECRET` (secret aléatoire)
 - `ADMIN_EMAIL` / `ADMIN_PASSWORD` (compte SUPER_ADMIN du seed)
+- `PUBLIC_BASE_URL` (URL publique du backend, ex. `https://mon-api.railway.app`)
+- `CORS_ORIGINES` (origines du dashboard, séparées par des virgules, ex. `https://mon-dashboard.vercel.app`)
 - `PORT` (défaut 3000)
 
 Après déploiement : vérifier `GET /api/health`, puis lancer le seed et l'import d'ouvriers via la console du service.

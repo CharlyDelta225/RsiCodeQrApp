@@ -57,3 +57,49 @@ test("route inconnue => 404 ROUTE_INCONNUE", async () => {
   const body = await res.json();
   assert.strictEqual(body.code, "ROUTE_INCONNUE");
 });
+
+test("CORS : même origine autorisée (terminal servi par l'API)", async () => {
+  const res = await fetch(`${baseURL}/api/health`, {
+    headers: { Origin: baseURL },
+  });
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.headers.get("access-control-allow-origin"), baseURL);
+});
+
+test("CORS : origine inconnue refusée => 403 ORIGINE_NON_AUTORISEE", async () => {
+  const res = await fetch(`${baseURL}/api/health`, {
+    headers: { Origin: "http://site-malicieux.example.com" },
+  });
+  assert.strictEqual(res.status, 403);
+  const body = await res.json();
+  assert.strictEqual(body.code, "ORIGINE_NON_AUTORISEE");
+});
+
+test("corps JSON trop gros => 413 CORPS_TROP_GROS", async () => {
+  const gros = JSON.stringify({ data: "x".repeat(200 * 1024) });
+  const res = await fetch(`${baseURL}/api/badgeage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: gros,
+  });
+  assert.strictEqual(res.status, 413);
+  const body = await res.json();
+  assert.strictEqual(body.code, "CORPS_TROP_GROS");
+});
+
+test("rate limit : login -> 429 TROP_DE_TENTATIVES après 5 essais", async () => {
+  const tenter = () =>
+    fetch(`${baseURL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "nobody@test.dev", motDePasse: "mauvais-mot-de-passe" }),
+    });
+  for (let i = 0; i < 5; i++) {
+    const r = await tenter();
+    assert.strictEqual(r.status, 401); // échec normal tant que le quota n'est pas dépassé
+  }
+  const res = await tenter();
+  assert.strictEqual(res.status, 429);
+  const body = await res.json();
+  assert.strictEqual(body.code, "TROP_DE_TENTATIVES");
+});

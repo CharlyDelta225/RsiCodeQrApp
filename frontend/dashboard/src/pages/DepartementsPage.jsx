@@ -4,6 +4,9 @@ import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
 
+import { usePagination } from "../lib/pagination";
+import PaginationBar from "../components/PaginationBar";
+
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
 function peutEcrire() {
@@ -180,6 +183,8 @@ export default function DepartementsPage() {
 
   const nbMembres = selection?.membres?.length ?? 0;
 
+  const pagination = usePagination(selection?.membres ?? []);
+
   return (
     <div className="p-4 md:p-8 space-y-5 max-w-6xl mx-auto">
       {/* Bandeau titre */}
@@ -192,9 +197,10 @@ export default function DepartementsPage() {
             <p className="text-sm text-slate-500">Gérez les membres et leurs postes dans chaque département.</p>
             <Link
               to="/gestion-departements"
-              className="inline-block mt-1 text-xs text-rose-600 hover:text-rose-700 underline underline-offset-2 transition"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-rose-600 bg-rose-50 ring-1 ring-rose-100 hover:bg-rose-100 rounded-full px-4 py-2 transition"
             >
-              → Créer / renommer / exporter les départements (page Gestion des départements)
+              Créer / renommer / exporter les départements
+              <span className="text-xs">→</span>
             </Link>
           </div>
           <button
@@ -279,7 +285,7 @@ export default function DepartementsPage() {
                 </tr>
               </thead>
               <tbody>
-                {selection.membres.map((m) => (
+                {pagination.elementsPage.map((m) => (
                   <tr key={m.id} className="border-t border-slate-100 hover:bg-rose-50/30 transition">
                     <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{m.ouvrier?.matricule}</td>
                     <td className="px-3 py-2.5 text-slate-700">{m.ouvrier?.nom}</td>
@@ -309,6 +315,16 @@ export default function DepartementsPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {!chargementDetail && selection && nbMembres > 0 && (
+          <PaginationBar
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            onPage={pagination.setPage}
+            total={nbMembres}
+            label="membre(s)"
+          />
         )}
       </div>
 

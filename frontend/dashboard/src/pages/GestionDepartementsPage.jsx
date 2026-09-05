@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
+import ConfirmDialog from "../components/ConfirmDialog";
+import PaginationBar from "../components/PaginationBar";
+import { usePagination } from "../lib/pagination";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -32,6 +35,7 @@ export default function GestionDepartementsPage() {
   const [renommageErreur, setRenommageErreur] = useState(null);
   const [gestionErreur, setGestionErreur] = useState(null);
   const [enGestion, setEnGestion] = useState(false);
+  const [suppression, setSuppression] = useState(null);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -55,6 +59,8 @@ export default function GestionDepartementsPage() {
     d.nom.toLowerCase().includes(filtre.trim().toLowerCase())
   );
   const nbMembresTotal = departements.reduce((s, d) => s + (d._count?.membres ?? 0), 0);
+
+  const pagination = usePagination(departementsFiltres);
 
   async function handleCreer(e) {
     e.preventDefault();
@@ -93,16 +99,23 @@ export default function GestionDepartementsPage() {
     }
   }
 
-  async function handleSupprimerDepartement(dep) {
-    if (!confirm(`Supprimer le département « ${dep.nom} » ? Les membres seront retirés mais conservés comme ouvriers.`)) return;
+  function demanderSuppression(dep) {
+    setGestionErreur(null);
+    setSuppression(dep);
+  }
+
+  async function supprimerConfirme() {
+    if (!suppression) return;
     setEnGestion(true);
     setGestionErreur(null);
     try {
-      await api.deleteDepartement(dep.id);
-      setSucces(`Département « ${dep.nom} » supprimé.`);
+      await api.deleteDepartement(suppression.id);
+      setSucces(`Département « ${suppression.nom} » supprimé.`);
+      setSuppression(null);
       await charger();
     } catch (err) {
       setGestionErreur(err instanceof ApiError ? err.message : "Erreur lors de la suppression");
+      setSuppression(null);
     } finally {
       setEnGestion(false);
     }
@@ -131,9 +144,10 @@ export default function GestionDepartementsPage() {
             </p>
             <Link
               to="/departements"
-              className="inline-block mt-1 text-xs text-rose-600 hover:text-rose-700 underline underline-offset-2 transition"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-rose-600 bg-rose-50 ring-1 ring-rose-100 hover:bg-rose-100 rounded-full px-4 py-2 transition"
             >
-              → Gérer les membres et postes (page Départements)
+              Gérer les membres et postes
+              <span className="text-xs">→</span>
             </Link>
           </div>
           <div className="flex items-center gap-2">
@@ -203,7 +217,7 @@ export default function GestionDepartementsPage() {
                 </tr>
               </thead>
               <tbody>
-                {departementsFiltres.map((d) => (
+                {pagination.elementsPage.map((d) => (
                   <tr key={d.id} className="border-t border-slate-100 hover:bg-rose-50/30 transition">
                     <td className="px-3 py-2.5 text-slate-700">{d.nom}</td>
                     <td className="px-3 py-2.5 text-slate-400 text-xs">{d.description || "—"}</td>
@@ -224,7 +238,7 @@ export default function GestionDepartementsPage() {
                             ✏
                           </button>
                           <button
-                            onClick={() => handleSupprimerDepartement(d)}
+                            onClick={() => demanderSuppression(d)}
                             disabled={enGestion}
                             title={`Supprimer ${d.nom}`}
                             className="w-8 h-8 rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-rose-600 hover:border-rose-200 disabled:opacity-40 transition"
@@ -242,6 +256,14 @@ export default function GestionDepartementsPage() {
             </table>
           </div>
         )}
+
+        <PaginationBar
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          onPage={pagination.setPage}
+          total={departementsFiltres.length}
+          label="département(s)"
+        />
       </div>
 
       {/* Popup de création d'un département */}
@@ -356,6 +378,16 @@ export default function GestionDepartementsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        ouvert={!!suppression}
+        titre={suppression ? `Supprimer le département « ${suppression.nom} » ?` : ""}
+        message="Les membres seront retirés de ce département mais conservés comme ouvriers."
+        bouton="Supprimer"
+        enCours={enGestion}
+        surAnnuler={() => setSuppression(null)}
+        surConfirmer={supprimerConfirme}
+      />
     </div>
   );
 }

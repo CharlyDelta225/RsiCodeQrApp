@@ -1,12 +1,11 @@
 import { C } from "../theme";
-import { logout } from "../lib/auth";
 
 function initials(email) {
   if (!email) return "?";
   return email.split("@")[0].slice(0, 2).toUpperCase();
 }
 
-export default function TopBar({ title, subtitle, onMenuToggle, admin }) {
+export default function TopBar({ title, subtitle, onMenuToggle, onDeconnexion, admin }) {
   return (
     <header className="flex items-center gap-2 bg-white border-b border-red-100/60 px-3 md:px-4 py-3 flex-shrink-0 min-w-0">
       {/* hamburger — visible seulement sur mobile (tablette+ a la sidebar icônes) */}
@@ -34,7 +33,7 @@ export default function TopBar({ title, subtitle, onMenuToggle, admin }) {
           {initials(admin?.email)}
         </div>
         <button
-          onClick={logout}
+          onClick={onDeconnexion}
           title="Se déconnecter"
           className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
         >

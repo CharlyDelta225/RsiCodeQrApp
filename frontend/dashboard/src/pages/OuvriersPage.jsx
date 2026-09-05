@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { libelleDepartement } from "../lib/departement";
 import { getAdmin } from "../lib/auth";
+import { usePagination } from "../lib/pagination";
+import PaginationBar from "../components/PaginationBar";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -46,6 +48,8 @@ export default function OuvriersPage() {
   const [badgeOuvrier, setBadgeOuvrier] = useState(null);
 
   const [departements, setDepartements] = useState([]);
+
+  const pagination = usePagination(ouvriers);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -250,7 +254,7 @@ export default function OuvriersPage() {
             {!chargement && ouvriers.length === 0 && (
               <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400">Aucun ouvrier trouvé</td></tr>
             )}
-            {ouvriers.map((o) => (
+            {pagination.elementsPage.map((o) => (
               <tr key={o.id} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
                 <td className="px-3 py-2">{o.nom}</td>
@@ -294,6 +298,14 @@ export default function OuvriersPage() {
           </tbody>
         </table>
       </div>
+
+      <PaginationBar
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        onPage={pagination.setPage}
+        total={ouvriers.length}
+        label="ouvrier(s)"
+      />
 
       {/* Modal ajout manuel */}
       {modalOuvert && (

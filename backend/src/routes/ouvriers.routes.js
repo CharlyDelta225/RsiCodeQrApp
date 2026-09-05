@@ -2,7 +2,7 @@ import { Router } from "express";
 import QRCode from "qrcode";
 import archiver from "archiver";
 import prisma from "../lib/prisma.js";
-import { genererMatricule } from "../lib/matricule.js";
+import { genererMatricule, creerAvecMatricule } from "../lib/matricule.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -217,8 +217,11 @@ router.post("/", ECRITURE, async (req, res) => {
       }
     }
 
-    // Créer l'ouvrier
-    const ouvrier = await prisma.ouvrier.create({ data: donnees });
+    // Créer l'ouvrier. Si le client n'a pas fourni de matricule, on en tire un
+    // puis on crée avec retry (collision P2002 gérée dans creerAvecMatricule).
+    const ouvrier = donnees.matricule
+      ? await prisma.ouvrier.create({ data: donnees })
+      : await creerAvecMatricule({ nom: donnees.nom, prenom: donnees.prenom, ...(donnees.photoUrl !== undefined && { photoUrl: donnees.photoUrl }), ...(donnees.actif !== undefined && { actif: donnees.actif }) });
 
     // Créer la liaison département si fourni
     if (departementIdFinal) {

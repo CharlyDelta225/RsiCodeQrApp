@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
 import prisma from "../lib/prisma.js";
-import { genererMatricule } from "../lib/matricule.js";
+import { creerAvecMatricule } from "../lib/matricule.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -130,6 +130,16 @@ router.post(
       throw new AppError(
         "FICHIER_VIDE",
         "Le fichier ne contient aucune donnée. Veuillez vérifier le fichier."
+      );
+    }
+
+    // Limite du nombre de lignes : évite qu'un fichier gigantesque fasse
+    // ramer Prisma (2000 lignes = déjà un import conséquent pour une église).
+    const MAX_LIGNES = 2000;
+    if (lignes.length > MAX_LIGNES) {
+      throw new AppError(
+        "TROP_DE_LIGNES",
+        `Le fichier contient ${lignes.length} lignes. Le maximum autorisé est de ${MAX_LIGNES}.`
       );
     }
 
@@ -268,14 +278,11 @@ router.post(
       // Le département existe (validé en 5-bis) => on ne le crée jamais
       const departement = await prisma.departement.findUnique({ where: { nom: donnees.departementNom } });
 
-      // Créer l'ouvrier (matricule auto-généré, actif par défaut)
-      const matricule = await genererMatricule();
-      const ouvrier = await prisma.ouvrier.create({
-        data: {
-          matricule,
-          nom: donnees.nom,
-          prenom: donnees.prenom,
-        },
+      // Créer l'ouvrier (matricule auto-généré avec retry sur collision P2002,
+      // actif par défaut)
+      const ouvrier = await creerAvecMatricule({
+        nom: donnees.nom,
+        prenom: donnees.prenom,
       });
 
       // Créer la liaison OuvrierDepartement

@@ -1,10 +1,31 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { rateLimit } from "express-rate-limit";
 import prisma from "../lib/prisma.js";
 import requireAuth from "../middleware/auth.middleware.js";
 
 const router = Router();
+
+// Anti brute-force : 5 tentatives / min / IP sur login+register.
+// Un compteur dédié par IP évite qu'un attaquant épuise les comptes
+// d'autres clients (et protège aussi contre l'énumération d'emails).
+const limiterAuth = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    code: "TROP_DE_TENTATIVES",
+    message: "Trop de tentatives de connexion. Réessayez dans une minute.",
+  },
+});
+
+// Appliqué aux deux routes sensibles (création de compte comprise : un
+// attaquant pourrait sinon créer des comptes en masse depuis le net).
+router.use("/login", limiterAuth);
+router.use("/register", limiterAuth);
 
 /**
  * POST /api/auth/register  (PUBLIC)

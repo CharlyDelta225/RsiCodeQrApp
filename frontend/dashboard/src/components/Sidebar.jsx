@@ -1,7 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { C, navItems } from "../theme";
 import rsiLogo from "../assets/rsi-logo.png";
-import { logout } from "../lib/auth";
 
 function initials(email) {
   if (!email) return "?";
@@ -40,7 +39,7 @@ function NavButton({ item, onNavigate, iconOnly }) {
 }
 
 /** Contenu complet (logo + nav + utilisateur) — utilisé par la sidebar desktop et le drawer mobile. */
-function SidebarContent({ admin, onClose }) {
+function SidebarContent({ admin, onClose, onDeconnexion }) {
   return (
     <>
       <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-4 border-b border-white/10 flex-shrink-0">
@@ -77,7 +76,7 @@ function SidebarContent({ admin, onClose }) {
             <p className="text-white/50 text-[10px]">Administrateur</p>
           </div>
           <button
-            onClick={logout}
+            onClick={onDeconnexion}
             title="Se déconnecter"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
           >
@@ -90,7 +89,7 @@ function SidebarContent({ admin, onClose }) {
 }
 
 /** Sidebar fixe : icônes seules sur tablette (md→lg), complète sur desktop (lg+). */
-export function Sidebar({ admin }) {
+export function Sidebar({ admin, onDeconnexion }) {
   return (
     <>
       <aside className="hidden md:flex lg:hidden flex-col h-full w-14 flex-shrink-0" style={{ background: C.sidebar }}>
@@ -110,7 +109,7 @@ export function Sidebar({ admin }) {
             {initials(admin?.email)}
           </div>
           <button
-            onClick={logout}
+            onClick={onDeconnexion}
             title="Se déconnecter"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
           >
@@ -120,14 +119,14 @@ export function Sidebar({ admin }) {
       </aside>
 
       <aside className="hidden lg:flex flex-col h-full w-56 flex-shrink-0" style={{ background: C.sidebar }}>
-        <SidebarContent admin={admin} />
+        <SidebarContent admin={admin} onDeconnexion={onDeconnexion} />
       </aside>
     </>
   );
 }
 
 /** Tiroir plein écran (mobile), ouvert via le bouton hamburger de la TopBar. */
-export function MobileDrawer({ admin, onClose }) {
+export function MobileDrawer({ admin, onClose, onDeconnexion }) {
   return (
     <>
       <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={onClose} />
@@ -135,7 +134,7 @@ export function MobileDrawer({ admin, onClose }) {
         className="md:hidden fixed inset-y-0 left-0 w-72 max-w-[85vw] z-50 flex flex-col"
         style={{ background: C.sidebar }}
       >
-        <SidebarContent admin={admin} onClose={onClose} />
+        <SidebarContent admin={admin} onClose={onClose} onDeconnexion={onDeconnexion} />
       </aside>
     </>
   );
