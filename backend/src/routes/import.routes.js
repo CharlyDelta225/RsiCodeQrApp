@@ -6,6 +6,7 @@ import path from "node:path";
 import QRCode from "qrcode";
 import prisma from "../lib/prisma.js";
 import { creerAvecMatricule } from "../lib/matricule.js";
+import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -160,6 +161,8 @@ router.post(
     }
 
     // Construire une fonction "ligne tabulaire → objet {nom, prenom, departementNom}"
+    // Le département est normalisé en MAJUSCULES (la table Departement est
+    // insensible à la casse : tous les noms sont stockés en majuscules).
     const idx = {
       nom: entete.indexOf("Nom"),
       prenom: entete.indexOf("Prénom"),
@@ -168,22 +171,26 @@ router.post(
     const ligneVersObjet = (l) => ({
       nom: String(l[idx.nom] ?? "").trim().toUpperCase(),
       prenom: String(l[idx.prenom] ?? "").trim(),
-      departementNom: String(l[idx.departement] ?? "").trim(),
+      departementNom: String(l[idx.departement] ?? "").trim().toUpperCase(),
     });
 
     // --- 5-bis. Vérifier que tous les départements du fichier existent dans
     // le référentiel (table Departement). Aucun département n'est créé : si le
-    // fichier en contient d'inconnus, tout l'import est refusé. ---
+    // fichier en contient d'inconnus, tout l'import est refusé.
+    // La correspondance est insensible à la casse ET aux accents ("media",
+    // "MEDIA", "Média" → tous rattachés au département "MÉDIA"). ---
+    const departementsEnBase = await prisma.departement.findMany();
+    const departementParCle = new Map(
+      departementsEnBase.map((d) => [normaliserNomDepartement(d.nom), d])
+    );
     const nomsDepartementsFichier = [
       ...new Set(
         lignes.map((l) => ligneVersObjet(l).departementNom).filter((n) => n !== "")
       ),
     ];
-    const departementsEnBase = await prisma.departement.findMany({
-      where: { nom: { in: nomsDepartementsFichier } },
-    });
-    const nomsEnBase = new Set(departementsEnBase.map((d) => d.nom));
-    const introuvables = nomsDepartementsFichier.filter((n) => !nomsEnBase.has(n));
+    const introuvables = nomsDepartementsFichier.filter(
+      (n) => !departementParCle.has(normaliserNomDepartement(n))
+    );
     if (introuvables.length > 0) {
       throw new AppError(
         "DEPARTEMENT_INCONNU",
@@ -193,7 +200,6 @@ router.post(
 
     // --- 6. Traitement ligne par ligne ---
     let creees = 0;
-    let ignorees = 0;
     let erreurs = 0;
     const detail = [];
 
@@ -225,7 +231,7 @@ router.post(
 
       // Si l'ouvrier existe, vérifier s'il est déjà dans ce département
       if (ouvrierExistant) {
-        const deptExistant = await prisma.departement.findUnique({ where: { nom: donnees.departementNom } });
+        const deptExistant = departementParCle.get(normaliserNomDepartement(donnees.departementNom));
         if (deptExistant) {
           const liaisonExistante = await prisma.ouvrierDepartement.findUnique({
             where: {
@@ -236,13 +242,16 @@ router.post(
             },
           });
           if (liaisonExistante) {
-            ignorees++;
+            // Doublon (même Nom+Prénom+Département déjà rattaché en base) :
+            // on le remonte comme ligne en erreur pour que le responsable voie
+            // qu'il y a un doublon dans le rapport d'import.
+            erreurs++;
             detail.push({
               nom: donnees.nom,
               prenom: donnees.prenom,
               departement: donnees.departementNom,
-              statut: "ignore",
-              raison: "doublon",
+              statut: "erreur",
+              raison: "doublon : déjà rattaché à ce département",
             });
             continue;
           }
@@ -276,7 +285,7 @@ router.post(
       }
 
       // Le département existe (validé en 5-bis) => on ne le crée jamais
-      const departement = await prisma.departement.findUnique({ where: { nom: donnees.departementNom } });
+      const departement = departementParCle.get(normaliserNomDepartement(donnees.departementNom));
 
       // Créer l'ouvrier (matricule auto-généré avec retry sur collision P2002,
       // actif par défaut)
@@ -308,7 +317,7 @@ router.post(
     }
 
     // --- 7. Réponse détaillée ---
-    res.json({ ok: true, creees, ignorees, erreurs, detail });
+    res.json({ ok: true, creees, ignorees: 0, erreurs, detail });
   } catch (err) {
     // Les erreurs AppError (validation métier) sont renvoyées telles quelles
     if (err.code && err.status) {

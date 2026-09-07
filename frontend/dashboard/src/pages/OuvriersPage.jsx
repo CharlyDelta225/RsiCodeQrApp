@@ -13,12 +13,23 @@ function peutEcrire() {
 
 // Raison courte et compréhensible d'un échec, basée sur le code machine de
 // l'API (cf. api-contrat.md : le front se branche sur les codes, pas les messages).
+// Si le code n'est pas reconnu, on retombe sur le message réel du backend
+// (jamais sur un texte vague) pour que l'utilisateur comprenne toujours pourquoi.
 function raisonEchec(err, fallback) {
   const raisons = {
+    // Validations d'import
+    FICHIER_MANQUANT: "Aucun fichier sélectionné. Choisissez un fichier .csv ou .xlsx.",
+    TYPE_FICHIER_NON_SUPPORTE: "Type de fichier non accepté. Seuls les formats .csv et .xlsx sont autorisés.",
+    FICHIER_TROP_GROS: "Le fichier dépasse la taille maximale autorisée (5 Mo).",
+    FORMAT_INVALIDE: "Le fichier est illisible ou corrompu. Vérifiez le fichier avant de le recharger.",
+    FICHIER_VIDE: "Le fichier ne contient aucune donnée. Vérifiez qu'il comporte au moins une ligne.",
+    TROP_DE_LIGNES: "Le fichier est trop volumineux : maximum 2000 lignes autorisées.",
+    COLONNES_MANQUANTES: "Colonnes attendues manquantes. Le fichier doit contenir : Nom, Prénom, Département.",
+    DEPARTEMENT_INCONNU: "Un ou plusieurs départements ne sont pas dans la liste. Veuillez choisir des départements corrects.",
+    // Autres (création, etc.)
     DOUBLON_DEPARTEMENT: "Un ouvrier avec ce nom et ce prénom existe déjà dans ce département",
     MATRICULE_EXISTANT: "Ce matricule existe déjà",
     CHAMPS_MANQUANTS: "Des champs obligatoires sont manquants",
-    DEPARTEMENT_INCONNU: "Un ou plusieurs départements ne sont pas dans la liste. Veuillez choisir des départements corrects.",
     ROLE_INVALIDE: "Poste invalide",
     POSTE_DEJA_PRIS: "Ce poste est déjà occupé dans le département",
     ACCES_REFUSE: "Vous n'avez pas les droits pour cette action",
@@ -26,7 +37,11 @@ function raisonEchec(err, fallback) {
     ROLE_REQUIS: "Réseau non autorisé à effectuer cette action",
     FICHIER_INVALIDE: "Le fichier fourni est invalide (formats acceptés : .csv ou .xlsx)",
   };
+  // Si on a une erreur API avec un code connu → message explicite dédié.
   if (err instanceof ApiError && raisons[err.code]) return raisons[err.code];
+  // Si on a une erreur API (code inconnu) → on montre le message réel du backend.
+  if (err instanceof ApiError && err.message) return err.message;
+  // Sinon (erreur réseau, inattendue) → fallback fourni par l'appelant.
   return fallback;
 }
 
@@ -103,19 +118,26 @@ export default function OuvriersPage() {
     setAlerte(null);
     try {
       const data = await api.importOuvriers(fichier);
-      const { creees = 0, ignorees = 0, erreurs = 0 } = data;
-      if (creees > 0) {
-        let message = `Import réussi : ${creees} nouvel(s) ouvrier(s) ajouté(s)${ignorees > 0 ? `, ${ignorees} doublon(s) déjà en base ignoré(s)` : ""}.`;
-        if (erreurs > 0) message += ` ${erreurs} ligne(s) en erreur.`;
-        setSucces({ titre: "Import réussi", message });
-      } else if (ignorees > 0) {
-        let message = "Import refusé : des doublons ont été trouvés en base.";
-        if (erreurs > 0) message += ` ${erreurs} ligne(s) en erreur.`;
-        setAlerte({ titre: "Import refusé", message });
+      // D'abord recharger la liste (le fetch charger() remettrait alerte à null
+      // s'il était appelé après, ce qui écrase le popup : on recharge donc AVANT
+      // de fixer le message de résultat).
+      await charger();
+      const { creees = 0, erreurs = 0 } = data;
+      if (creees > 0 && erreurs > 0) {
+        setAlerte({
+          titre: "Import avec erreurs",
+          message: `${creees} ouvrier(s) ajouté(s), ${erreurs} ligne(s) en erreur (doublon ou données invalides).`,
+        });
+      } else if (creees > 0) {
+        setSucces({ titre: "Import réussi", message: `${creees} nouvel(s) ouvrier(s) ajouté(s).` });
+      } else if (erreurs > 0) {
+        setAlerte({
+          titre: "Import terminé avec erreurs",
+          message: `${erreurs} ligne(s) en erreur (doublon ou données invalides). Aucun nouvel ouvrier ajouté.`,
+        });
       } else {
         setAlerte({ titre: "Import terminé", message: "Aucun ouvrier ajouté." });
       }
-      charger();
     } catch (err) {
       setAlerte({ titre: "Échec de l'import", message: raisonEchec(err, "L'import du fichier a échoué") });
     } finally {

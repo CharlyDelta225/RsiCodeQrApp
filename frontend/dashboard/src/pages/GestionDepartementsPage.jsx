@@ -68,7 +68,7 @@ export default function GestionDepartementsPage() {
     setCreationErreur(null);
     try {
       const res = await api.createDepartement({
-        nom: formCreation.nom,
+        nom: formCreation.nom.trim().toUpperCase(),
         description: formCreation.description,
       });
       setCreationOuvert(false);
@@ -88,7 +88,7 @@ export default function GestionDepartementsPage() {
     setEnGestion(true);
     setRenommageErreur(null);
     try {
-      await api.updateDepartement(renommage.id, { nom: formRenommage.nom });
+      await api.updateDepartement(renommage.id, { nom: formRenommage.nom.trim().toUpperCase() });
       setRenommage(null);
       setSucces("Département renommé.");
       await charger();

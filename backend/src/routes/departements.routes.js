@@ -1,5 +1,6 @@
 import { Router } from "express";
 import prisma from "../lib/prisma.js";
+import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -114,6 +115,30 @@ router.get("/:id/membres", async (req, res) => {
 });
 
 /**
+ * Normalise un nom de département : MAJUSCULE + suppression des espaces.
+ * La table Departement est insensible à la casse PAR CONSTRUCTION : tous les
+ * noms sont stockés en majuscules (l'unicité PostgreSQL reste sensible à la
+ * casse, mais dès l'instant où l'écriture est normalisée, il est impossible
+ * que deux noms ne diffèrent que par la casse).
+ */
+function normaliserNom(valeur) {
+  return String(valeur ?? "").trim().toUpperCase();
+}
+
+/**
+ * Vérifie qu'un nom de département n'existe pas déjà, en ignorant la casse ET
+ * les accents ("media" ≈ "MÉDIA"). Renvoie true si le nom est déjà pris.
+ */
+async function nomDejaPris(nom, idExclu = null) {
+  const departements = await prisma.departement.findMany({
+    where: idExclu ? { id: { not: idExclu } } : undefined,
+    select: { nom: true },
+  });
+  const cible = normaliserNomDepartement(nom);
+  return departements.some((d) => normaliserNomDepartement(d.nom) === cible);
+}
+
+/**
  * POST /api/departements
  * Crée un département. Body :
  *   { "nom": "...", "description": "..."? }
@@ -131,9 +156,19 @@ router.post("/", ECRITURE, async (req, res) => {
       });
     }
 
+    // Anti-doublon insensible à la casse ET aux accents (renvoie 409 avant
+    // même que PostgreSQL n'émette P2002, qui reste garde-fou pour la casse).
+    if (await nomDejaPris(nom)) {
+      return res.status(409).json({
+        ok: false,
+        code: "DEPARTEMENT_EXISTANT",
+        message: "Ce nom de département existe déjà",
+      });
+    }
+
     const departement = await prisma.departement.create({
       data: {
-        nom: String(nom).trim(),
+        nom: normaliserNom(nom),
         description: description ? String(description).trim() : null,
       },
     });
@@ -156,11 +191,20 @@ router.post("/", ECRITURE, async (req, res) => {
 router.patch("/:id", ECRITURE, async (req, res) => {
   try {
     const donnees = {};
-    if (req.body.nom !== undefined) donnees.nom = String(req.body.nom).trim();
+    if (req.body.nom !== undefined) donnees.nom = normaliserNom(req.body.nom);
     if (req.body.description !== undefined) donnees.description = String(req.body.description).trim() || null;
 
     if (Object.keys(donnees).length === 0) {
       return res.status(400).json({ ok: false, code: "AUCUNE_DONNEE", message: "Aucune donnée à mettre à jour" });
+    }
+
+    // Anti-doublon insensible à la casse ET aux accents (jamais sur soi-même).
+    if (donnees.nom !== undefined && (await nomDejaPris(donnees.nom, req.params.id))) {
+      return res.status(409).json({
+        ok: false,
+        code: "DEPARTEMENT_EXISTANT",
+        message: "Ce nom de département existe déjà",
+      });
     }
 
     const departement = await prisma.departement.update({

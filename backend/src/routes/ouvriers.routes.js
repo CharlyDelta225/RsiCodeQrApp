@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import archiver from "archiver";
 import prisma from "../lib/prisma.js";
 import { genererMatricule, creerAvecMatricule } from "../lib/matricule.js";
+import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -190,11 +191,19 @@ router.post("/", ECRITURE, async (req, res) => {
       donnees.matricule = await genererMatricule();
     }
 
-    // Déterminer le département cible (rattachement créé après la création)
+    // Déterminer le département cible (rattachement créé après la création).
+    // La correspondance par nom ignore la casse et les accents ("media" → "MÉDIA").
     let departementIdFinal = departementId || null;
     if (!departementIdFinal && departementNom) {
-      const dept = await prisma.departement.findUnique({ where: { nom: String(departementNom).trim() } });
-      if (dept) departementIdFinal = dept.id;
+      const departements = await prisma.departement.findMany({
+        select: { id: true, nom: true },
+      });
+      const cible = departements.find(
+        (d) =>
+          normaliserNomDepartement(d.nom) ===
+          normaliserNomDepartement(departementNom)
+      );
+      if (cible) departementIdFinal = cible.id;
     }
 
     // Anti doublon (aligné sur l'import) : un ouvrier portant le même nom +
