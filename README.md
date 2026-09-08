@@ -30,6 +30,7 @@ RsiCodeQrApp/
 - **Auth** : JWT (jsonwebtoken) + bcryptjs + `express-rate-limit` (anti brute-force)
 - **QR codes** : `qrcode` (PNG) + `archiver` (ZIP bulk)
 - **Import** : `multer` (upload) + `xlsx` (parse .csv et .xlsx)
+- **Rapports** : `pdfkit` (PDF par département + récap), `nodemailer` (envoi email SMTP), `node-cron` (envoi auto 06h00)
 - **Sécurité** : CORS restreint, limites de corps/fichier, rôles (moindre privilège)
 - **Déploiement** : préparation Railway (`railway.toml`) et Render (`render.yaml`)
 
@@ -83,6 +84,7 @@ Pages du dashboard :
 | `/pointages` · `/historique` | Pointages du jour · historique filtrable/exportable |
 | `/departements` | Membres et postes par département |
 | `/gestion-departements` | Créer / lister / renommer / exporter les départements |
+| `/rapports` | Rapport de pointage : filtrer (date/département), présent/absent, exporter en CSV, envoyer par email |
 
 > Les listes du dashboard sont **paginées à 17 éléments par page** ; la
 > suppression d'un département et la déconnexion passent par un popup de
@@ -199,6 +201,13 @@ Ouvrier ──< OuvrierDepartement >── Departement
 |---|---|---|---|
 | `GET` | `/api/pointages` | tous | Historique (filtres du/au, ouvrier, pagination) |
 
+### Rapports
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| `GET` | `/api/rapports/journalier` | tous | Structure d'un rapport (filtres `date`, `departementId`) pour la page `/rapports` |
+| `POST` | `/api/rapports/journalier` | ADMIN/SUPER | Génère les PDF par département + récap et les envoie par email (destinataires ou `RAPPORT_EMAIL_DESTINATAIRES`) |
+
 Le contrat détaillé (formats de requête/réponse, codes d'erreur) est dans **`docs/api-contrat.md`**.
 
 ---
@@ -254,5 +263,7 @@ Variables d'environnement requises :
 - `PUBLIC_BASE_URL` (URL publique du backend, ex. `https://mon-api.railway.app`)
 - `CORS_ORIGINES` (origines du dashboard, séparées par des virgules, ex. `https://mon-dashboard.vercel.app`)
 - `PORT` (défaut 3000)
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_EXPEDITEUR` (envoi des rapports par email)
+- `RAPPORT_EMAIL_DESTINATAIRES` (destinataires par défaut des rapports, séparés par des virgules)
 
 Après déploiement : vérifier `GET /api/health`, puis lancer le seed et l'import d'ouvriers via la console du service.

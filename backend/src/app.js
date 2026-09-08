@@ -11,6 +11,7 @@ import requireAuth from "./middleware/auth.middleware.js";
 import importRoutes from "./routes/import.routes.js";
 import adminsRoutes from "./routes/admins.routes.js";
 import departementsRoutes from "./routes/departements.routes.js";
+import rapportsRoutes from "./routes/rapports.routes.js";
 
 dotenv.config();
 
@@ -107,6 +108,9 @@ app.use("/api/pointages", requireAuth, pointagesRoutes);
 
 // Gestion des départements + affectation ouvriers — PROTÉGÉ (JWT admin requis)
 app.use("/api/departements", requireAuth, departementsRoutes);
+
+// Rapports de pointage + envoi programmé — PROTÉGÉ (ADMIN/SUPER_ADMIN)
+app.use("/api/rapports", requireAuth, rapportsRoutes);
 
 // --- 404 : toute route non déclarée ---
 app.use((req, res) => {

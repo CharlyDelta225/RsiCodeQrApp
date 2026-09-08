@@ -7,6 +7,7 @@ import PointagesJourPage from "./pages/PointagesJourPage.jsx";
 import HistoriquePage from "./pages/HistoriquePage.jsx";
 import DepartementsPage from "./pages/DepartementsPage.jsx";
 import GestionDepartementsPage from "./pages/GestionDepartementsPage.jsx";
+import RapportPage from "./pages/RapportPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
 
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/historique" element={<HistoriquePage />} />
         <Route path="/departements" element={<DepartementsPage />} />
         <Route path="/gestion-departements" element={<GestionDepartementsPage />} />
+        <Route path="/rapports" element={<RapportPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

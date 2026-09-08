@@ -119,4 +119,20 @@ export const api = {
 
   // Santé (public, pas de token nécessaire mais request() n'en ajoute pas si absent)
   health: () => request("/api/health"),
+
+  // Rapports de pointage
+  // GET /api/rapports/journalier?date=YYYY-MM-DD&departementId=<id>
+  // Retourne { ok, rapport: { dateISO, jourLabel, seuilTexte, notePresence, programme,
+  //   departements: [{ id, nom, presents, absents, effectif,
+  //                    lignes: [{ matricule, nom, prenom, present, heure }] }],
+  //   recap: { presents, absents, effectif } } }
+  getRapportJournalier: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/rapports/journalier${qs ? `?${qs}` : ""}`);
+  },
+  // POST /api/rapports/journalier — génère les PDF et les envoie par email.
+  // Body : { date?: "YYYY-MM-DD", destinataires?: string[] }
+  // Réponse : { ok, rapport, email: { destinataires, messageId } }
+  envoyerRapportJournalier: (data = {}) =>
+    request("/api/rapports/journalier", { method: "POST", body: JSON.stringify(data) }),
 };

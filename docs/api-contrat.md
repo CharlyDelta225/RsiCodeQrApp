@@ -376,6 +376,128 @@ Réponse : `{ "ok": true }`. Erreurs : `404 DEPARTEMENT_INCONNU` / `404 MEMBRE_I
 
 ---
 
+## 5. Rapports de pointage (PROTÉGÉ — header `Authorization: Bearer <token>`)
+
+### Contexte
+
+Les jours de **programme** de l'église sont : **Mercredi, Vendredi, Dimanche**.
+Présence d'un ouvrier (il ne badge qu'**une** fois par jour) :
+
+| Jour | Présent si badge ≤ |
+|---|---|
+| Mercredi | 21h30 |
+| Vendredi | 21h30 |
+| Dimanche | 12h00 |
+| Tout autre jour (route manuelle) | **badgé = présent** (aucun seuil) |
+
+### `GET /api/rapports/journalier` (lecture — tout rôle authentifié)
+
+Retourne la structure d'un rapport **sans envoyer d'email** (pour la page
+Rapport du dashboard : filtre + affichage présent/absent + export CSV).
+
+**Query optionnels** :
+```text
+?date=2026-09-09            AAAA-MM-JJ (défaut : aujourd'hui)
+&departementId=<id>          filtre sur un département (défaut : tous) —
+                             le `recap` est recalculé sur la sélection
+```
+
+**Réponse 200** :
+```json
+{
+  "ok": true,
+  "rapport": {
+    "dateISO": "2026-09-09",
+    "dateLongueur": "Mercredi 9 septembre 2026",
+    "jourLabel": "Mercredi",
+    "seuilTexte": "21:30",
+    "notePresence": "Statut : présent si badge ≤ 21:30",
+    "programme": true,
+    "departements": [
+      {
+        "id": "0a4939e7-...",
+        "nom": "SÉCURITÉ",
+        "presents": 12,
+        "absents": 6,
+        "effectif": 18,
+        "lignes": [ { "matricule": "RSI-0001", "nom": "KOUASSI", "prenom": "Jean", "present": true, "heure": "19:42" } ]
+      }
+    ],
+    "recap": { "presents": 120, "absents": 70, "effectif": 190 }
+  }
+}
+```
+
+**Réponses d'erreur** :
+| HTTP | code | message |
+|---|---|---|
+| 400 | `DATE_INVALIDE` | Date illisible (format `AAAA-MM-JJ`) |
+| 404 | `DEPARTEMENT_INCONNU` | `departementId` introuvable |
+
+### `POST /api/rapports/journalier` (écriture — **ADMIN/SUPER_ADMIN**)
+
+Génère les PDF (un par département + **récapitulatif**) de la date demandée et
+les **envoie par email** en pièces jointes. **Fonctionne n'importe quel jour** :
+sur un jour de programme le seuil s'applique, sur un autre jour « badgé » suffit.
+
+**Body optionnel** :
+```json
+{ "date": "2026-09-09",                     // AAAA-MM-JJ (défaut : aujourd'hui)
+  "destinataires": ["a@x.fr", "b@x.fr"] }   // destinataires (défaut : RAPPORT_EMAIL_DESTINATAIRES)
+```
+
+**Réponse 200** :
+```json
+{
+  "ok": true,
+  "rapport": {
+    "dateISO": "2026-09-09",
+    "jourLabel": "Mercredi",
+    "seuilTexte": "21:30",
+    "departements": [ { "id": "0a4939e7-...", "nom": "SÉCURITÉ", "presents": 12, "absents": 6, "effectif": 18 } ],
+    "recap": { "presents": 120, "absents": 70, "effectif": 190 }
+  },
+  "email": { "destinataires": ["a@x.fr"], "messageId": "<...>" }
+}
+```
+
+**Réponses d'erreur** :
+| HTTP | code | message |
+|---|---|---|
+| 400 | `DATE_INVALIDE` | Date illisible (format `AAAA-MM-JJ`) |
+| 400 | `SMTP_NON_CONFIGURE` | `SMTP_HOST` absent du `.env` |
+| 400 | `SANS_DESTINATAIRE` | ni paramètre ni `RAPPORT_EMAIL_DESTINATAIRES` |
+| 400 | `ENVOI_EMAIL_ECHOUE` | L'envoi SMTP a échoué (message SMTP précisé) |
+| 500 | `ERREUR_INTERNE` | Erreur interne |
+
+### Envoi programmé (automatique)
+
+Chaque matin à **06h00** (heure locale du serveur), le backend envoie
+automatiquement le rapport du **jour de programme précédent** :
+
+| Matin | Rapport envoyé |
+|---|---|
+| Jeudi 06h00 | Mercredi |
+| Samedi 06h00 | Vendredi |
+| Lundi 06h00 | Dimanche |
+
+Destinataires : `RAPPORT_EMAIL_DESTINATAIRES` (variable d'environnement,
+**plusieurs adresses séparées par des virgules**).
+Un même rapport n'est envoyé **qu'une fois** par session serveur.
+
+**Variables `.env` requises** :
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=moncompte@gmail.com
+SMTP_PASS=xxxx
+SMTP_EXPEDITEUR="Rapports <moncompte@gmail.com>"  # optionnel (défaut : SMTP_USER)
+RAPPORT_EMAIL_DESTINATAIRES=responsable@eglise.ci,secretariat@eglise.ci
+```
+
+---
+
 ## 6. Divers
 
 - `GET /api/health` — public, `{ "status": "ok", ... }`. Utilisé par les healthcheck Railway/Render.
@@ -387,6 +509,8 @@ Réponse : `{ "ok": true }`. Erreurs : `404 DEPARTEMENT_INCONNU` / `404 MEMBRE_I
 
 | Date | Changement |
 |---|---|
+| 2026-09-08 | **Page Rapport (dashboard `/rapports`)** : ajout de `GET /api/rapports/journalier` (lecture, filtre `date` + `departementId`, `recap` recalculé), tableau présent/absent, export CSV (colonne `Date`), envoi email manuel ; `RAPPORT_EMAIL_DESTINATAIRES` multi-adresses (séparées par des virgules) |
+| 2026-09-07 | **Rapports de pointage** : ajout de la section 5 — `POST /api/rapports/journalier` (PDF par département + récap, envoi email SMTP) + envoi automatique chaque matin 06h00 du rapport du jour de programme précédent (Mer/Jeu, Ven/Sam, Dim/Lun). Règle de présence : Mercredi/Vendredi ≤ 21h30, Dimanche ≤ 12h00. **La route manuelle fonctionne n'importe quel jour** (hors programme : badgé = présent). Env `SMTP_*` et `RAPPORT_EMAIL_DESTINATAIRES` |
 | 2026-09-05 | **Durcissement sécurité** : rate-limit sur `POST /api/auth/login` et `/register` (5 tentatives/min/IP) → `429 TROP_DE_TENTATIVES` ; CORS restreint aux origines du dashboard (variable `CORS_ORIGINES`, défauts 5173/5174) → `403 ORIGINE_NON_AUTORISEE` ; corps JSON limité à 100 ko → `413 CORPS_TROP_GROS` ; fichier d'import > 5 Mo → `413 FICHIER_TROP_GROS` ; import > 2000 lignes → `400 TROP_DE_LIGNES` ; matricule auto-généré avec retry sur collision unique (l'erreur `409 MATRICULE_EXISTANT` ne peut plus survenir pour un matricule généré) |
 | 2026-09-05 | **Import strict sur les départements** : l'import refuse tout fichier contenant au moins un département absent du référentiel → `400 DEPARTEMENT_INCONNU` (l'auto-création de département est supprimée) |
 | 2026-09-05 | **Anti doublon** : `POST /api/ouvriers` refuse toute création dont le nom+prénom existent déjà dans le département ciblé (comparaison insensible à la casse, aligné sur l'import) → `409 DOUBLON_DEPARTEMENT` ; l'import applique désormais aussi une comparaison insensible à la casse ; contournement volontaire : `{"force": true}` (deux vraies personnes homonymes) |

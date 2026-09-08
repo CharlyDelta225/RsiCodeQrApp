@@ -22,6 +22,7 @@ export const navItems = [
   { path: "/historique", label: "Historique", icon: "⊡", short: "Historique" },
   { path: "/departements", label: "Départements", icon: "▣", short: "Départ." },
   { path: "/gestion-departements", label: "Gestion départements", icon: "◫", short: "Gest. dép." },
+  { path: "/rapports", label: "Rapport de pointage", icon: "▤", short: "Rapport" },
 ];
 
 // Titre/sous-titre de la TopBar selon la route active
@@ -33,4 +34,5 @@ export const pageTitles = {
   "/historique": { title: "Historique", subtitle: "Filtrable · Exportable" },
   "/departements": { title: "Départements", subtitle: "Membres et postes" },
   "/gestion-departements": { title: "Gestion des départements", subtitle: "Créer · Lister · Exporter" },
+  "/rapports": { title: "Rapport de pointage", subtitle: "Filtrer · Exporter · Envoyer" },
 };
