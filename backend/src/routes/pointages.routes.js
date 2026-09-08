@@ -35,7 +35,8 @@ router.get("/", async (req, res) => {
       prisma.pointage.count({ where }),
       prisma.pointage.findMany({
         where,
-        orderBy: { dateHeure: "desc" },
+        // Liste triée alphabétiquement par ouvrier (nom puis prénom).
+        orderBy: [{ ouvrier: { nom: "asc" } }, { ouvrier: { prenom: "asc" } }],
         skip: (page - 1) * limit,
         take: limit,
         include: {

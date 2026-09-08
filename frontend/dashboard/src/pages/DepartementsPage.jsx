@@ -20,8 +20,6 @@ const ROLES = [
   { valeur: "MEMBRE", libelle: "Membre" },
 ];
 
-const PRIORITE_ROLE = { RESPONSABLE: 0, ADJOINT: 1, SECRETAIRE: 2, MEMBRE: 3 };
-
 function libelleRole(role) {
   return ROLES.find((r) => r.valeur === role)?.libelle || role;
 }
@@ -87,7 +85,10 @@ export default function DepartementsPage() {
     try {
       const data = await api.getDepartement(selectedId);
       const membres = [...(data.departement.membres || [])];
-      membres.sort((a, b) => (PRIORITE_ROLE[a.roleDansDepartement] ?? 9) - (PRIORITE_ROLE[b.roleDansDepartement] ?? 9));
+      membres.sort((a, b) =>
+        (a.ouvrier?.nom ?? "").localeCompare(b.ouvrier?.nom ?? "", "fr") ||
+        (a.ouvrier?.prenom ?? "").localeCompare(b.ouvrier?.prenom ?? "", "fr")
+      );
       setSelection({ ...data.departement, membres });
     } catch (err) {
       setErreur(err instanceof ApiError ? err.message : "Impossible de charger ce département");

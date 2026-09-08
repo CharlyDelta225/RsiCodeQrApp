@@ -66,7 +66,7 @@ router.get("/:id", async (req, res) => {
       include: {
         membres: {
           include: { ouvrier: true },
-          orderBy: { createdAt: "asc" },
+          orderBy: [{ ouvrier: { nom: "asc" } }, { ouvrier: { prenom: "asc" } }],
         },
       },
     });
@@ -94,7 +94,7 @@ router.get("/:id/membres", async (req, res) => {
       include: {
         membres: {
           include: { ouvrier: true },
-          orderBy: { createdAt: "asc" },
+          orderBy: [{ ouvrier: { nom: "asc" } }, { ouvrier: { prenom: "asc" } }],
         },
       },
     });

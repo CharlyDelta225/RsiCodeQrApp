@@ -55,7 +55,7 @@ router.get("/", async (req, res) => {
       prisma.ouvrier.count({ where: ou }),
       prisma.ouvrier.findMany({
         where: ou,
-        orderBy: { nom: "asc" },
+        orderBy: [{ nom: "asc" }, { prenom: "asc" }],
         skip: (page - 1) * limit,
         take: limit,
         include: {
@@ -94,7 +94,7 @@ router.get("/badges/zip", async (req, res) => {
       ou.departements = { some: { departementId: req.query.departementId } };
     }
 
-    const ouvriers = await prisma.ouvrier.findMany({ where: ou, orderBy: { nom: "asc" } });
+    const ouvriers = await prisma.ouvrier.findMany({ where: ou, orderBy: [{ nom: "asc" }, { prenom: "asc" }] });
 
     if (ouvriers.length === 0) {
       return res.status(404).json({

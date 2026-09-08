@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
+import PaginationBar from "../components/PaginationBar";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
+const LIMIT = 17;
 
 function peutEcrire() {
   return ROLE_ECRITURE.includes(getAdmin()?.role);
@@ -41,6 +43,7 @@ export default function RapportPage() {
   const [rapport, setRapport] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const [page, setPage] = useState(1);
 
   // Dialoque d'envoi email manuel
   const [envoiOuvert, setEnvoiOuvert] = useState(false);
@@ -73,10 +76,12 @@ export default function RapportPage() {
 
   useEffect(() => {
     charger();
+    setPage(1); // un changement de filtre repart de la page 1
   }, [charger]);
 
   function handleFiltrer(e) {
     e.preventDefault();
+    setPage(1);
     charger();
   }
 
@@ -86,6 +91,15 @@ export default function RapportPage() {
     dep.lignes.map((ligne) => ({ ligne, nomDepartement: dep.nom }))
   );
   const totaux = rapport?.recap;
+
+  // Pagination (page éventuellement au-delà de la dernière après un filtre si
+  // on ne repassait pas par la page 1 : on la borne au maximum).
+  const totalPages = Math.max(1, Math.ceil(lignesAffichees.length / LIMIT));
+  const pageCourante = Math.min(page, totalPages);
+  const lignesPage = lignesAffichees.slice(
+    (pageCourante - 1) * LIMIT,
+    pageCourante * LIMIT
+  );
 
   function handleExporterCsv() {
     const dateRapport = rapport?.dateISO ?? date;
@@ -266,7 +280,7 @@ export default function RapportPage() {
                 </td>
               </tr>
             )}
-            {lignesAffichees.map(({ ligne, nomDepartement }, index) => (
+            {lignesPage.map(({ ligne, nomDepartement }, index) => (
               <tr key={`${nomDepartement}-${ligne.matricule}-${index}`} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-mono text-xs">{ligne.matricule}</td>
                 <td className="px-3 py-2">{ligne.nom}</td>
@@ -290,6 +304,14 @@ export default function RapportPage() {
           </tbody>
         </table>
       </div>
+
+      <PaginationBar
+        page={pageCourante}
+        totalPages={totalPages}
+        onPage={setPage}
+        total={lignesAffichees.length}
+        label="ouvrier(s)"
+      />
 
       {envoiOuvert && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">

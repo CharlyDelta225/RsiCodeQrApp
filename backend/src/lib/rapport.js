@@ -89,7 +89,7 @@ export async function construireRapport(date) {
       include: {
         membres: {
           include: { ouvrier: true },
-          orderBy: { ouvrier: { nom: "asc" } },
+          orderBy: [{ ouvrier: { nom: "asc" } }, { ouvrier: { prenom: "asc" } }],
         },
       },
     }),
