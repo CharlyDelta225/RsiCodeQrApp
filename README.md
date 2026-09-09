@@ -26,13 +26,34 @@ RsiCodeQrApp/
 ## Technologies
 
 - **Backend** : Node.js (ESM) + Express 5
-- **Base de données** : PostgreSQL 18 + Prisma ORM 6
+- **Base de données** : PostgreSQL — **base commune Supabase** (session pooler) pour toute l'équipe ; fallback local PostgreSQL 18 — + Prisma ORM 6
 - **Auth** : JWT (jsonwebtoken) + bcryptjs + `express-rate-limit` (anti brute-force)
 - **QR codes** : `qrcode` (PNG) + `archiver` (ZIP bulk)
 - **Import** : `multer` (upload) + `xlsx` (parse .csv et .xlsx)
 - **Rapports** : `pdfkit` (PDF par département + récap), `nodemailer` (envoi email SMTP), `node-cron` (envoi auto 06h00)
 - **Sécurité** : CORS restreint, limites de corps/fichier, rôles (moindre privilège)
 - **Déploiement** : préparation Railway (`railway.toml`) et Render (`render.yaml`)
+
+---
+
+## Base de données commune — Supabase (équipe)
+
+Pour **uniformiser les tests**, tout le monde pointe sur la **même base Supabase**
+(hébergée), pas sur des bases locales séparées.
+
+- **Connexion** : via le **Session pooler** (IPv4, accessible sur tous les réseaux).
+  Dans le dashboard Supabase : **Connect → "Session pooler"** → copier l'URI.
+- **Format** :
+  `postgresql://postgres.<REF-PROJET>:<MOT-DE-PASSE>@aws-1-<REGION>.pooler.supabase.com:5432/postgres?schema=public&connection_limit=4&sslmode=require`
+  Le mot de passe reste **privé** : il se partage hors du dépôt (jamais commiter).
+- ⚠️ Éviter "**Direct connection**" (`db.<ref>.supabase.co`) : **IPv6 uniquement**.
+- **Schéma déjà appliqué + données d'exemple présentes** : après `cp .env.example .env`
+  et mise du bon `DATABASE_URL`, un simple `npm start` suffit — pas de migration.
+- **Nouvelle table / modèle** ? Modifier `prisma/schema.prisma` puis
+  `npm run prisma:migrate` → la migration s'applique **sur Supabase** (la base
+  locale n'est plus utilisée sauf à re-pointer `DATABASE_URL` dessus).
+- **Réinitialiser des données d'exemple** : `npm run seed` (idempotent : départements,
+  ouvriers d'exemple, admin `SUPER_ADMIN`).
 
 ---
 
@@ -46,10 +67,12 @@ cd backend
 npm install
 
 # 2. Configurer les variables d'environnement
-cp .env.example .env   # puis remplir DATABASE_URL, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+cp .env.example .env   # remplir DATABASE_URL, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+                        #   (équipe : DATABASE_URL = pooler Supabase, voir section ci-dessus)
 
 # 3. Appliquer le schéma de base de données
-npm run prisma:migrate  # (prisma migrate dev --name init)
+npm run prisma:migrate  # requis uniquement si la base n'est pas provisionnée
+                        # (base commune Supabase : déjà appliqué → passer à l'étape 4)
 
 # 4. (Optionnel) Remplir avec des données d'exemple + admin SUPER_ADMIN
 npm run seed

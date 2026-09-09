@@ -3,10 +3,13 @@ dotenv.config();
 
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
+import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 
-// Script de seed : remplit la base de données de dev avec des ouvriers d'exemple.
+// Script de seed : remplit la base avec des départements et ouvriers d'exemple.
 // Usage : npm run seed
-// Idempotent : si un matricule existe déjà, il est ignoré (upsert).
+// Idempotent : si un matricule ou un département existe déjà, il est ignoré.
+const departementsExemples = ["Louange", "Accueil", "Enfant", "Intercession", "Technique"];
+
 const ouvriersExemples = [
   { matricule: "RSI-0001", nom: "KOUAME", prenom: "Aya", departement: "Louange" },
   { matricule: "RSI-0002", nom: "BAMBA", prenom: "Ibrahim", departement: "Accueil" },
@@ -15,29 +18,61 @@ const ouvriersExemples = [
   { matricule: "RSI-0005", nom: "TRAORE", prenom: "Fatou", departement: "Technique", actif: false },
 ];
 
+async function recupererOuCreerDepartements(noms) {
+  const existants = await prisma.departement.findMany();
+  const parNormalise = new Map(
+    existants.map((d) => [normaliserNomDepartement(d.nom), d])
+  );
+  const resultats = [];
+  for (const nom of noms) {
+    const cle = normaliserNomDepartement(nom);
+    let dept = parNormalise.get(cle);
+    if (!dept) {
+      dept = await prisma.departement.create({ data: { nom } });
+      parNormalise.set(cle, dept);
+    }
+    resultats.push(dept);
+  }
+  return resultats;
+}
+
 async function main() {
+  const departements = await recupererOuCreerDepartements(departementsExemples);
+  const deptParNormalise = new Map(
+    departements.map((d) => [normaliserNomDepartement(d.nom), d])
+  );
+
   let crees = 0;
+  let rattaches = 0;
   for (const o of ouvriersExemples) {
-    const result = await prisma.ouvrier.upsert({
+    const ouvrier = await prisma.ouvrier.upsert({
       where: { matricule: o.matricule },
       update: {},
-      create: { ...o, actif: o.actif ?? true },
+      create: { matricule: o.matricule, nom: o.nom, prenom: o.prenom, actif: o.actif ?? true },
     });
-    if (result) crees++;
-  }
-  const total = await prisma.ouvrier.count();
-  console.log(`✓ Seed terminé. ${crees}/${ouvriersExemples.length} ouvriers traités. Total en base : ${total}`);
+    if (ouvrier) crees++;
 
-  // Admin par défaut (étape 7) — email/mot de passe depuis .env
-  // Rôle SUPER_ADMIN : c'est le seul qui peut créer d'autres comptes admin.
+    const dept = deptParNormalise.get(normaliserNomDepartement(o.departement));
+    if (dept) {
+      const lien = await prisma.ouvrierDepartement.upsert({
+        where: { ouvrierId_departementId: { ouvrierId: ouvrier.id, departementId: dept.id } },
+        update: {},
+        create: { ouvrierId: ouvrier.id, departementId: dept.id, roleDansDepartement: "MEMBRE" },
+      });
+      if (lien) rattaches++;
+    }
+  }
+
+  console.log(`✓ Seed terminé. ${departements.length} départements, ${crees}/${ouvriersExemples.length} ouvriers, ${rattaches} rattachements.`);
+  console.log(`  Total ouvriers en base : ${await prisma.ouvrier.count()}`);
+
+  // Admin par défaut — email/mot de passe depuis .env
   const email = process.env.ADMIN_EMAIL;
   const motDePasse = process.env.ADMIN_PASSWORD;
   if (email && motDePasse) {
     const hash = await bcrypt.hash(motDePasse, 10);
     await prisma.admin.upsert({
       where: { email },
-      // update : on réaffirme le rôle SUPER_ADMIN même si le compte existe déjà
-      // (il a pu être créé avant l'ajout du champ rôle, ou rétrogradé).
       update: { role: "SUPER_ADMIN" },
       create: { email, motDePasse: hash, role: "SUPER_ADMIN" },
     });
