@@ -196,6 +196,7 @@ export default function DepartementsPage() {
               Départements
             </h1>
             <p className="text-sm text-slate-500">Gérez les membres et leurs postes dans chaque département.</p>
+            {peutEcrire() && (
             <Link
               to="/gestion-departements"
               className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-rose-600 bg-rose-50 ring-1 ring-rose-100 hover:bg-rose-100 rounded-full px-4 py-2 transition"
@@ -203,14 +204,17 @@ export default function DepartementsPage() {
               Créer / renommer / exporter les départements
               <span className="text-xs">→</span>
             </Link>
+          )}
           </div>
-          <button
-            onClick={handleExporterCsv}
-            disabled={!selection || nbMembres === 0}
-            className="text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 disabled:opacity-50 rounded-xl px-4 py-2 shadow-sm transition"
-          >
-            ⬇ Exporter en CSV
-          </button>
+          {peutEcrire() && (
+            <button
+              onClick={handleExporterCsv}
+              disabled={!selection || nbMembres === 0}
+              className="text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 disabled:opacity-50 rounded-xl px-4 py-2 shadow-sm transition"
+            >
+              ⬇ Exporter en CSV
+            </button>
+          )}
         </div>
       </div>
 

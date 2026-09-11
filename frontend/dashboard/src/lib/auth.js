@@ -15,6 +15,26 @@ export function getAdmin() {
   return raw ? JSON.parse(raw) : null;
 }
 
+/** Rôle de l'admin connecté (SUPER_ADMIN | ADMIN | LECTEUR) ou null. */
+export function roleAdmin() {
+  return getAdmin()?.role ?? null;
+}
+
+/** Seul le SUPER_ADMIN gère les comptes admin (page /gestion-admins). */
+export function estSuperAdmin() {
+  return roleAdmin() === "SUPER_ADMIN";
+}
+
+/** Libellé lisible du rôle (affiché près de l'email, ex : sidebar). */
+export function libelleRole(role) {
+  const libelles = {
+    SUPER_ADMIN: "Super administrateur",
+    ADMIN: "Administrateur",
+    LECTEUR: "Lecteur",
+  };
+  return libelles[role] || role || "…";
+}
+
 export function setSession(token, admin) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(ADMIN_KEY, JSON.stringify(admin));

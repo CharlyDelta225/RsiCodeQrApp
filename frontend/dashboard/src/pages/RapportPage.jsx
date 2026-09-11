@@ -167,13 +167,15 @@ export default function RapportPage() {
             : "Rapport de pointage"}
         </h2>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleExporterCsv}
-            disabled={lignesAffichees.length === 0}
-            className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 disabled:opacity-50 rounded-lg px-3 py-2"
-          >
-            ⬇ Exporter en CSV
-          </button>
+          {peutEcrire() && (
+            <button
+              onClick={handleExporterCsv}
+              disabled={lignesAffichees.length === 0}
+              className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 disabled:opacity-50 rounded-lg px-3 py-2"
+            >
+              ⬇ Exporter en CSV
+            </button>
+          )}
           {peutEcrire() && (
             <button
               onClick={ouvrirModalEnvoi}

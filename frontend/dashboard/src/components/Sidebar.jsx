@@ -1,6 +1,21 @@
 import { NavLink } from "react-router-dom";
 import { C, navItems } from "../theme";
+import { roleAdmin, libelleRole } from "../lib/auth";
 import rsiLogo from "../assets/rsi-logo.png";
+
+// Tolérance des menus par rôle (hiérarchie) : SUPER_ADMIN voit tout, ADMIN
+// voit les pages ADMIN+, LECTEUR ne voit que les pages de lecture.
+const HIERARCHIE = { LECTEUR: 0, ADMIN: 1, SUPER_ADMIN: 2 };
+
+function voirMenu(item) {
+  if (!item.minRole) return true;
+  return (HIERARCHIE[roleAdmin()] ?? 0) >= HIERARCHIE[item.minRole];
+}
+
+// Recalculé à chaque rendu (le rôle vit dans localStorage et change au login).
+function navAutorises() {
+  return navItems.filter(voirMenu);
+}
 
 function initials(email) {
   if (!email) return "?";
@@ -58,7 +73,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
       </div>
 
       <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto min-h-0">
-        {navItems.map((item) => (
+        {navAutorises().map((item) => (
           <NavButton key={item.path} item={item} onNavigate={onClose} />
         ))}
       </nav>
@@ -73,7 +88,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-white text-xs font-semibold truncate">{admin?.email || "…"}</p>
-            <p className="text-white/50 text-[10px]">Administrateur</p>
+            <p className="text-white/50 text-[10px]">{libelleRole(admin?.role)}</p>
           </div>
           <button
             onClick={onDeconnexion}
@@ -97,7 +112,7 @@ export function Sidebar({ admin, onDeconnexion }) {
           <img src={rsiLogo} alt="RSI" className="w-8 h-8 object-contain rounded-full" />
         </div>
         <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto px-1.5 min-h-0 mt-2">
-          {navItems.map((item) => (
+          {navAutorises().map((item) => (
             <NavButton key={item.path} item={item} iconOnly />
           ))}
         </nav>
@@ -147,7 +162,7 @@ export function BottomNav() {
       className="md:hidden fixed bottom-0 inset-x-0 z-30 flex border-t border-red-900/30"
       style={{ background: C.sidebarFooter, paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      {navItems.map((item) => (
+      {navAutorises().map((item) => (
         <NavLink
           key={item.path}
           to={item.path}

@@ -14,6 +14,7 @@ export const C = {
 
 // Navigation adaptée à nos vraies entités (ouvriers/pointages/badges/
 // départements), pas aux écrans de la maquette (rapports de cellules, etc.)
+// `minRole` : rôle minimum pour voir l'entrée (absent = tous les rôles).
 export const navItems = [
   { path: "/", label: "Tableau de bord", icon: "⊞", short: "Accueil" },
   { path: "/ouvriers", label: "Ouvriers", icon: "◎", short: "Ouvriers" },
@@ -21,8 +22,9 @@ export const navItems = [
   { path: "/pointages", label: "Pointages du jour", icon: "⊕", short: "Pointages" },
   { path: "/historique", label: "Historique", icon: "⊡", short: "Historique" },
   { path: "/departements", label: "Départements", icon: "▣", short: "Départ." },
-  { path: "/gestion-departements", label: "Gestion départements", icon: "◫", short: "Gest. dép." },
+  { path: "/gestion-departements", label: "Gestion départements", icon: "◫", short: "Gest. dép.", minRole: "ADMIN" },
   { path: "/rapports", label: "Rapport de pointage", icon: "▤", short: "Rapport" },
+  { path: "/gestion-admins", label: "Gestion admins", icon: "⚙", short: "Comptes", minRole: "SUPER_ADMIN" },
 ];
 
 // Titre/sous-titre de la TopBar selon la route active
@@ -35,4 +37,5 @@ export const pageTitles = {
   "/departements": { title: "Départements", subtitle: "Membres et postes" },
   "/gestion-departements": { title: "Gestion des départements", subtitle: "Créer · Lister · Exporter" },
   "/rapports": { title: "Rapport de pointage", subtitle: "Filtrer · Exporter · Envoyer" },
+  "/gestion-admins": { title: "Gestion des comptes", subtitle: "Créer · Rôles · Accès" },
 };

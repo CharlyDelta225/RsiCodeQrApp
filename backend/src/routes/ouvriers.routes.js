@@ -85,7 +85,7 @@ router.get("/", async (req, res) => {
  * réel (ce chemin a deux segments, "/:id" et "/:id/badge" n'interceptent
  * jamais "/badges/zip").
  */
-router.get("/badges/zip", async (req, res) => {
+router.get("/badges/zip", ECRITURE, async (req, res) => {
   try {
     const ou = {};
     if (req.query.actif === "true") ou.actif = true;

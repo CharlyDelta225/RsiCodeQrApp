@@ -99,19 +99,31 @@ npm run dev             # => http://localhost:5174
 
 Pages du dashboard :
 
+| Route | Contenu | Accès |
+|---|---|---|
+| `/` | Tableau de bord : KPIs, pointages récents | tous |
+| `/ouvriers` | Gestion des ouvriers (CRUD, import `.csv`/`.xlsx`) | lecture : tous · écriture : ADMIN/SUPER |
+| `/badges` | Badges QR (aperçu) | tous · export/impression : ADMIN/SUPER |
+| `/pointages` · `/historique` | Pointages du jour · historique filtrable | lecture : tous · export CSV : ADMIN/SUPER |
+| `/departements` | Membres et postes par département | lecture : tous · export CSV : ADMIN/SUPER |
+| `/gestion-departements` | Créer / lister / renommer / exporter les départements | ADMIN/SUPER |
+| `/rapports` | Rapport de pointage : filtrer (date/département), présent/absent, envoyer par email | lecture : tous · CSV/email : ADMIN/SUPER |
+| `/gestion-admins` | Créer / rôles / activer-désactiver / débloquer / réinit mdp / supprimer les comptes | SUPER_ADMIN |
+
+Pages publiques (hors authentification) :
+
 | Route | Contenu |
 |---|---|
-| `/` | Tableau de bord : KPIs, pointages récents |
-| `/ouvriers` | Gestion des ouvriers (CRUD, import `.csv`/`.xlsx`) |
-| `/badges` | Badges QR (aperçu, ZIP d'impression) |
-| `/pointages` · `/historique` | Pointages du jour · historique filtrable/exportable |
-| `/departements` | Membres et postes par département |
-| `/gestion-departements` | Créer / lister / renommer / exporter les départements |
-| `/rapports` | Rapport de pointage : filtrer (date/département), présent/absent, exporter en CSV, envoyer par email |
+| `/login` | Connexion (avec compteur de tentatives et lien « mot de passe oublié ») |
+| `/inscription` | Créer un compte — le compte naît **LECTEUR** (moindre privilège) |
+| `/oublie` | Demander un lien de réinitialisation de mot de passe (envoyé par email) |
+| `/reinitialisation` | Poser un nouveau mot de passe grâce au lien reçu (usage unique, 1 h) |
 
 > Les listes du dashboard sont **paginées à 17 éléments par page** ; la
 > suppression d'un département et la déconnexion passent par un popup de
-> confirmation.
+> confirmation. Un LECTEUR ne voit que des boutons de consultation : toute
+> extraction (import, export CSV/PDF, ZIP des badges) est réservée aux rôles
+> à écriture, côté interface **et** côté API.
 
 ### Terminal kiosque
 
@@ -123,15 +135,16 @@ Le terminal est servi directement par le backend : http://localhost:3000/termina
 
 ## Rôles et permissions
 
-| Rôle | Lire ouvriers/pointages | Écrire ouvriers / import | Gérer les rôles |
-|---|---|---|---|
-| `LECTEUR` | ✅ | ❌ | ❌ |
-| `ADMIN` | ✅ | ✅ | ❌ |
-| `SUPER_ADMIN` | ✅ | ✅ | ✅ |
+| Rôle | Lire ouvriers/pointages | Écrire ouvriers / import | Gérer départements | Exports (CSV/ZIP/PDF) | Gérer les comptes |
+|---|---|---|---|---|---|
+| `LECTEUR` | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `ADMIN` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `SUPER_ADMIN` | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-- **Inscription** (`POST /api/auth/register`) est **publique** : tout compte naît `LECTEUR`.
-- **Élévation de rôle** : un `SUPER_ADMIN` change le rôle via `PATCH /api/admins/:id/role` depuis le dashboard.
-- **Anti-verrouillage** : un `SUPER_ADMIN` ne peut pas modifier son propre rôle.
+- **Inscription** (`POST /api/auth/register`) est **publique** (page `/inscription`) : tout compte naît `LECTEUR`, aucun droit d'extraction.
+- **Élévation de rôle** : un `SUPER_ADMIN` change le rôle via `PATCH /api/admins/:id/role` depuis le dashboard (`/gestion-admins`).
+- **Création de compte par le SUPER_ADMIN** : le mot de passe est généré et **envoyé par email** (s'il est renvoyé dans la réponse, l'email a échoué).
+- **Anti-verrouillage** : un `SUPER_ADMIN` ne peut ni modifier son propre rôle, ni se désactiver, ni se supprimer (et le dernier `SUPER_ADMIN` ne peut pas être supprimé).
 
 ---
 
@@ -139,13 +152,15 @@ Le terminal est servi directement par le backend : http://localhost:3000/termina
 
 | Protection | Détail |
 |---|---|
-| **Anti brute-force** | `login` / `register` limités à **5 tentatives/min/IP** → `429 TROP_DE_TENTATIVES` |
+| **Anti brute-force** | `login` / `register` / `reset-demand` limités à **5 tentatives/min/IP** → `429 TROP_DE_TENTATIVES` |
+| **Blocage par compte** | **3 mots de passe erronés** → compte gelé **15 min** (`423 COMPTE_BLOQUE`, minutes restantes dans `reste`) ; déblocage manuel par le SUPER_ADMIN |
+| **Récupération de mot de passe** | lien unique envoyé par email (**usage unique, 1 h**), stocké **haché** (SHA-256) en base, jamais en clair ; réponses identiques email connu/inconnu (anti-énumération) |
 | **CORS restreint** | seules origines dashboard (dev 5173/5174) + même origine acceptée (terminal) ; autre → `403 ORIGINE_NON_AUTORISEE` |
 | **Corps JSON limité** | 100 ko max → `413 CORPS_TROP_GROS` |
 | **Import borné** | fichier ≤ 5 Mo (`413 FICHIER_TROP_GROS`) et ≤ 2000 lignes (`400 TROP_DE_LIGNES`) |
 | **Matricule unique** | génération avec **retry** sur collision `P2002` (2 requêtes simultanées ne produisent plus `409 MATRICULE_EXISTANT` pour un matricule auto) |
 | **Réponses d'erreur** | jamais de stack technique ; code machine `{ ok, code, message }` |
-| **Moindre privilège** | rôle `LECTEUR` par défaut à l'inscription, écritures réservées `ADMIN`/`SUPER_ADMIN` |
+| **Moindre privilège** | rôle `LECTEUR` par défaut à l'inscription, écritures et extractions réservées `ADMIN`/`SUPER_ADMIN` |
 
 En production (hébergement), définir `CORS_ORIGINES` avec le/les domaine(s) du dashboard (voir `backend/.env.example`).
 
@@ -179,16 +194,24 @@ Ouvrier ──< OuvrierDepartement >── Departement
 
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
-| `POST` | `/api/auth/login` | public | Connexion → token JWT |
+| `POST` | `/api/auth/login` | public | Connexion → token JWT (blocage après 3 échecs) |
 | `POST` | `/api/auth/register` | public | Créer un compte (LECTEUR) |
+| `POST` | `/api/auth/reset-demand` | public | Envoyer un lien de réinitialisation par email |
+| `POST` | `/api/auth/reset` | public | Poser un nouveau mot de passe (lien unique, 1 h) |
 | `GET` | `/api/auth/me` | authentifié | Infos du compte |
 
 ### Admins (SUPER_ADMIN)
 
 | Méthode | Route | Description |
 |---|---|---|
-| `GET` | `/api/admins` | Liste des comptes |
+| `GET` | `/api/admins` | Liste des comptes (avec statut `actif` et blocage) |
+| `POST` | `/api/admins` | Créer un compte (mot de passe généré + envoyé par email) |
 | `PATCH` | `/api/admins/:id/role` | Changer un rôle |
+| `PATCH` | `/api/admins/:id/activer` | Réactiver un compte |
+| `PATCH` | `/api/admins/:id/desactiver` | Désactiver un compte |
+| `PATCH` | `/api/admins/:id/debloquer` | Déverrouiller un compte gelé (3 échecs) |
+| `POST` | `/api/admins/:id/reinitialiser-mot-de-passe` | Nouveau mot de passe temporaire (envoyé par email) |
+| `DELETE` | `/api/admins/:id` | Supprimer un compte |
 
 ### Ouvriers
 
@@ -201,7 +224,7 @@ Ouvrier ──< OuvrierDepartement >── Departement
 | `PATCH` | `/api/ouvriers/:id/desactiver` | ADMIN/SUPER | Désactiver le badge |
 | `DELETE` | `/api/ouvriers/:id` | ADMIN/SUPER | Supprimer (+ pointages + liaisons) |
 | `GET` | `/api/ouvriers/:id/badge` | tous | PNG du QR code |
-| `GET` | `/api/ouvriers/badges/zip` | tous | ZIP de tous les badges QR |
+| `GET` | `/api/ouvriers/badges/zip` | ADMIN/SUPER | ZIP de tous les badges QR (extraction) |
 | `POST` | `/api/ouvriers/import` | ADMIN/SUPER | Import massif .csv/.xlsx + QR auto |
 
 ### Départements
@@ -284,9 +307,10 @@ Variables d'environnement requises :
 - `JWT_SECRET` (secret aléatoire)
 - `ADMIN_EMAIL` / `ADMIN_PASSWORD` (compte SUPER_ADMIN du seed)
 - `PUBLIC_BASE_URL` (URL publique du backend, ex. `https://mon-api.railway.app`)
+- `APP_URL` (URL publique du dashboard — sert à construire les liens de réinitialisation de mot de passe, ex. `https://mon-dashboard.vercel.app`)
 - `CORS_ORIGINES` (origines du dashboard, séparées par des virgules, ex. `https://mon-dashboard.vercel.app`)
 - `PORT` (défaut 3000)
-- `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_EXPEDITEUR` (envoi des rapports par email)
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_EXPEDITEUR` (envoi des rapports par email + créations de comptes + liens de réinitialisation)
 - `RAPPORT_EMAIL_DESTINATAIRES` (destinataires par défaut des rapports, séparés par des virgules)
 
 Après déploiement : vérifier `GET /api/health`, puis lancer le seed et l'import d'ouvriers via la console du service.

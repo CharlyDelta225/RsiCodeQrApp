@@ -70,11 +70,11 @@ Appelé à chaque scan du QR par le terminal.
 
 ### Rôles admin (`RoleAdmin`)
 Hiérarchie : `SUPER_ADMIN` > `ADMIN` > `LECTEUR`
-| Rôle | Ouvriers (lecture) | Ouvriers (écriture/import) | Pointages | Gérer les rôles (`/api/admins`) |
-|---|---|---|---|---|
-| `LECTEUR` | ✅ | ❌ | ✅ | ❌ |
-| `ADMIN` | ✅ | ✅ | ✅ | ❌ |
-| `SUPER_ADMIN` | ✅ | ✅ | ✅ | ✅ |
+| Rôle | Ouvriers (lecture) | Ouvriers (écriture/import) | Pointages | Départements (gestion) | Gestion des comptes (`/api/admins`) |
+|---|---|---|---|---|---|
+| `LECTEUR` | ✅ | ❌ | ✅ | ❌ | ❌ |
+| `ADMIN` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `SUPER_ADMIN` | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### `POST /api/auth/login` (PUBLIC)
 ```json
@@ -85,32 +85,91 @@ Hiérarchie : `SUPER_ADMIN` > `ADMIN` > `LECTEUR`
 { "ok": true, "token": "<JWT>", "admin": { "id": "...", "email": "...", "role": "SUPER_ADMIN" } }
 
 // Erreurs
-// 401 { "ok": false, "code": "IDENTIFIANTS_INVALIDES", ... }
 // 400 { "ok": false, "code": "CHAMPS_MANQUANTS", ... }
+// 401 { "ok": false, "code": "IDENTIFIANTS_INVALIDES", "reste": 2, ... }
+//      "reste" = tentatives restantes AVANT blocage (3 par défaut)
+// 423 { "ok": false, "code": "COMPTE_BLOQUE", "reste": 15, ... }
+//      compte gelé 15 min après 3 échecs (reste = minutes)
+// 403 { "ok": false, "code": "COMPTE_DESACTIVE", ... } compte désactivé
+```
+
+> **Blocage anti brute-force** : après **3 mots de passe erronés**, le compte
+> est gelé **15 minutes** (`423 COMPTE_BLOQUE`, `reste` = minutes restantes).
+> Un déblocage manuel par le SUPER_ADMIN est possible (`PATCH /api/admins/:id/debloquer`).
+> Un **bon** mot de passe remet le compteur à zéro. Un email inconnu reçoit la
+> même réponse qu'un mauvais mot de passe (anti-énumération, sans `reste`).
+
+### `POST /api/auth/reset-demand` (PUBLIC, rate-limité)
+Demande d'un lien de réinitialisation de mot de passe par email (lien à usage
+unique, valable **1 heure**). Répond **toujours** `{ ok: true }` (même si
+l'email est inconnu) pour ne pas révéler quels comptes existent.
+```json
+// Body
+{ "email": "admin@example.com" }
+
+// Réponse 200
+{ "ok": true, "emailEnvoye": true,
+  "message": "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé." }
+// emailEnvoye=false si SMTP non configuré ou échec d'envoi (le compte existe)
+```
+
+### `POST /api/auth/reset` (PUBLIC)
+Pose un nouveau mot de passe grâce au lien reçu par email. Le lien est
+consommé (stocké haché en base, à usage unique), et le blocage éventuel est levé.
+```json
+// Body
+{ "token": "<token du lien>", "motDePasse": "NouveauMdp456!" }
+
+// Réponse 200
+{ "ok": true, "message": "Mot de passe réinitialisé. Vous pouvez vous connecter." }
+
+// Erreurs
+// 400 motDePasse < 8 ou token absent  → CHAMPS_MANQUANTS / MOT_DE_PASSE_TROP_COURT
+// 400 lien inconnu ou expiré           → LIEN_INVALIDE_OU_EXPIRE
+// 403 compte désactivé                 → COMPTE_DESACTIVE
 ```
 
 ### `GET /api/auth/me` (protégé)
 Renvoie l'admin connecté : `{ "ok": true, "admin": { "id", "email", "role", "createdAt" } }`
 
 ### `POST /api/auth/register` (PUBLIC)
-Création d'un compte. Tout nouveau compte naît **`LECTEUR`** (aucun pouvoir d'écriture). L'élévation vers `ADMIN`/`SUPER_ADMIN` se fait ensuite par un `SUPER_ADMIN` via `PATCH /api/admins/:id/role`.
+Création d'un compte. Tout nouveau compte naît **`LECTEUR`** et **`actif`**.
+L'élévation vers `ADMIN`/`SUPER_ADMIN` se fait ensuite par un `SUPER_ADMIN`
+via `PATCH /api/admins/:id/role`.
 ```json
 // Body
 { "email": "lambda@eglise.com", "motDePasse": "lambda123" }
 // (rôle NON accepté ici : tout inscrit est LECTEUR, le rôle fourni est ignoré)
 
 // Réponse 201
-{ "ok": true, "admin": { "id": "...", "email": "...", "role": "LECTEUR", "createdAt": "..." } }
+{ "ok": true, "admin": { "id": "...", "email": "...", "role": "LECTEUR", "actif": true, "createdAt": "..." } }
 
 // Erreurs
 // 400 motDePasse < 8 → MOT_DE_PASSE_TROP_COURT
 // 409 email déjà pris → EMAIL_EXISTANT
 ```
 
-### `GET /api/admins` (protégé — **SUPER_ADMIN uniquement**)
-Liste tous les comptes admin (pour la gestion des rôles côté dashboard).
+### `POST /api/admins` (protégé — **SUPER_ADMIN uniquement**)
+Crée un compte admin. Le **mot de passe est envoyé par email** (`motDePasseTemporaire`
+dans la réponse si SMTP non configuré). Le compte naît `LECTEUR` et `actif`.
 ```json
-{ "ok": true, "admins": [ { "id": "...", "email": "...", "role": "LECTEUR", "createdAt": "..." } ] }
+// Body
+{ "email": "nouveau@eglise.com" }
+
+// Réponse 201
+{ "ok": true, "admin": { "id": "...", "email": "...", "role": "LECTEUR", "actif": true, "createdAt": "..." },
+  "emailEnvoye": true }
+
+// Erreurs
+// 400 CHAMPS_MANQUANTS (email requis)
+// 409 EMAIL_EXISTANT
+```
+
+### `GET /api/admins` (protégé — **SUPER_ADMIN uniquement**)
+Liste tous les comptes admin (avec champs `actif`, `tentativesEchouees`, `bloqueJusqua`).
+```json
+{ "ok": true, "admins": [ { "id": "...", "email": "...", "role": "LECTEUR", "actif": true,
+                             "tentativesEchouees": 0, "bloqueJusqua": null, "createdAt": "..." } ] }
 ```
 
 ### `PATCH /api/admins/:id/role` (protégé — **SUPER_ADMIN uniquement**)
@@ -120,14 +179,51 @@ Change le rôle d'un compte admin.
 { "role": "ADMIN" }   // valeurs : ADMIN | LECTEUR | SUPER_ADMIN
 
 // Réponse 200
-{ "ok": true, "admin": { "id": "...", "email": "...", "role": "ADMIN", "createdAt": "..." } }
+{ "ok": true, "admin": { "id": "...", "email": "...", "role": "ADMIN", "actif": true, "createdAt": "..." } }
 
 // Erreurs
-// 400 rôle invalide       → ROLE_INVALIDE
-// 404 compte introuvable  → ADMIN_INCONNU
-// 403 auto-rétrogradation → ACTION_IMPOSSIBLE (on ne peut pas modifier son propre rôle)
+// 400 ROLE_INVALIDE
+// 404 ADMIN_INCONNU
+// 403 ACTION_IMPOSSIBLE (auto-rétrogradation ou on ne peut modifier son propre rôle)
 ```
-> Garde-fou : un `SUPER_ADMIN` ne peut **pas** se modifier lui-même (anti-verrouillage).
+
+### `PATCH /api/admins/:id/activer` (protégé — **SUPER_ADMIN uniquement**)
+Réactive un compte désactivé.
+```json
+// Réponse 200 : { "ok": true, "admin": { ..., "actif": true } }
+// Erreurs : 404 ADMIN_INCONNU, 403 ACTION_IMPOSSIBLE (déjà actif)
+```
+
+### `PATCH /api/admins/:id/desactiver` (protégé — **SUPER_ADMIN uniquement**)
+Désactive un compte (le front redirige vers la page d'erreur `COMPTE_DESACTIVE`).
+```json
+// Réponse 200 : { "ok": true, "admin": { ..., "actif": false } }
+// Erreurs : 404 ADMIN_INCONNU, 403 ACTION_IMPOSSIBLE (déjà inactif, ou auto-désactivation)
+```
+
+### `PATCH /api/admins/:id/debloquer` (protégé — **SUPER_ADMIN uniquement**)
+Déverrouille un compte gelé après 3 échecs.
+```json
+// Réponse 200 : { "ok": true, "admin": { ..., "tentativesEchouees": 0, "bloqueJusqua": null } }
+// Erreurs : 404 ADMIN_INCONNU
+```
+
+### `POST /api/admins/:id/reinitialiser-mot-de-passe` (protégé — **SUPER_ADMIN uniquement**)
+Génère un nouveau mot de passe temporaire et l'envoie par email.
+```json
+// Réponse 200
+{ "ok": true, "admin": { "id": "...", "email": "...", "role": "..." },
+  "emailEnvoye": true, "motDePasseTemporaire": "AbCDe123" }
+// motDePasseTemporaire : présent SEULEMENT si l'envoi email a échoué
+// Erreurs : 404 ADMIN_INCONNU, 403 ACTION_IMPOSSIBLE (auto-réinitialisation)
+```
+
+### `DELETE /api/admins/:id` (protégé — **SUPER_ADMIN uniquement**)
+Supprime un compte admin.
+```json
+// Réponse 200 : { "ok": true }
+// Erreurs : 404 ADMIN_INCONNU, 403 ACTION_IMPOSSIBLE (auto-suppression ou dernier SUPER_ADMIN)
+```
 
 ---
 
@@ -189,7 +285,7 @@ Supprime l'ouvrier, ses pointages et ses liaisons départements (cascade).
 ### `GET /api/ouvriers/:id/badge`
 Renvoie le **PNG du QR code** du badge (type `image/png`) — pour prévisualiser/imprimer.
 
-### `GET /api/ouvriers/badges/zip`
+### `GET /api/ouvriers/badges/zip` (protégé — **ADMIN/SUPER_ADMIN**)
 Télécharge un **ZIP** contenant le QR code PNG de chaque ouvrier (un fichier par
 ouvrier, nommé `<matricule>_<NOM>_<Prenom>.png`) — pour attribuer précisément
 un badge imprimé à chaque ouvrier avant impression en masse.
@@ -200,6 +296,8 @@ Query optionnels :
 
 Réponse 200 : `application/zip`. Réponse 404 si aucun ouvrier ne correspond
 aux filtres : `{ "ok": false, "code": "AUCUN_OUVRIER", ... }`.
+Un `LECTEUR` reçoit `403 ACCES_REFUSE` : l'extraction de masse est réservée
+aux rôles à écriture (la consultation d'un badge seul reste ouverte).
 
 ### `POST /api/ouvriers/import` (protégé)
 Import **massif** d'ouvriers depuis un fichier `.csv` ou `.xlsx` (multipart/form-data, champ `fichier`). Crée automatiquement un matricule et un QR badge par ouvrier.
@@ -509,6 +607,8 @@ RAPPORT_EMAIL_DESTINATAIRES=responsable@eglise.ci,secretariat@eglise.ci
 
 | Date | Changement |
 |---|---|
+| 2026-09-11 | **Sécurité authentification** : login avec compteur de tentatives (`reste`), blocage 15 min après 3 échecs (`423 COMPTE_BLOQUE`), déblocage manuel `PATCH /admins/:id/debloquer` ; demandation reset par email `POST /reset-demand` + lien à usage unique (1h) + `POST /reset` ; `POST /admins` crée un compte et envoie le mot de passe par email ; `PATCH /admins/:id/activer|desactiver`, `POST /admins/:id/reinitialiser-mot-de-passe`, `DELETE /admins/:id` ; tableau rôles enrichi (Départements gestion, Gestion comptes) ; role `actif` ajouté au modèle Admin |
+| 2026-09-11 | **Extractions réservées à ADMIN/SUPER_ADMIN** : `GET /api/ouvriers/badges/zip` passe de « tous » à **ADMIN/SUPER_ADMIN** (`403 ACCES_REFUSE` pour LECTEUR). Côté dashboard, les exports CSV (rapports, historique, départements) et les téléchargements de badges sont masqués pour un `LECTEUR` (lecture seule) |
 | 2026-09-08 | **Page Rapport (dashboard `/rapports`)** : ajout de `GET /api/rapports/journalier` (lecture, filtre `date` + `departementId`, `recap` recalculé), tableau présent/absent, export CSV (colonne `Date`), envoi email manuel ; `RAPPORT_EMAIL_DESTINATAIRES` multi-adresses (séparées par des virgules) |
 | 2026-09-07 | **Rapports de pointage** : ajout de la section 5 — `POST /api/rapports/journalier` (PDF par département + récap, envoi email SMTP) + envoi automatique chaque matin 06h00 du rapport du jour de programme précédent (Mer/Jeu, Ven/Sam, Dim/Lun). Règle de présence : Mercredi/Vendredi ≤ 21h30, Dimanche ≤ 12h00. **La route manuelle fonctionne n'importe quel jour** (hors programme : badgé = présent). Env `SMTP_*` et `RAPPORT_EMAIL_DESTINATAIRES` |
 | 2026-09-05 | **Durcissement sécurité** : rate-limit sur `POST /api/auth/login` et `/register` (5 tentatives/min/IP) → `429 TROP_DE_TENTATIVES` ; CORS restreint aux origines du dashboard (variable `CORS_ORIGINES`, défauts 5173/5174) → `403 ORIGINE_NON_AUTORISEE` ; corps JSON limité à 100 ko → `413 CORPS_TROP_GROS` ; fichier d'import > 5 Mo → `413 FICHIER_TROP_GROS` ; import > 2000 lignes → `400 TROP_DE_LIGNES` ; matricule auto-généré avec retry sur collision unique (l'erreur `409 MATRICULE_EXISTANT` ne peut plus survenir pour un matricule généré) |

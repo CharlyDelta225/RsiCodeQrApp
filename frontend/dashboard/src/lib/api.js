@@ -8,12 +8,15 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 /**
  * Erreur typée sur le `code` machine renvoyé par l'API (cf. docs/api-contrat.md :
  * "c'est sur eux que le front fait ses branchements, pas sur les messages").
+ * `data` = corps complet de la réponse (contient par ex. `reste` pour les
+ * tentatives de connexion restantes).
  */
 export class ApiError extends Error {
-  constructor(message, code, status) {
+  constructor(message, code, status, data = {}) {
     super(message);
     this.code = code;
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -51,7 +54,7 @@ async function request(path, options = {}) {
   const body = await res.json();
 
   if (!res.ok || body.ok === false) {
-    throw new ApiError(body.message || `Erreur ${res.status}`, body.code || "ERREUR_INCONNUE", res.status);
+    throw new ApiError(body.message || `Erreur ${res.status}`, body.code || "ERREUR_INCONNUE", res.status, body);
   }
 
   return body;
@@ -61,7 +64,31 @@ export const api = {
   // Auth
   login: (email, motDePasse) =>
     request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, motDePasse }) }),
+  register: (email, motDePasse) =>
+    request("/api/auth/register", { method: "POST", body: JSON.stringify({ email, motDePasse }) }),
   me: () => request("/api/auth/me"),
+  // Récupération de mot de passe oublié (public).
+  // POST /api/auth/reset-demand { email } → toujours { ok, emailEnvoye }.
+  // POST /api/auth/reset { token, motDePasse } → valide le lien reçu par email.
+  demanderResetEmail: (email) =>
+    request("/api/auth/reset-demand", { method: "POST", body: JSON.stringify({ email }) }),
+  effectuerReset: (token, motDePasse) =>
+    request("/api/auth/reset", { method: "POST", body: JSON.stringify({ token, motDePasse }) }),
+
+  // Gestion des comptes admin — réservée au SUPER_ADMIN (403 ACCES_REFUSE sinon).
+  // La création envoie le mot de passe par email ; si l'envoi échoue, la
+  // réponse contient `motDePasseTemporaire` (à transmettre à la main).
+  getAdmins: () => request("/api/admins"),
+  creerAdmin: (email, role) =>
+    request("/api/admins", { method: "POST", body: JSON.stringify({ email, role }) }),
+  changerRoleAdmin: (id, role) =>
+    request(`/api/admins/${id}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  activerAdmin: (id) => request(`/api/admins/${id}/activer`, { method: "PATCH" }),
+  desactiverAdmin: (id) => request(`/api/admins/${id}/desactiver`, { method: "PATCH" }),
+  debloquerAdmin: (id) => request(`/api/admins/${id}/debloquer`, { method: "PATCH" }),
+  reinitialiserMdpAdmin: (id) =>
+    request(`/api/admins/${id}/reinitialiser-mot-de-passe`, { method: "POST" }),
+  supprimerAdmin: (id) => request(`/api/admins/${id}`, { method: "DELETE" }),
 
   // Ouvriers
   getOuvriers: (params = {}) => {

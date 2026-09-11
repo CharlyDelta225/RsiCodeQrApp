@@ -1,43 +1,40 @@
 import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import { setSession } from "../lib/auth";
 import { C } from "../theme";
 import rsiLogo from "../assets/rsi-logo.png";
 
-export default function LoginPage() {
+export default function InscriptionPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const inscription = Boolean(location.state?.inscription);
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [erreur, setErreur] = useState(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErreur(null);
+
+    if (motDePasse !== confirmation) {
+      setErreur("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const data = await api.login(email.trim(), motDePasse);
-      setSession(data.token, data.admin);
-      navigate("/", { replace: true });
+      await api.register(email.trim(), motDePasse);
+      navigate("/login", {
+        replace: true,
+        state: { inscription: true },
+      });
     } catch (err) {
-      // On distingue les cas par le code machine (cf. docs/api-contrat.md).
-      if (err.code === "IDENTIFIANTS_INVALIDES") {
-        // Après un mot de passe erroné, l'API renvoie le nombre de tentatives
-        // restantes (reste). Au-delà de 3 échecs, code COMPTE_BLOQUE.
-        const reste = err.data?.reste;
-        setErreur(
-          reste > 0
-            ? `Email ou mot de passe incorrect. Il vous reste ${reste} tentative(s) avant blocage.`
-            : "Email ou mot de passe incorrect."
-        );
-      } else if (err.code === "CHAMPS_MANQUANTS") {
-        setErreur("Merci de renseigner l'email et le mot de passe.");
+      if (err.code === "EMAIL_EXISTANT") {
+        setErreur("Un compte existe déjà avec cet email.");
+      } else if (err.code === "MOT_DE_PASSE_TROP_COURT") {
+        setErreur("Le mot de passe doit faire au moins 8 caractères.");
       } else {
-        // COMPTE_BLOQUE / COMPTE_DESACTIVE / autres : on montre le message réel.
-        setErreur(err.message || "Impossible de se connecter. Vérifiez que le backend tourne.");
+        setErreur(err.message || "Impossible de contacter le serveur.");
       }
     } finally {
       setLoading(false);
@@ -49,7 +46,6 @@ export default function LoginPage() {
       className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
       style={{ background: C.header }}
     >
-      {/* Logo en grand filigrane derrière la carte — purement décoratif */}
       <img
         src={rsiLogo}
         alt=""
@@ -73,17 +69,13 @@ export default function LoginPage() {
               className="text-lg font-bold text-slate-900"
               style={{ fontFamily: "Poppins,sans-serif" }}
             >
-              RSI — Dashboard présence
+              Créer un compte
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">Connexion administrateur</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Un administrateur définira ensuite vos droits d'accès.
+            </p>
           </div>
         </div>
-
-        {inscription && (
-          <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-            Compte créé avec succès. Vous pouvez vous connecter.
-          </div>
-        )}
 
         {erreur && (
           <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -96,14 +88,14 @@ export default function LoginPage() {
           <input
             type="email"
             required
-            autoComplete="username"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow"
             style={{ "--tw-ring-color": "#D4A017" }}
             onFocus={(e) => (e.target.style.borderColor = "#C0392B")}
             onBlur={(e) => (e.target.style.borderColor = "")}
-            placeholder="admin@example.com"
+            placeholder="votre@email.com"
           />
         </div>
 
@@ -112,14 +104,31 @@ export default function LoginPage() {
           <input
             type="password"
             required
-            autoComplete="current-password"
+            autoComplete="new-password"
+            minLength={8}
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
             className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow"
             style={{ "--tw-ring-color": "#D4A017" }}
             onFocus={(e) => (e.target.style.borderColor = "#C0392B")}
             onBlur={(e) => (e.target.style.borderColor = "")}
-            placeholder="••••••••"
+            placeholder="8 caractères minimum"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Confirmer le mot de passe</label>
+          <input
+            type="password"
+            required
+            autoComplete="new-password"
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow"
+            style={{ "--tw-ring-color": "#D4A017" }}
+            onFocus={(e) => (e.target.style.borderColor = "#C0392B")}
+            onBlur={(e) => (e.target.style.borderColor = "")}
+            placeholder="Retapez le mot de passe"
           />
         </div>
 
@@ -129,22 +138,15 @@ export default function LoginPage() {
           className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60 transition-opacity hover:opacity-90"
           style={{ background: C.btn }}
         >
-          {loading ? "Connexion…" : "Se connecter"}
+          {loading ? "Création…" : "Créer mon compte"}
         </button>
 
         <p className="text-center">
           <Link
-            to="/oublie"
+            to="/login"
             className="text-xs text-slate-500 hover:text-red-700 transition-colors"
           >
-            Mot de passe oublié ?
-          </Link>
-        </p>
-
-        <p className="text-center text-xs text-slate-500">
-          Pas encore de compte ?{" "}
-          <Link to="/inscription" className="font-medium hover:text-red-700 transition-colors">
-            Créer un compte
+            ← Retour à la connexion
           </Link>
         </p>
       </form>

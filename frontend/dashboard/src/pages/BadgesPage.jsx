@@ -2,8 +2,17 @@ import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { libelleDepartement } from "../lib/departement";
+import { getAdmin } from "../lib/auth";
 import { usePagination } from "../lib/pagination";
 import PaginationBar from "../components/PaginationBar";
+
+const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
+
+// Les badges = support d'empreinte : leur export/impression est réservé aux
+// rôles à écriture ; un LECTEUR ne fait que consulter (voir le QR).
+function peutEcrire() {
+  return ROLE_ECRITURE.includes(getAdmin()?.role);
+}
 
 export default function BadgesPage() {
   const [ouvriers, setOuvriers] = useState([]);
@@ -100,13 +109,15 @@ export default function BadgesPage() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm font-semibold text-gray-700">{total} badge(s)</h2>
-        <button
-          onClick={handleTelechargerZip}
-          disabled={telechargementZip}
-          className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 disabled:opacity-50 transition"
-        >
-          {telechargementZip ? "Préparation du ZIP…" : "⬇ Télécharger tous les QR (ZIP)"}
-        </button>
+        {peutEcrire() && (
+          <button
+            onClick={handleTelechargerZip}
+            disabled={telechargementZip}
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 disabled:opacity-50 transition"
+          >
+            {telechargementZip ? "Préparation du ZIP…" : "⬇ Télécharger tous les QR (ZIP)"}
+          </button>
+        )}
       </div>
 
       {erreur && (
@@ -206,13 +217,15 @@ export default function BadgesPage() {
               <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>
             )}
             <div className="flex justify-center gap-3 pt-1">
-              <button
-                onClick={handleTelechargerUnBadge}
-                disabled={telechargementUnite}
-                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 disabled:opacity-50 transition"
-              >
-                {telechargementUnite ? "Téléchargement…" : "⬇ Télécharger ce badge"}
-              </button>
+              {peutEcrire() && (
+                <button
+                  onClick={handleTelechargerUnBadge}
+                  disabled={telechargementUnite}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 disabled:opacity-50 transition"
+                >
+                  {telechargementUnite ? "Téléchargement…" : "⬇ Télécharger ce badge"}
+                </button>
+              )}
               <button
                 onClick={fermerModal}
                 className="text-sm font-medium px-4 py-2 rounded-full bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition"

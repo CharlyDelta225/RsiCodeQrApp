@@ -2,10 +2,18 @@ import { useEffect, useState, useCallback } from "react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { libelleDepartement } from "../lib/departement";
+import { getAdmin } from "../lib/auth";
 import PaginationBar from "../components/PaginationBar";
 
 const LIMIT = 17;
+const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+
+// L'export CSV extrait des données : réservé aux rôles à écriture (un LECTEUR
+// consulte l'écran, il n'exporte pas).
+function peutEcrire() {
+  return ROLE_ECRITURE.includes(getAdmin()?.role);
+}
 
 function dateDuJour(decalageJours = 0) {
   const d = new Date();
@@ -106,13 +114,15 @@ export default function HistoriquePage() {
         <h2 className="text-sm font-semibold text-gray-700">
           {pointagesAffiches.length} pointage(s) affiché(s) sur {total}
         </h2>
-        <button
-          onClick={handleExporterCsv}
-          disabled={pointages.length === 0}
-          className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 disabled:opacity-50 rounded-lg px-3 py-2"
-        >
-          ⬇ Exporter cette page en CSV
-        </button>
+        {peutEcrire() && (
+          <button
+            onClick={handleExporterCsv}
+            disabled={pointages.length === 0}
+            className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 disabled:opacity-50 rounded-lg px-3 py-2"
+          >
+            ⬇ Exporter cette page en CSV
+          </button>
+        )}
       </div>
 
       {erreur && (

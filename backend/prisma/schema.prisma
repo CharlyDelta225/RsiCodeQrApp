@@ -95,9 +95,17 @@ model Pointage {
 model Admin {
   id         String    @id @default(uuid())
   email      String    @unique
-  motDePasse String // haché avec bcrypt (étape 7)
+  motDePasse String // haché avec bcrypt
   role       RoleAdmin @default(ADMIN) // hiérarchie SUPER_ADMIN > ADMIN > LECTEUR
-  createdAt  DateTime  @default(now())
+  actif      Boolean   @default(true) // compte activable/désactivable par le SUPER_ADMIN
+  // Blocage anti brute-force : après 3 échecs, le compte est gelé 15 min
+  // (bloqueJusqua). Un SUPER_ADMIN peut débloquer manuellement.
+  tentativesEchouees Int       @default(0)
+  bloqueJusqua       DateTime?
+  // Lien de réinitialisation de mot de passe (stocké HASHÉ, expirant).
+  resetTokenHash   String?   @unique
+  resetTokenExpire DateTime?
+  createdAt        DateTime  @default(now())
 
   @@map("Admin")
 }
