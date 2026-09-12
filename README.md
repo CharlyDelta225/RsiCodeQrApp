@@ -124,9 +124,11 @@ Pages publiques (hors authentification) :
 | `/oublie` | Demander un lien de réinitialisation de mot de passe (envoyé par email) |
 | `/reinitialisation` | Poser un nouveau mot de passe grâce au lien reçu (usage unique, 1 h) |
 
-> Les listes du dashboard sont **paginées à 17 éléments par page** ; la
-> suppression d'un département et la déconnexion passent par un popup de
-> confirmation. Un LECTEUR ne voit que des boutons de consultation : toute
+> Les listes du dashboard sont **paginées à 17 éléments par page** ; les
+> actions sensibles passent par un **popup de confirmation** : désactiver /
+> activer / supprimer un ouvrier (page `/ouvriers`), suppression d'un
+> département, gestion des comptes (rôles, désactivation, suppression) et
+> déconnexion. Un LECTEUR ne voit que des boutons de consultation : toute
 > extraction (import, export CSV/PDF, ZIP des badges) est réservée aux rôles
 > à écriture, côté interface **et** côté API.
 

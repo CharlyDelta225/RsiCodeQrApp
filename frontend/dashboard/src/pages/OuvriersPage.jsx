@@ -4,6 +4,7 @@ import { libelleDepartement } from "../lib/departement";
 import { getAdmin } from "../lib/auth";
 import { usePagination } from "../lib/pagination";
 import PaginationBar from "../components/PaginationBar";
+import ConfirmDialog from "../components/ConfirmDialog";
 import TableShell from "../ui/TableShell";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
@@ -93,6 +94,9 @@ export default function OuvriersPage() {
   const [badgeUrl, setBadgeUrl] = useState(null);
   const [badgeOuvrier, setBadgeOuvrier] = useState(null);
 
+  const [confirmation, setConfirmation] = useState(null);
+  const [confirmationEnCours, setConfirmationEnCours] = useState(false);
+
   const [departements, setDepartements] = useState([]);
 
   const pagination = usePagination(ouvriers);
@@ -174,22 +178,39 @@ export default function OuvriersPage() {
     }
   }
 
-  async function handleToggleActif(ouvrier) {
-    try {
-      await api.updateOuvrier(ouvrier.id, { actif: !ouvrier.actif });
-      charger();
-    } catch (err) {
-      setAlerte({ titre: "Une erreur est survenue", message: err instanceof ApiError ? err.message : "Erreur lors du changement de statut" });
-    }
+  async function demanderConfirmation(type, ouvrier) {
+    setConfirmation({ type, ouvrier });
   }
 
-  async function handleSupprimer(ouvrier) {
-    if (!confirm(`Supprimer ${ouvrier.prenom} ${ouvrier.nom} et son historique de pointages ?`)) return;
+  async function executerConfirmation() {
+    if (!confirmation) return;
+    const { type, ouvrier } = confirmation;
+    setConfirmationEnCours(true);
     try {
-      await api.deleteOuvrier(ouvrier.id);
+      if (type === "supprimer") {
+        await api.deleteOuvrier(ouvrier.id);
+        setSucces({
+          titre: "Ouvrier supprimé",
+          message: `${ouvrier.prenom} ${ouvrier.nom} (${ouvrier.matricule}) a été supprimé(e).`,
+        });
+      } else {
+        const actif = type === "activer";
+        await api.updateOuvrier(ouvrier.id, { actif });
+        setSucces({
+          titre: actif ? "Badge activé" : "Badge désactivé",
+          message: `Le badge de ${ouvrier.prenom} ${ouvrier.nom} (${ouvrier.matricule}) est ${actif ? "réactivé" : "désactivé"}.`,
+        });
+      }
+      setConfirmation(null);
       charger();
     } catch (err) {
-      setAlerte({ titre: "Une erreur est survenue", message: err instanceof ApiError ? err.message : "Erreur lors de la suppression" });
+      setAlerte({
+        titre: "Une erreur est survenue",
+        message: err instanceof ApiError ? err.message : "Erreur lors de l'action",
+      });
+      setConfirmation(null);
+    } finally {
+      setConfirmationEnCours(false);
     }
   }
 
@@ -247,6 +268,36 @@ export default function OuvriersPage() {
         />
       )}
 
+      {confirmation && (
+        <ConfirmDialog
+          ouvert
+          titre={
+            confirmation.type === "supprimer"
+              ? "Supprimer l'ouvrier"
+              : confirmation.type === "activer"
+              ? "Activer le badge"
+              : "Désactiver le badge"
+          }
+          message={
+            confirmation.type === "supprimer"
+              ? `Supprimer définitivement ${confirmation.ouvrier.prenom} ${confirmation.ouvrier.nom} (${confirmation.ouvrier.matricule}) ? Son historique de pointages et ses départements seront aussi supprimés. Action irréversible.`
+              : confirmation.type === "activer"
+              ? `Le badge de ${confirmation.ouvrier.prenom} ${confirmation.ouvrier.nom} (${confirmation.ouvrier.matricule}) redevient valide pour le badgeage.`
+              : `Le badge de ${confirmation.ouvrier.prenom} ${confirmation.ouvrier.nom} (${confirmation.ouvrier.matricule}) sera désactivé : le badgeage renverra une erreur jusqu'à réactivation.`
+          }
+          bouton={
+            confirmation.type === "supprimer"
+              ? "Supprimer"
+              : confirmation.type === "activer"
+              ? "Activer"
+              : "Désactiver"
+          }
+          enCours={confirmationEnCours}
+          surAnnuler={() => setConfirmation(null)}
+          surConfirmer={executerConfirmation}
+        />
+      )}
+
       <Input
         placeholder="Rechercher par nom, prénom, département, matricule…"
         value={recherche}
@@ -272,12 +323,12 @@ export default function OuvriersPage() {
                 Badge
               </Btn>
               {peutEcrire() && (
-                <Btn variant="softDanger" size="xs" onClick={() => handleToggleActif(o)}>
+                <Btn variant="softDanger" size="xs" onClick={() => demanderConfirmation(o.actif ? "desactiver" : "activer", o)}>
                   {o.actif ? "Désactiver" : "Activer"}
                 </Btn>
               )}
               {peutEcrire() && (
-                <Btn variant="softDanger" size="xs" onClick={() => handleSupprimer(o)}>
+                <Btn variant="softDanger" size="xs" onClick={() => demanderConfirmation("supprimer", o)}>
                   Supprimer
                 </Btn>
               )}
