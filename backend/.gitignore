@@ -1,0 +1,6 @@
+.vercel
+.env*
+
+# Copies d'assemblage générées par scripts/vercel-build.mjs (sources : frontend/)
+public/dashboard/
+public/terminal/

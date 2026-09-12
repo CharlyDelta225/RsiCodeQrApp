@@ -30,3 +30,11 @@ prisma/dev.db
 .idea/
 .DS_Store
 Thumbs.db
+.vercel
+.env*
+
+# Captures de vérification QA (à ne jamais commiter)
+/departements-prod.png
+/edition-membre-prod.png
+/gestion-departements-prod.png
+/terminal-v2.png

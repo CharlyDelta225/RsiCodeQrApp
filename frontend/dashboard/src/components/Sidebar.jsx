@@ -154,34 +154,3 @@ export function MobileDrawer({ admin, onClose, onDeconnexion }) {
     </>
   );
 }
-
-/** Navigation basse (mobile uniquement). */
-export function BottomNav() {
-  return (
-    <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-30 flex border-t border-red-900/30"
-      style={{ background: C.sidebarFooter, paddingBottom: "env(safe-area-inset-bottom)" }}
-    >
-      {navAutorises().map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          end={item.path === "/"}
-          className={({ isActive }) =>
-            `flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[52px] transition-colors min-w-0 ${
-              isActive ? "text-yellow-300" : "text-white/50"
-            }`
-          }
-        >
-          <span className="text-sm leading-none">{item.icon}</span>
-          <span
-            className="text-[8px] leading-tight font-medium truncate w-full text-center px-0.5"
-            style={{ fontFamily: "Poppins,sans-serif" }}
-          >
-            {item.short}
-          </span>
-        </NavLink>
-      ))}
-    </nav>
-  );
-}

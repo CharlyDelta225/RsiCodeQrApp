@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { Sidebar, MobileDrawer, BottomNav } from "../components/Sidebar";
+import { Sidebar, MobileDrawer } from "../components/Sidebar";
 import TopBar from "../components/TopBar";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { pageTitles } from "../theme";
@@ -38,11 +38,10 @@ export default function DashboardLayout() {
           onMenuToggle={() => setDrawerOpen(true)}
           onDeconnexion={() => setConfirmerDeconnexion(true)}
         />
-        <main className="flex-1 overflow-y-auto min-h-0 pb-16 md:pb-0">
+        <main className="flex-1 overflow-y-auto min-h-0">
           <Outlet />
         </main>
       </div>
-      <BottomNav />
       <ConfirmDialog
         ouvert={confirmerDeconnexion}
         titre="Se déconnecter ?"

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { C } from "../theme";
+import Btn from "../ui/Btn";
+import { Input } from "../ui/inputs";
 import rsiLogo from "../assets/rsi-logo.png";
 
 export default function InscriptionPage() {
@@ -29,9 +31,7 @@ export default function InscriptionPage() {
         state: { inscription: true },
       });
     } catch (err) {
-      if (err.code === "EMAIL_EXISTANT") {
-        setErreur("Un compte existe déjà avec cet email.");
-      } else if (err.code === "MOT_DE_PASSE_TROP_COURT") {
+      if (err.code === "MOT_DE_PASSE_TROP_COURT") {
         setErreur("Le mot de passe doit faire au moins 8 caractères.");
       } else {
         setErreur(err.message || "Impossible de contacter le serveur.");
@@ -78,68 +78,51 @@ export default function InscriptionPage() {
         </div>
 
         {erreur && (
-          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <div className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
             {erreur}
           </div>
         )}
 
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
-          <input
+          <Input
             type="email"
             required
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow"
-            style={{ "--tw-ring-color": "#D4A017" }}
-            onFocus={(e) => (e.target.style.borderColor = "#C0392B")}
-            onBlur={(e) => (e.target.style.borderColor = "")}
             placeholder="votre@email.com"
           />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Mot de passe</label>
-          <input
+          <Input
             type="password"
             required
             autoComplete="new-password"
             minLength={8}
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow"
-            style={{ "--tw-ring-color": "#D4A017" }}
-            onFocus={(e) => (e.target.style.borderColor = "#C0392B")}
-            onBlur={(e) => (e.target.style.borderColor = "")}
             placeholder="8 caractères minimum"
           />
         </div>
 
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Confirmer le mot de passe</label>
-          <input
+          <Input
             type="password"
             required
             autoComplete="new-password"
             value={confirmation}
             onChange={(e) => setConfirmation(e.target.value)}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow"
-            style={{ "--tw-ring-color": "#D4A017" }}
-            onFocus={(e) => (e.target.style.borderColor = "#C0392B")}
-            onBlur={(e) => (e.target.style.borderColor = "")}
             placeholder="Retapez le mot de passe"
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60 transition-opacity hover:opacity-90"
-          style={{ background: C.btn }}
-        >
+        <Btn type="submit" disabled={loading} loading={loading} className="w-full" size="lg">
           {loading ? "Création…" : "Créer mon compte"}
-        </button>
+        </Btn>
 
         <p className="text-center">
           <Link

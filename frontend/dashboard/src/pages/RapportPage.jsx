@@ -3,6 +3,10 @@ import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
 import PaginationBar from "../components/PaginationBar";
+import TableShell from "../ui/TableShell";
+import Pill from "../ui/Pill";
+import Btn from "../ui/Btn";
+import { Field, Input, Select } from "../ui/inputs";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 const LIMIT = 17;
@@ -161,36 +165,27 @@ export default function RapportPage() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-gray-700">
+        <h2 className="text-sm font-semibold text-bordeaux-900">
           {rapport
             ? `${totaux.effectif} ouvrier(s) · ${totaux.presents} présent(s) · ${totaux.absents} absent(s)`
             : "Rapport de pointage"}
         </h2>
         <div className="flex items-center gap-2 flex-wrap">
           {peutEcrire() && (
-            <button
-              onClick={handleExporterCsv}
-              disabled={lignesAffichees.length === 0}
-              className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 disabled:opacity-50 rounded-lg px-3 py-2"
-            >
-              ⬇ Exporter en CSV
-            </button>
+            <Btn variant="secondary" onClick={handleExporterCsv} disabled={lignesAffichees.length === 0} icon="⬇">
+              Exporter en CSV
+            </Btn>
           )}
           {peutEcrire() && (
-            <button
-              onClick={ouvrirModalEnvoi}
-              disabled={chargement || !rapport}
-              className="text-sm font-medium text-white rounded-lg px-3 py-2 disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg,#C0392B,#922B21)" }}
-            >
-              ✉ Envoyer par email
-            </button>
+            <Btn variant="primary" onClick={ouvrirModalEnvoi} disabled={chargement || !rapport} icon="✉">
+              Envoyer par email
+            </Btn>
           )}
         </div>
       </div>
 
       {erreur && (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <p className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
           {erreur}
         </p>
       )}
@@ -199,36 +194,20 @@ export default function RapportPage() {
         onSubmit={handleFiltrer}
         className="flex flex-wrap items-end gap-2 bg-white border border-slate-200 rounded-xl p-3"
       >
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-500">Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-300 text-sm"
-          />
-        </div>
-        <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
-          <label className="text-xs text-slate-500">Département</label>
-          <select
-            value={departementId}
-            onChange={(e) => setDepartementId(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"
-          >
+        <Field label="Date">
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label="Département" className="flex-1 min-w-[200px]">
+          <Select value={departementId} onChange={(e) => setDepartementId(e.target.value)}>
             <option value="">Tous les départements</option>
             {departements.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.nom}
               </option>
             ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 rounded-lg px-3 py-2"
-        >
-          Filtrer
-        </button>
+          </Select>
+        </Field>
+        <Btn type="submit">Filtrer</Btn>
       </form>
 
       {rapport && (
@@ -239,73 +218,35 @@ export default function RapportPage() {
           <span className="text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-1.5">
             {rapport.notePresence}
           </span>
-          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-            Présents : {totaux.presents}
-          </span>
-          <span className="text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-1.5">
-            Absents : {totaux.absents}
-          </span>
+          <Pill tonalite="vert">Présents : {totaux.presents}</Pill>
+          <Pill tonalite="rouge">Absents : {totaux.absents}</Pill>
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100 text-slate-600 text-left">
-            <tr>
-              <th className="px-3 py-2">Matricule</th>
-              <th className="px-3 py-2">Nom</th>
-              <th className="px-3 py-2">Prénom</th>
-              <th className="px-3 py-2">Département</th>
-              <th className="px-3 py-2">Statut</th>
-              <th className="px-3 py-2">Heure</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chargement && (
-              <tr>
-                <td colSpan={6} className="px-3 py-4 text-center text-slate-400">
-                  Chargement…
-                </td>
-              </tr>
-            )}
-            {!chargement && rapport && lignesAffichees.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-3 py-4 text-center text-slate-400">
-                  Aucun ouvrier rattaché à la sélection
-                </td>
-              </tr>
-            )}
-            {!chargement && !rapport && !erreur && (
-              <tr>
-                <td colSpan={6} className="px-3 py-4 text-center text-slate-400">
-                  Aucune donnée
-                </td>
-              </tr>
-            )}
-            {lignesPage.map(({ ligne, nomDepartement }, index) => (
-              <tr key={`${nomDepartement}-${ligne.matricule}-${index}`} className="border-t border-slate-100">
-                <td className="px-3 py-2 font-mono text-xs">{ligne.matricule}</td>
-                <td className="px-3 py-2">{ligne.nom}</td>
-                <td className="px-3 py-2">{ligne.prenom}</td>
-                <td className="px-3 py-2">{nomDepartement}</td>
-                <td className="px-3 py-2">
-                  <span
-                    className={
-                      "text-xs font-bold px-2 py-0.5 rounded-full " +
-                      (ligne.present
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-rose-50 text-rose-700")
-                    }
-                  >
-                    {ligne.present ? "PRÉSENT" : "ABSENT"}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-xs">{ligne.heure ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TableShell
+        colonnes={["Matricule", "Nom", "Prénom", "Département", "Statut", "Heure"]}
+        chargement={chargement}
+        vide={
+          !chargement && rapport && lignesAffichees.length === 0
+            ? "Aucun ouvrier rattaché à la sélection"
+            : "Aucune donnée"
+        }
+      >
+        {lignesPage.map(({ ligne, nomDepartement }, index) => (
+          <tr key={`${nomDepartement}-${ligne.matricule}-${index}`} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
+            <td className="px-3 py-2 font-mono text-xs">{ligne.matricule}</td>
+            <td className="px-3 py-2">{ligne.nom}</td>
+            <td className="px-3 py-2">{ligne.prenom}</td>
+            <td className="px-3 py-2">{nomDepartement}</td>
+            <td className="px-3 py-2">
+              <Pill tonalite={ligne.present ? "vert" : "rouge"}>
+                {ligne.present ? "Présent" : "Absent"}
+              </Pill>
+            </td>
+            <td className="px-3 py-2 text-xs">{ligne.heure ?? "—"}</td>
+          </tr>
+        ))}
+      </TableShell>
 
       <PaginationBar
         page={pageCourante}
@@ -351,23 +292,12 @@ export default function RapportPage() {
               )}
             </div>
             <div className="px-6 pb-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setEnvoiOuvert(false)}
-                disabled={envoiEnCours}
-                className="text-sm font-medium text-slate-600 bg-slate-50 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-40 rounded-full px-5 py-2 transition"
-              >
+              <Btn variant="secondary" onClick={() => setEnvoiOuvert(false)} disabled={envoiEnCours}>
                 Fermer
-              </button>
-              <button
-                type="button"
-                onClick={handleEnvoyerEmail}
-                disabled={envoiEnCours}
-                className="text-sm font-medium text-white disabled:opacity-50 rounded-full px-5 py-2 shadow-sm transition"
-                style={{ background: "linear-gradient(135deg,#C0392B,#922B21)" }}
-              >
+              </Btn>
+              <Btn type="button" onClick={handleEnvoyerEmail} disabled={envoiEnCours} loading={envoiEnCours}>
                 {envoiEnCours ? "Envoi…" : "Envoyer"}
-              </button>
+              </Btn>
             </div>
           </div>
         </div>

@@ -1,10 +1,13 @@
+import { C } from "../theme";
+
 const BTN_NAV =
   "px-2.5 py-1 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition";
 const BTN_NUM =
-  "min-w-[28px] px-2 py-1 rounded-full text-xs text-slate-500 border border-slate-200 hover:bg-rose-50 transition";
+  "min-w-[28px] px-2 py-1 rounded-full text-xs text-slate-500 border border-slate-200 hover:bg-bordeaux-50 hover:text-bordeaux-700 transition";
 const BTN_NUM_ACTIF = {
-  className: "min-w-[28px] px-2 py-1 rounded-full text-xs font-semibold text-white shadow-sm transition",
-  style: { background: "linear-gradient(135deg,#fb7185,#f43f5e)" },
+  className:
+    "min-w-[28px] px-2 py-1 rounded-full text-xs font-semibold text-white shadow-sm transition",
+  style: { background: C.btn },
 };
 
 export default function PaginationBar({ page, totalPages, onPage, total, label = "élément(s)" }) {

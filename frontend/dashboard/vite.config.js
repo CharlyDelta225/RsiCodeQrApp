@@ -17,4 +17,29 @@ export default defineConfig({
       },
     },
   },
+  // Code-splitting : recharts (lourd, utilisé uniquement sur le dashboard) est
+  // isolé dans son propre chunk ; React et le routeur forment des chunks stables
+  // et mis en cache — le démarrage (login) reste ultra-léger.
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("recharts") || id.includes("/d3-") || id.includes("victory-vendor")) {
+            return "charts";
+          }
+          if (id.includes("react-router")) return "router";
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("scheduler") ||
+            id.includes("use-sync-external-store")
+          ) {
+            return "react-vendor";
+          }
+          return "vendor";
+        },
+      },
+    },
+  },
 });

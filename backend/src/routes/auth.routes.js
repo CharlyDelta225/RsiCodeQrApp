@@ -6,6 +6,7 @@ import { rateLimit } from "express-rate-limit";
 import prisma from "../lib/prisma.js";
 import requireAuth from "../middleware/auth.middleware.js";
 import { envoyerEmailSimple, urlDashboard } from "../lib/mailer.js";
+import { ipReelle } from "../lib/ip.js";
 
 const router = Router();
 
@@ -26,27 +27,48 @@ function sha256Hex(texte) {
   return crypto.createHash("sha256").update(texte).digest("hex");
 }
 
-// Anti brute-force : 5 tentatives / min / IP sur login+register+reset-demand.
-// Un compteur dédié par IP évite qu'un attaquant épuise les comptes
-// d'autres clients (et protège aussi contre l'énumération d'emails).
-// Le maximum est surchargeable via AUTH_RATE_LIMIT_MAX (utile en test).
-const LIMITE_AUTH_MAX = Math.max(1, parseInt(process.env.AUTH_RATE_LIMIT_MAX || "5", 10) || 5);
+// Anti brute-force : limites de débit sur login+register+reset-demand.
+// - limiterAuth   : par IP RÉELLE (X-Vercel-Forwarded-For, pas le champ
+//   forgable X-Forwarded-For) — protège contre l'énumération d'emails et une
+//   rafale depuis une même machine.
+// - limiterCompte : par email de compte — même si l'IP change (VPN, rotation
+//   d'adresses), un même compte ne peut pas être bourrinné plus vite que ça.
+// Le verrouillage DB (3 erreurs → 15 min) reste la barrière finale, valable
+// même si les compteurs en mémoire sont répartis entre instances.
+// Les maximums sont surchargeables via AUTH_RATE_LIMIT_MAX (utile en test).
+const LIMITE_AUTH_MAX = Math.max(1, parseInt(process.env.AUTH_RATE_LIMIT_MAX || "10", 10) || 10);
 const limiterAuth = rateLimit({
   windowMs: 60 * 1000,
   limit: LIMITE_AUTH_MAX,
+  keyGenerator: (req) => `ip:${ipReelle(req)}`,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: {
     ok: false,
     code: "TROP_DE_TENTATIVES",
-    message: "Trop de tentatives de connexion. Réessayez dans une minute.",
+    message: "Trop de tentatives. Réessayez dans une minute.",
+  },
+});
+const limiterCompte = rateLimit({
+  windowMs: 60 * 1000,
+  limit: LIMITE_AUTH_MAX,
+  keyGenerator: (req) =>
+    `compte:${String(req.body?.email ?? "").trim().toLowerCase() || ipReelle(req)}`,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    code: "TROP_DE_TENTATIVES",
+    message: "Trop de tentatives pour ce compte. Réessayez dans une minute.",
   },
 });
 
-// Appliqué aux deux routes sensibles (création de compte comprise : un
+// Appliqué aux trois routes sensibles (création de compte comprise : un
 // attaquant pourrait sinon créer des comptes en masse depuis le net).
 router.use("/login", limiterAuth);
 router.use("/register", limiterAuth);
+router.use("/reset-demand", limiterAuth);
+router.use("/login", limiterCompte);
 
 /**
  * POST /api/auth/register  (PUBLIC)
@@ -75,20 +97,22 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ ok: false, code: "MOT_DE_PASSE_TROP_COURT", message: "Le mot de passe doit faire au moins 8 caractères" });
     }
 
+    // Anti-énumération : que le compte existe ou non, on répond EXACTEMENT la
+    // même chose (même code HTTP, même corps). Un attaquant ne peut pas savoir
+    // si une adresse est déjà un compte admin.
     const existe = await prisma.admin.findUnique({ where: { email } });
-    if (existe) {
-      return res.status(409).json({ ok: false, code: "EMAIL_EXISTANT", message: "Cet email est déjà enregistré" });
+    if (!existe) {
+      // Le mot de passe n'est JAMAIS stocké en clair : hash bcrypt + sel intégré
+      const hash = await bcrypt.hash(motDePasse, 10);
+      await prisma.admin.create({
+        data: { email, motDePasse: hash, role },
+        select: { id: true, email: true, role: true, createdAt: true },
+      });
     }
 
-    // Le mot de passe n'est JAMAIAS stocké en clair : hash bcrypt + sel intégré
-    const hash = await bcrypt.hash(motDePasse, 10);
-
-    const admin = await prisma.admin.create({
-      data: { email, motDePasse: hash, role },
-      select: { id: true, email: true, role: true, createdAt: true },
-    });
-
-    return res.status(201).json({ ok: true, admin });
+    const MESSAGE_NEUTRE =
+      "Si votre adresse n'était pas déjà enregistrée, un compte vient d'être créé. Vous pouvez vous connecter.";
+    return res.json({ ok: true, message: MESSAGE_NEUTRE });
   } catch (err) {
     console.error("[AUTH/REGISTER]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
@@ -218,8 +242,12 @@ router.post("/reset-demand", limiterAuth, async (req, res) => {
 
     const admin = await prisma.admin.findUnique({ where: { email } });
     if (!admin) {
-      // Anti-énumération : même réponse que si le compte existait.
-      return res.json({ ok: true, emailEnvoye: false, message: "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé." });
+      // Anti-énumération : réponse STRICTEMENT identique à celle d'un compte
+      // existant (même statut, même corps — aucun champ distinctif).
+      return res.json({
+        ok: true,
+        message: "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.",
+      });
     }
 
     const token = crypto.randomBytes(32).toString("hex");
@@ -232,7 +260,6 @@ router.post("/reset-demand", limiterAuth, async (req, res) => {
     });
 
     const lien = `${urlDashboard()}/reinitialisation?token=${token}&email=${encodeURIComponent(admin.email)}`;
-    let emailEnvoye = true;
     try {
       await envoyerEmailSimple({
         to: admin.email,
@@ -251,12 +278,12 @@ router.post("/reset-demand", limiterAuth, async (req, res) => {
       });
     } catch (err) {
       console.error("[AUTH/RESET_DEMAND/EMAIL]", err);
-      emailEnvoye = false;
     }
 
+    // Réponse volontairement neutre : pas d'indice (emailEnvoye, statut) qui
+    // révélerait si le compte existe.
     return res.json({
       ok: true,
-      emailEnvoye,
       message: "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.",
     });
   } catch (err) {

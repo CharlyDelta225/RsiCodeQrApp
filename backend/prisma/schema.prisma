@@ -86,8 +86,12 @@ model Pointage {
   ouvrierId String
   ouvrier   Ouvrier  @relation(fields: [ouvrierId], references: [id], onDelete: Cascade)
   dateHeure DateTime @default(now())
+  // Jour civil (UTC, AAAA-MM-JJ) : garantit en base qu'un ouvrier ne peut
+  // badger qu'UNE fois par jour, même si deux requêtes arrivent en parallèle.
+  jour      DateTime @db.Date
   type      TypePointage @default(ENTRER) // non utilisé pour l'instant
 
+  @@unique([ouvrierId, jour])
   @@index([ouvrierId, dateHeure])
   @@map("Pointage")
 }

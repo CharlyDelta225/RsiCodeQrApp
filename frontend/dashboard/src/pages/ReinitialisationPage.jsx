@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { C } from "../theme";
+import Btn from "../ui/Btn";
+import { Input } from "../ui/inputs";
 import rsiLogo from "../assets/rsi-logo.png";
 
 /**
@@ -90,7 +92,7 @@ export default function ReinitialisationPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {erreur && (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <div className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
                 {erreur}
               </div>
             )}
@@ -99,41 +101,32 @@ export default function ReinitialisationPage() {
               <>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Nouveau mot de passe</label>
-                  <input
+                  <Input
                     type="password"
                     required
                     autoComplete="new-password"
                     minLength={8}
                     value={motDePasse}
                     onChange={(e) => setMotDePasse(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
-                    style={{ "--tw-ring-color": "#D4A017" }}
                     placeholder="8 caractères minimum"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Confirmation</label>
-                  <input
+                  <Input
                     type="password"
                     required
                     autoComplete="new-password"
                     value={confirmation}
                     onChange={(e) => setConfirmation(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
-                    style={{ "--tw-ring-color": "#D4A017" }}
                     placeholder="Répétez le mot de passe"
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading || !token}
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60 transition-opacity hover:opacity-90"
-                  style={{ background: C.btn }}
-                >
+                <Btn type="submit" disabled={loading || !token} loading={loading} className="w-full" size="lg">
                   {loading ? "Enregistrement…" : "Enregistrer le mot de passe"}
-                </button>
+                </Btn>
               </>
             )}
 

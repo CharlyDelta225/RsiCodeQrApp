@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { getAdmin } from "../lib/auth";
 import ConfirmDialog from "../components/ConfirmDialog";
+import Btn from "../ui/Btn";
+import { Input, Select } from "../ui/inputs";
 import { C } from "../theme";
 
 const ROLES = [
-  { valeur: "SUPER_ADMIN", libelle: "Super admin", couleur: "bg-rose-50 text-rose-700 ring-1 ring-rose-100" },
-  { valeur: "ADMIN", libelle: "Admin", couleur: "bg-sky-50 text-sky-700 ring-1 ring-sky-100" },
-  { valeur: "LECTEUR", libelle: "Lecteur", couleur: "bg-slate-100 text-slate-600 ring-1 ring-slate-200" },
+  { valeur: "SUPER_ADMIN", libelle: "Super admin", couleur: "text-gold-800 bg-gold-50 ring-1 ring-gold-200" },
+  { valeur: "ADMIN", libelle: "Admin", couleur: "text-sky-700 bg-sky-50 ring-1 ring-sky-200" },
+  { valeur: "LECTEUR", libelle: "Lecteur", couleur: "text-slate-600 bg-slate-100 ring-1 ring-slate-200" },
 ];
 
 const SUJETS = {
@@ -27,16 +29,103 @@ function couleurRole(role) {
 
 function Statut({ admin }) {
   if (!admin.actif) {
-    return <span className="text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-700 ring-1 ring-rose-100">Désactivé</span>;
+    return <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 ring-1 ring-slate-200">Désactivé</span>;
   }
   if (admin.bloqueJusqua) {
     const fin = new Date(admin.bloqueJusqua);
     const texte = fin > new Date()
       ? `Bloqué jusqu'à ${fin.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
       : "Bloqué";
-    return <span className="text-xs px-2 py-1 rounded-full bg-orange-50 text-orange-700 ring-1 ring-orange-100">{texte}</span>;
+    return <span className="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200">{texte}</span>;
   }
-  return <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">Actif</span>;
+  return <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">Actif</span>;
+}
+
+function initials(email) {
+  if (!email) return "?";
+  return email.split("@")[0].slice(0, 2).toUpperCase();
+}
+
+/** Boutons d'action d'un compte — partagés entre tableau (desktop) et cartes (mobile). */
+function ActionsCompte({ admin, moiMeme, onAction }) {
+  const boutons = [];
+  if (admin.bloqueJusqua) {
+    boutons.push(
+      <button
+        key="debloquer"
+        onClick={() => onAction("debloquer", admin)}
+        className="text-xs px-2 py-1 rounded-lg bg-orange-50 text-orange-700 ring-1 ring-orange-200 hover:bg-orange-100 transition-colors"
+      >
+        Débloquer
+      </button>
+    );
+  }
+  if (!admin.actif) {
+    boutons.push(
+      <button
+        key="activer"
+        onClick={() => onAction("activer", admin)}
+        className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 transition-colors"
+      >
+        Réactiver
+      </button>
+    );
+  }
+  boutons.push(
+    <button
+      key="reinit"
+      onClick={() => onAction("reinit", admin)}
+      className="text-xs px-2 py-1 rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100 transition-colors"
+    >
+      Réinit. mot de passe
+    </button>
+  );
+  if (admin.actif) {
+    boutons.push(
+      <button
+        key="desactiver"
+        disabled={moiMeme}
+        title={moiMeme ? "Impossible sur votre propre compte" : undefined}
+        onClick={() => onAction("desactiver", admin)}
+        className="text-xs px-2 py-1 rounded-lg ring-1 ring-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+      >
+        Désactiver
+      </button>
+    );
+  }
+  boutons.push(
+    <button
+      key="delete"
+      disabled={moiMeme}
+      title={moiMeme ? "Impossible sur votre propre compte" : undefined}
+      onClick={() => onAction("delete", admin)}
+      className="text-xs px-2 py-1 rounded-lg bg-bordeaux-50 text-bordeaux-700 ring-1 ring-bordeaux-200 hover:bg-bordeaux-100 disabled:opacity-40 transition-colors"
+    >
+      Supprimer
+    </button>
+  );
+  return boutons;
+}
+
+/** Selecteur de rôle — remplace par une pastille quand c'est le compte connecté. */
+function SelecteurRole({ admin, moiMeme, surChangement }) {
+  if (moiMeme) {
+    return <span className={`text-xs px-2 py-1 rounded-full ${couleurRole(admin.role)}`}>{libelleRole(admin.role)}</span>;
+  }
+  return (
+    <select
+      value={admin.role}
+      onChange={(e) => surChangement(admin, e.target.value)}
+      className="text-xs rounded-lg border border-slate-200 px-2 py-1.5 focus:outline-none focus:ring-2"
+      style={{ "--tw-ring-color": "#D4A017" }}
+    >
+      {ROLES.map((r) => (
+        <option key={r.valeur} value={r.valeur}>
+          {r.libelle}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 export default function GestionAdminsPage() {
@@ -139,6 +228,21 @@ export default function GestionAdminsPage() {
     }
   }
 
+  // Centralise : action directe (débloquer/activer) ou ouverture d'un confirm.
+  function lancerAction(type, admin) {
+    setAlerte(null);
+    setMdpTemporaire(null);
+    if (type === "debloquer") {
+      debloquer(admin);
+      return;
+    }
+    if (type === "activer") {
+      activer(admin);
+      return;
+    }
+    setConfirm({ type, admin });
+  }
+
   async function debloquer(admin) {
     setAlerte(null);
     try {
@@ -185,11 +289,11 @@ export default function GestionAdminsPage() {
       </div>
 
       {alerte && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+        <div className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-4 py-3">
           <p className="font-semibold">{alerte.titre}</p>
           <p className="mt-0.5">{alerte.message}</p>
           {mdpTemporaire && (
-            <div className="mt-3 p-3 rounded-lg bg-white ring-1 ring-red-100">
+            <div className="mt-3 p-3 rounded-lg bg-white ring-1 ring-bordeaux-200">
               <p className="text-xs text-slate-500 mb-1">Mot de passe temporaire pour {mdpTemporaire.email} :</p>
               <code className="text-sm font-mono font-semibold break-all">{mdpTemporaire.motDePasse}</code>
             </div>
@@ -207,24 +311,22 @@ export default function GestionAdminsPage() {
       {chargement ? (
         <p className="text-sm text-slate-400 text-center py-8">Chargement…</p>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
-                <th className="px-4 py-3 font-medium">Compte</th>
-                <th className="px-4 py-3 font-medium">Rôle</th>
-                <th className="px-4 py-3 font-medium">Statut</th>
-                <th className="px-4 py-3 font-medium">Créé le</th>
-                <th className="px-4 py-3 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {admins.map((a) => {
-                const moiMeme = estMoi(a);
-                return (
-                  <tr key={a.id} className="border-b border-slate-100 last:border-b-0 align-middle">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-slate-800">
+        <>
+          {/* ─── CARTES MOBILE (<md) ─── */}
+          <div className="md:hidden space-y-3">
+            {admins.map((a) => {
+              const moiMeme = estMoi(a);
+              return (
+                <div key={a.id} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      style={{ background: C.avatar }}
+                    >
+                      {initials(a.email)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-800 truncate">
                         {a.email} {moiMeme && <span className="text-[10px] uppercase text-slate-400">(vous)</span>}
                       </p>
                       {a.tentativesEchouees > 0 && !a.bloqueJusqua && (
@@ -232,81 +334,73 @@ export default function GestionAdminsPage() {
                           {a.tentativesEchouees}/3 tentative(s) échouée(s)
                         </p>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {moiMeme ? (
-                        <span className={`text-xs px-2 py-1 rounded-full ${couleurRole(a.role)}`}>{libelleRole(a.role)}</span>
-                      ) : (
-                        <select
-                          value={a.role}
-                          onChange={(e) => changerRole(a, e.target.value)}
-                          className="text-xs rounded-lg border border-slate-200 px-2 py-1.5 focus:outline-none focus:ring-2"
-                          style={{ "--tw-ring-color": "#D4A017" }}
-                        >
-                          {ROLES.map((r) => (
-                            <option key={r.valeur} value={r.valeur}>
-                              {r.libelle}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Statut admin={a} />
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">
-                      {new Date(a.createdAt).toLocaleDateString("fr-FR")}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                        {a.bloqueJusqua && (
-                          <button
-                            className="text-xs px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 ring-1 ring-orange-200 hover:bg-orange-100"
-                            onClick={() => debloquer(a)}
-                          >
-                            Débloquer
-                          </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SelecteurRole admin={a} moiMeme={moiMeme} surChangement={changerRole} />
+                    <Statut admin={a} />
+                    <span className="text-[11px] text-slate-400">
+                      Créé le {new Date(a.createdAt).toLocaleDateString("fr-FR")}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
+                    <ActionsCompte admin={a} moiMeme={moiMeme} onAction={lancerAction} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ─── TABLEAU DESKTOP (≥md) ─── */}
+          <div className="hidden md:block bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
+                  <th className="px-4 py-3 font-medium">Compte</th>
+                  <th className="px-4 py-3 font-medium">Rôle</th>
+                  <th className="px-4 py-3 font-medium">Statut</th>
+                  <th className="px-4 py-3 font-medium">Créé le</th>
+                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {admins.map((a) => {
+                  const moiMeme = estMoi(a);
+                  return (
+                    <tr key={a.id} className="border-b border-slate-100 last:border-b-0 align-middle">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-800">
+                          {a.email} {moiMeme && <span className="text-[10px] uppercase text-slate-400">(vous)</span>}
+                        </p>
+                        {a.tentativesEchouees > 0 && !a.bloqueJusqua && (
+                          <p className="text-[11px] text-orange-600">
+                            {a.tentativesEchouees}/3 tentative(s) échouée(s)
+                          </p>
                         )}
-                        {!a.actif && (
-                          <button
-                            className="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
-                            onClick={() => activer(a)}
-                          >
-                            Réactiver
-                          </button>
-                        )}
-                        <button
-                          className="text-xs px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100"
-                          onClick={() => setConfirm({ type: "reinit", admin: a })}
-                        >
-                          Réinit. mot de passe
-                        </button>
-                        {a.actif && (
-                          <button
-                            className="text-xs px-2.5 py-1.5 rounded-lg ring-1 ring-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                            disabled={moiMeme}
-                            onClick={() => setConfirm({ type: "desactiver", admin: a })}
-                            title={moiMeme ? "Impossible sur votre propre compte" : undefined}
-                          >
-                            Désactiver
-                          </button>
-                        )}
-                        <button
-                          className="text-xs px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 disabled:opacity-40"
-                          disabled={moiMeme}
-                          onClick={() => setConfirm({ type: "delete", admin: a })}
-                          title={moiMeme ? "Impossible sur votre propre compte" : undefined}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <SelecteurRole admin={a} moiMeme={moiMeme} surChangement={changerRole} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Statut admin={a} />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-500">
+                        {new Date(a.createdAt).toLocaleDateString("fr-FR")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          <ActionsCompte admin={a} moiMeme={moiMeme} onAction={lancerAction} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {modalOuvert && (
@@ -321,31 +415,24 @@ export default function GestionAdminsPage() {
 
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
-              <input
+              <Input
                 type="email"
                 required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
-                style={{ "--tw-ring-color": "#D4A017" }}
                 placeholder="prenom.nom@exemple.ci"
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Rôle</label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
-                style={{ "--tw-ring-color": "#D4A017" }}
-              >
+              <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 {ROLES.map((r) => (
                   <option key={r.valeur} value={r.valeur}>
                     {r.libelle}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <p className="text-xs text-slate-500 leading-relaxed">
@@ -353,22 +440,12 @@ export default function GestionAdminsPage() {
             </p>
 
             <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setModalOuvert(false)}
-                disabled={envoi}
-                className="text-sm font-medium text-slate-600 bg-slate-50 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-40 rounded-full px-5 py-2 transition"
-              >
+              <Btn variant="secondary" onClick={() => setModalOuvert(false)} disabled={envoi}>
                 Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={envoi}
-                className="text-sm font-medium text-white disabled:opacity-50 rounded-full px-5 py-2 shadow-sm transition"
-                style={{ background: C.btn }}
-              >
+              </Btn>
+              <Btn type="submit" loading={envoi}>
                 {envoi ? "Création…" : "Créer le compte"}
-              </button>
+              </Btn>
             </div>
           </form>
         </div>

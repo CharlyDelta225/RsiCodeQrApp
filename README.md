@@ -2,23 +2,28 @@
 
 Système de **badgeage par QR code** : chaque ouvrier reçoit un badge avec un QR code ; une douchette scanne le QR au kiosque (terminal), le matricule est envoyé à l'API qui enregistre le pointage et renvoie les infos de l'ouvrier. Un dashboard permet à l'équipe de gérer les ouvriers, les départements et de consulter l'historique.
 
-**Monorepo** : backend API (notre travail) + deux dossiers frontend réservés à l'équipe frontend.
+**Monorepo** : backend API + dashboard + terminal, tous maintenus ici.
 
 ```
 RsiCodeQrApp/
+├── api/                    ← entrée serverless Vercel (réexporte l'app Express)
 ├── backend/                ← API Node.js/Express + PostgreSQL/Prisma
 │   ├── src/                ← code applicatif
-│   │   ├── routes/         ← endpoints (badgeage, auth, ouvriers, pointages, admins, import, départements)
+│   │   ├── routes/         ← endpoints (badgeage, auth, ouvriers, pointages, admins, import, départements, rapports)
 │   │   ├── middleware/     ← requireAuth + requireRole
-│   │   ├── lib/            ← prisma client, générateur de matricule
-│   │   └── scripts/        ← seed, reset-admin-password
+│   │   ├── lib/            ← prisma client, générateur de matricule, ipReelle (rate-limit)
+│   │   └── scripts/        ← seed, set-admin (SUPER_ADMIN), check-admin
 │   ├── prisma/             ← schéma + migrations
 │   ├── tests/              ← tests d'intégration (node:test)
 │   ├── data/               ← exemple de fichier CSV
-│   └── public/badges/      ← QR codes générés (à imprimer)
-├── frontend/dashboard/     ← gestion + historique (dashboard maintenu avec le backend)
-├── frontend/terminal/      ← (équipe front) kiosque de badgeage
-└── docs/api-contrat.md     ← contrat d'API partagé avec l'équipe front
+│   └── public/             ← assemblage dashboard/ + terminal/ (produit par le build Vercel, non commité)
+├── frontend/dashboard/     ← gestion + historique (Vite + React + Tailwind)
+│   └── src/ui/             ← composants UI réutilisables (TableShell, Btn, Pill, inputs…)
+├── frontend/terminal/      ← kiosque de badgeage (caméra + annonces vocales)
+│   └── audio/              ← sons et annonces vocales (WAV)
+├── scripts/                ← vercel-build.mjs (pipeline de build Vercel)
+├── vercel.json             ← config déploiement Vercel (serverless)
+└── docs/api-contrat.md     ← contrat d'API partagé (endpoints, formats, codes d'erreur)
 ```
 
 ---
@@ -32,7 +37,7 @@ RsiCodeQrApp/
 - **Import** : `multer` (upload) + `xlsx` (parse .csv et .xlsx)
 - **Rapports** : `pdfkit` (PDF par département + récap), `nodemailer` (envoi email SMTP), `node-cron` (envoi auto 06h00)
 - **Sécurité** : CORS restreint, limites de corps/fichier, rôles (moindre privilège)
-- **Déploiement** : préparation Railway (`railway.toml`) et Render (`render.yaml`)
+- **Déploiement** : **Vercel** (serverless — entrée `api/index.js`, build `scripts/vercel-build.mjs` ; migrations appliquées manuellement via le pooler Supabase)
 
 ---
 
@@ -127,7 +132,11 @@ Pages publiques (hors authentification) :
 
 ### Terminal kiosque
 
-Le terminal est servi directement par le backend : http://localhost:3000/terminal
+Le terminal est servi directement par le backend : dev `http://localhost:3000/terminal`, prod `https://<app>/terminal`.
+
+- Scan du QR badge par **caméra** (html5-qrcode) ; le matricule est envoyé à `POST /api/badgeage`.
+- **Sons + annonces vocales** (WAV dans `frontend/terminal/audio/`) selon le résultat : succès, déjà badgé, erreur, avec annonce du prénom.
+- **Politique d'autoplay** : un scan caméra n'est **pas** compté comme geste utilisateur par le navigateur (et iOS/tablettes sont stricts). Le terminal demande **un seul contact** au premier affichage (bandeau « Touchez l'écran pour activer le son »), qui démarre l'`AudioContext` Web Audio de façon **persistante** → chaque badge suivant joue sa voix **automatiquement**, sans retoucher l'écran. Bouton 🔊/🔇 en haut à droite.
 
 > Sur Windows, npm 11 bloque les scripts d'installation des moteurs Prisma : la config `allowScripts` dans `backend/package.json` règle ce point. Le miroir `registry.npmmirror.com` dans `.npmrc` facilite l'install si le réseau est instable.
 
@@ -152,9 +161,12 @@ Le terminal est servi directement par le backend : http://localhost:3000/termina
 
 | Protection | Détail |
 |---|---|
-| **Anti brute-force** | `login` / `register` / `reset-demand` limités à **5 tentatives/min/IP** → `429 TROP_DE_TENTATIVES` |
+| **Anti brute-force** | `login` / `register` / `reset-demand` limités à **10 tentatives/min par IP réelle** → `429 TROP_DE_TENTATIVES` ; badgeage limité à 30/min |
+| **IP réelle** | les rate-limits utilisent l'IP du client **derrière le proxy** (`X-Vercel-Forwarded-For`) — `X-Forwarded-For` (forgeable) n'est jamais une clé de limite (`src/lib/ip.js`) ; maximum surchargeable via `AUTH_RATE_LIMIT_MAX` |
 | **Blocage par compte** | **3 mots de passe erronés** → compte gelé **15 min** (`423 COMPTE_BLOQUE`, minutes restantes dans `reste`) ; déblocage manuel par le SUPER_ADMIN |
-| **Récupération de mot de passe** | lien unique envoyé par email (**usage unique, 1 h**), stocké **haché** (SHA-256) en base, jamais en clair ; réponses identiques email connu/inconnu (anti-énumération) |
+| **Anti-énumération** | `register` et `reset-demand` renvoient des réponses **strictement identiques** quelle que soit l'existence de l'email — aucun oracle (`emailEnvoye` neutre) |
+| **Récupération de mot de passe** | lien unique envoyé par email (**usage unique, 1 h**), stocké **haché** (SHA-256) en base, jamais en clair |
+| **Anti double-badgeage** | règle « une fois par jour civil » verrouillée **en base** (`jour` Date + index unique `(ouvrierId, jour)`) → atomique même en concurrence |
 | **CORS restreint** | seules origines dashboard (dev 5173/5174) + même origine acceptée (terminal) ; autre → `403 ORIGINE_NON_AUTORISEE` |
 | **Corps JSON limité** | 100 ko max → `413 CORPS_TROP_GROS` |
 | **Import borné** | fichier ≤ 5 Mo (`413 FICHIER_TROP_GROS`) et ≤ 2000 lignes (`400 TROP_DE_LIGNES`) |
@@ -180,6 +192,18 @@ Ouvrier ──< OuvrierDepartement >── Departement
 - **Un seul ADJOINT** par département (idem).
 - Un ouvrier peut être dans **plusieurs départements** (chorale + accueil par ex.).
 
+## Modèle de données — Pointages (anti double-badgeage)
+
+Un ouvrier ne peut badger **qu'une fois par jour civil** :
+
+```
+Pointage { id, ouvrierId, dateHeure (timestamp), jour (Date), type }
+UNIQUE (ouvrierId, jour)   → migration 20260912090000_anti_double_badgeage
+```
+
+- La colonne `jour` (date du badge, heure UTC) + l'index unique **garantissent la règle en base** : deux requêtes simultanées, une seule crée le pointage, l'autre reçoit `P2002` → `409 DEJA_BADGE_AUJOURDHUI`.
+- Index croisé `(ouvrierId, jour)` : l'unicité par ouvrier et par jour, sans ralentir les recherches par jour.
+
 ---
 
 ## Principaux endpoints
@@ -188,15 +212,15 @@ Ouvrier ──< OuvrierDepartement >── Departement
 
 | Méthode | Route | Description |
 |---|---|---|
-| `POST` | `/api/badgeage` | Badgeage : `{ "matricule" }` → infos ouvrier + pointage |
+| `POST` | `/api/badgeage` | Badgeage : `{ "matricule" }` → infos ouvrier + pointage. **Un seul badgeage par jour civil**, verrouillé en base (colonne `jour` + index unique `(ouvrierId, jour)`) : même deux requêtes simultanées, une seule aboutit, l'autre reçoit `409 DEJA_BADGE_AUJOURDHUI` (heure UTC) |
 
 ### Authentification
 
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
-| `POST` | `/api/auth/login` | public | Connexion → token JWT (blocage après 3 échecs) |
-| `POST` | `/api/auth/register` | public | Créer un compte (LECTEUR) |
-| `POST` | `/api/auth/reset-demand` | public | Envoyer un lien de réinitialisation par email |
+| `POST` | `/api/auth/login` | public | Connexion → token JWT (rate-limit par IP + blocage après 3 échecs) |
+| `POST` | `/api/auth/register` | public | Créer un compte (LECTEUR) — réponse identique email déjà pris/succès (anti-énumération) |
+| `POST` | `/api/auth/reset-demand` | public | Envoyer un lien de réinitialisation par email — réponse identique email connu/inconnu (anti-énumération) |
 | `POST` | `/api/auth/reset` | public | Poser un nouveau mot de passe (lien unique, 1 h) |
 | `GET` | `/api/auth/me` | authentifié | Infos du compte |
 
@@ -294,23 +318,42 @@ node --test "tests/*.test.js"
 
 ---
 
-## Déploiement (Railway / Render)
+## Déploiement (Vercel — serverless)
 
-Le backend se déploie avec **Root Directory = `backend`**.
+L'API Express **et** le dashboard **et** le terminal sont servis sous une seule
+URL Vercel (ex. `https://rsi-app-phi.vercel.app`).
 
-Chaîne au démarrage : `npx prisma migrate deploy && npm start`
-- `migrate deploy` applique les migrations en attente (sans interaction),
-- `npm start` régénère le client Prisma puis lance Express.
+- **Entrée** : `api/index.js` → réexporte l'app Express (`backend/src/app.js`).
+- **Config** : `vercel.json` — `functions.api/index.js.maxDuration=60`,
+  `includeFiles=backend/public/**` (les assets servis par Express sont empaquetés
+  avec la fonction), rewrite `/(.*)` → `/api/index`, `outputDirectory=backend/public`.
+- **Build** : `scripts/vercel-build.mjs` :
+  1. `npm install` (backend + dashboard, registre npmjs) puis `npx prisma generate`,
+  2. `vite build` du dashboard (`VITE_API_URL` vide → mêmes-origine `/api/...`),
+  3. assemble `frontend/dashboard/dist` → `backend/public/dashboard` et
+     `frontend/terminal/` → `backend/public/terminal`.
+- **Migrations** : **non** appliquées au déploiement (instance immuable). Elles
+  s'appliquent à la main via le pooler Supabase : `npx prisma migrate deploy`
+  (ou en direct, cf. section base commune).
 
-Variables d'environnement requises :
-- `DATABASE_URL` (PostgreSQL fourni par la plateforme)
+Déploiement en CLI (depuis la racine du dépôt) :
+
+```bash
+npx vercel --prod --scope solutionniste --yes
+```
+
+Variables d'environnement (à renseigner dans le projet Vercel / le `.env`) :
+- `DATABASE_URL` — pooler Supabase (`postgresql://postgres.<ref>:<mdp>@aws-1-<region>.pooler.supabase.com:5432/postgres?schema=public`) ; sans `sslmode` dans l'URL, le code passe `ssl: { rejectUnauthorized: false }`
 - `JWT_SECRET` (secret aléatoire)
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` (compte SUPER_ADMIN du seed)
-- `PUBLIC_BASE_URL` (URL publique du backend, ex. `https://mon-api.railway.app`)
-- `APP_URL` (URL publique du dashboard — sert à construire les liens de réinitialisation de mot de passe, ex. `https://mon-dashboard.vercel.app`)
-- `CORS_ORIGINES` (origines du dashboard, séparées par des virgules, ex. `https://mon-dashboard.vercel.app`)
-- `PORT` (défaut 3000)
-- `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_EXPEDITEUR` (envoi des rapports par email + créations de comptes + liens de réinitialisation)
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_EXPEDITEUR` (rapports + création de comptes + liens de réinitialisation)
+- `APP_URL` (URL du dashboard, ex. `https://rsi-app-phi.vercel.app` — liens de réinitialisation)
+- `CORS_ORIGINES` (origines du dashboard, ex. `https://rsi-app-phi.vercel.app`)
+- `AUTH_RATE_LIMIT_MAX` (optionnel, défaut 10/min par IP sur l'authentification)
 - `RAPPORT_EMAIL_DESTINATAIRES` (destinataires par défaut des rapports, séparés par des virgules)
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD` (création/rotation du compte SUPER_ADMIN via `npm --prefix backend run seed` ou `node backend/src/scripts/set-admin.js`)
 
-Après déploiement : vérifier `GET /api/health`, puis lancer le seed et l'import d'ouvriers via la console du service.
+Comptes : création d'un SUPER_ADMIN idempotente (`set-admin.js`, upsert d'après
+`ADMIN_EMAIL`/`ADMIN_PASSWORD`), contrôle du hash avec `check-admin.mjs`.
+
+Après déploiement : vérifier `GET /api/health`, puis ouvrir `/` (dashboard),
+`/terminal` (kiosque) et `/login`.

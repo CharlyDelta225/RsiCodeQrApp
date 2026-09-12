@@ -4,6 +4,11 @@ import { libelleDepartement } from "../lib/departement";
 import { getAdmin } from "../lib/auth";
 import { usePagination } from "../lib/pagination";
 import PaginationBar from "../components/PaginationBar";
+import TableShell from "../ui/TableShell";
+import Pill from "../ui/Pill";
+import Btn from "../ui/Btn";
+import { Field, Input } from "../ui/inputs";
+import { C } from "../theme";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -13,11 +18,8 @@ function peutEcrire() {
 
 // Raison courte et compréhensible d'un échec, basée sur le code machine de
 // l'API (cf. api-contrat.md : le front se branche sur les codes, pas les messages).
-// Si le code n'est pas reconnu, on retombe sur le message réel du backend
-// (jamais sur un texte vague) pour que l'utilisateur comprenne toujours pourquoi.
 function raisonEchec(err, fallback) {
   const raisons = {
-    // Validations d'import
     FICHIER_MANQUANT: "Aucun fichier sélectionné. Choisissez un fichier .csv ou .xlsx.",
     TYPE_FICHIER_NON_SUPPORTE: "Type de fichier non accepté. Seuls les formats .csv et .xlsx sont autorisés.",
     FICHIER_TROP_GROS: "Le fichier dépasse la taille maximale autorisée (5 Mo).",
@@ -26,7 +28,6 @@ function raisonEchec(err, fallback) {
     TROP_DE_LIGNES: "Le fichier est trop volumineux : maximum 2000 lignes autorisées.",
     COLONNES_MANQUANTES: "Colonnes attendues manquantes. Le fichier doit contenir : Nom, Prénom, Département.",
     DEPARTEMENT_INCONNU: "Un ou plusieurs départements ne sont pas dans la liste. Veuillez choisir des départements corrects.",
-    // Autres (création, etc.)
     DOUBLON_DEPARTEMENT: "Un ouvrier avec ce nom et ce prénom existe déjà dans ce département",
     MATRICULE_EXISTANT: "Ce matricule existe déjà",
     CHAMPS_MANQUANTS: "Des champs obligatoires sont manquants",
@@ -37,12 +38,42 @@ function raisonEchec(err, fallback) {
     ROLE_REQUIS: "Réseau non autorisé à effectuer cette action",
     FICHIER_INVALIDE: "Le fichier fourni est invalide (formats acceptés : .csv ou .xlsx)",
   };
-  // Si on a une erreur API avec un code connu → message explicite dédié.
   if (err instanceof ApiError && raisons[err.code]) return raisons[err.code];
-  // Si on a une erreur API (code inconnu) → on montre le message réel du backend.
   if (err instanceof ApiError && err.message) return err.message;
-  // Sinon (erreur réseau, inattendue) → fallback fourni par l'appelant.
   return fallback;
+}
+
+/** Popup résultat (alerte ou succès) — reskiné dans les tons de la maison. */
+function PopupResultat({ titre, message, action, surFermer }) {
+  const danger = action === "alerte";
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
+        <div
+          className="w-14 h-14 mx-auto rounded-full flex items-center justify-center text-2xl text-white"
+          style={{
+            background: danger ? C.btn : "linear-gradient(135deg,#10b981,#059669)",
+            boxShadow: danger ? "0 8px 20px rgba(178,58,43,.3)" : "0 8px 20px rgba(5,150,105,.3)",
+          }}
+        >
+          {danger ? "!" : "✓"}
+        </div>
+        <div>
+          <h2 className="font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
+            {titre}
+          </h2>
+          <p className="text-sm text-slate-500 mt-1">{message}</p>
+        </div>
+        <button
+          onClick={surFermer}
+          className="w-full text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm transition hover:opacity-90"
+          style={{ background: danger ? C.btn : "linear-gradient(135deg,#10b981,#059669)" }}
+        >
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function OuvriersPage() {
@@ -118,9 +149,6 @@ export default function OuvriersPage() {
     setAlerte(null);
     try {
       const data = await api.importOuvriers(fichier);
-      // D'abord recharger la liste (le fetch charger() remettrait alerte à null
-      // s'il était appelé après, ce qui écrase le popup : on recharge donc AVANT
-      // de fixer le message de résultat).
       await charger();
       const { creees = 0, erreurs = 0 } = data;
       if (creees > 0 && erreurs > 0) {
@@ -178,148 +206,85 @@ export default function OuvriersPage() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-gray-700">{total} ouvrier(s)</h2>
+        <h2 className="text-sm font-semibold text-bordeaux-900">{total} ouvrier(s)</h2>
         <div className="flex items-center gap-2">
           {peutEcrire() && (
-            <label className="text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 rounded-lg px-3 py-2 cursor-pointer">
-              {importEnCours ? "Import en cours…" : "Importer (.csv / .xlsx)"}
+            <label className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg px-3 py-2 cursor-pointer disabled:opacity-50 transition">
+              {importEnCours ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-bordeaux-500 border-t-transparent" />
+                  Import en cours…
+                </span>
+              ) : (
+                <>Importer (.csv / .xlsx)</>
+              )}
               <input type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImport} disabled={importEnCours} />
             </label>
           )}
           {peutEcrire() && (
-            <button
-              onClick={() => setModalOuvert(true)}
-              className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 rounded-lg px-3 py-2"
-            >
-              + Ajouter un ouvrier
-            </button>
+            <Btn onClick={() => setModalOuvert(true)} icon="+">
+              Ajouter un ouvrier
+            </Btn>
           )}
         </div>
       </div>
 
       {alerte && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
-            <div
-              className="w-14 h-14 mx-auto rounded-full flex items-center justify-center text-2xl text-white"
-              style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)", boxShadow: "0 8px 20px rgba(244,63,94,.3)" }}
-            >
-              !
-            </div>
-            <div>
-              <h2 className="font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
-                {alerte.titre}
-              </h2>
-              <p className="text-sm text-slate-500 mt-1">{alerte.message}</p>
-            </div>
-            <button
-              onClick={() => setAlerte(null)}
-              className="w-full text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm transition"
-              style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)" }}
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
+        <PopupResultat
+          action="alerte"
+          titre={alerte.titre}
+          message={alerte.message}
+          surFermer={() => setAlerte(null)}
+        />
       )}
 
       {succes && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
-            <div
-              className="w-14 h-14 mx-auto rounded-full flex items-center justify-center text-2xl text-white"
-              style={{ background: "linear-gradient(135deg,#34d399,#10b981)", boxShadow: "0 8px 20px rgba(16,185,129,.3)" }}
-            >
-              ✓
-            </div>
-            <div>
-              <h2 className="font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
-                {succes.titre}
-              </h2>
-              <p className="text-sm text-slate-500 mt-1">{succes.message}</p>
-            </div>
-            <button
-              onClick={() => setSucces(null)}
-              className="w-full text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm transition"
-              style={{ background: "linear-gradient(135deg,#34d399,#10b981)" }}
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
+        <PopupResultat
+          action="succes"
+          titre={succes.titre}
+          message={succes.message}
+          surFermer={() => setSucces(null)}
+        />
       )}
 
-      <input
-        type="text"
+      <Input
         placeholder="Rechercher par nom, prénom, département, matricule…"
         value={recherche}
         onChange={(e) => setRecherche(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"
       />
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100 text-slate-600 text-left">
-            <tr>
-              <th className="px-3 py-2">Matricule</th>
-              <th className="px-3 py-2">Nom</th>
-              <th className="px-3 py-2">Prénom</th>
-              <th className="px-3 py-2">Département</th>
-              <th className="px-3 py-2">Statut</th>
-              <th className="px-3 py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chargement && (
-              <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400">Chargement…</td></tr>
-            )}
-            {!chargement && ouvriers.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400">Aucun ouvrier trouvé</td></tr>
-            )}
-            {pagination.elementsPage.map((o) => (
-              <tr key={o.id} className="border-t border-slate-100">
-                <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
-                <td className="px-3 py-2">{o.nom}</td>
-                <td className="px-3 py-2">{o.prenom}</td>
-                <td className="px-3 py-2">{libelleDepartement(o)}</td>
-                <td className="px-3 py-2">
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      o.actif ? "bg-green-100 text-green-700" : "bg-slate-200 text-slate-600"
-                    }`}
-                  >
-                    {o.actif ? "Actif" : "Désactivé"}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right space-x-2 whitespace-nowrap">
-                  <button
-                    onClick={() => handleVoirBadge(o)}
-                    className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition"
-                  >
-                    Badge
-                  </button>
-                  {peutEcrire() && (
-                    <button
-                      onClick={() => handleToggleActif(o)}
-                      className="inline-flex items-center justify-center text-xs font-medium w-[92px] px-2 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 transition"
-                    >
-                      {o.actif ? "Désactiver" : "Activer"}
-                    </button>
-                  )}
-                  {peutEcrire() && (
-                    <button
-                      onClick={() => handleSupprimer(o)}
-                      className="text-xs font-medium px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 transition"
-                    >
-                      Supprimer
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TableShell
+        colonnes={["Matricule", "Nom", "Prénom", "Département", "Statut", "Actions"]}
+        chargement={chargement}
+        vide="Aucun ouvrier trouvé"
+      >
+        {pagination.elementsPage.map((o) => (
+          <tr key={o.id} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
+            <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
+            <td className="px-3 py-2">{o.nom}</td>
+            <td className="px-3 py-2">{o.prenom}</td>
+            <td className="px-3 py-2">{libelleDepartement(o)}</td>
+            <td className="px-3 py-2">
+              <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
+            </td>
+            <td className="px-3 py-2 text-right whitespace-nowrap space-x-1.5">
+              <Btn variant="secondary" size="xs" onClick={() => handleVoirBadge(o)} icon="⊛">
+                Badge
+              </Btn>
+              {peutEcrire() && (
+                <Btn variant="softDanger" size="xs" onClick={() => handleToggleActif(o)}>
+                  {o.actif ? "Désactiver" : "Activer"}
+                </Btn>
+              )}
+              {peutEcrire() && (
+                <Btn variant="softDanger" size="xs" onClick={() => handleSupprimer(o)}>
+                  Supprimer
+                </Btn>
+              )}
+            </td>
+          </tr>
+        ))}
+      </TableShell>
 
       <PaginationBar
         page={pagination.page}
@@ -333,45 +298,36 @@ export default function OuvriersPage() {
       {modalOuvert && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
           <form onSubmit={handleCreer} className="bg-white rounded-xl p-6 w-full max-w-sm space-y-3">
-            <h2 className="font-bold text-slate-900">Ajouter un ouvrier</h2>
-            <input
-              required
-              placeholder="Nom"
-              value={form.nom}
-              onChange={(e) => setForm({ ...form, nom: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"
-            />
-            <input
-              required
-              placeholder="Prénom"
-              value={form.prenom}
-              onChange={(e) => setForm({ ...form, prenom: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"
-            />
-            <input
-              required
-              list="departements"
-              placeholder="Département"
-              value={form.departement}
-              onChange={(e) => setForm({ ...form, departement: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"
-            />
+            <h2 className="font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
+              Ajouter un ouvrier
+            </h2>
+            <Field label="Nom">
+              <Input required placeholder="Nom" value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} />
+            </Field>
+            <Field label="Prénom">
+              <Input required placeholder="Prénom" value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
+            </Field>
+            <Field label="Département">
+              <Input
+                required
+                list="departements"
+                placeholder="Département"
+                value={form.departement}
+                onChange={(e) => setForm({ ...form, departement: e.target.value })}
+              />
+            </Field>
             <datalist id="departements">
               {departements.map((d) => (
                 <option key={d} value={d} />
               ))}
             </datalist>
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setModalOuvert(false)} className="text-sm text-slate-500 px-3 py-2">
+              <Btn variant="ghost" onClick={() => setModalOuvert(false)}>
                 Annuler
-              </button>
-              <button
-                type="submit"
-                disabled={envoi}
-                className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 rounded-lg px-3 py-2"
-              >
+              </Btn>
+              <Btn type="submit" loading={envoi}>
                 {envoi ? "Création…" : "Créer"}
-              </button>
+              </Btn>
             </div>
           </form>
         </div>
@@ -381,7 +337,7 @@ export default function OuvriersPage() {
       {badgeUrl && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl p-6 text-center space-y-3">
-            <h2 className="font-bold text-slate-900">
+            <h2 className="font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
               Badge — {badgeOuvrier?.prenom} {badgeOuvrier?.nom}
             </h2>
             <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-64" />
@@ -389,16 +345,16 @@ export default function OuvriersPage() {
             {badgeOuvrier && (
               <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>
             )}
-            <button
+            <Btn
+              variant="secondary"
               onClick={() => {
                 URL.revokeObjectURL(badgeUrl);
                 setBadgeUrl(null);
                 setBadgeOuvrier(null);
               }}
-              className="text-sm text-slate-600"
             >
               Fermer
-            </button>
+            </Btn>
           </div>
         </div>
       )}

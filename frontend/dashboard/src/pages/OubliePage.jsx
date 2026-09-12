@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { C } from "../theme";
+import Btn from "../ui/Btn";
+import { Input } from "../ui/inputs";
 import rsiLogo from "../assets/rsi-logo.png";
 
 /**
@@ -66,33 +68,26 @@ export default function OubliePage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {erreur && (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <div className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
                 {erreur}
               </div>
             )}
 
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Email du compte</label>
-              <input
+              <Input
                 type="email"
                 required
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
-                style={{ "--tw-ring-color": "#D4A017" }}
                 placeholder="admin@example.com"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60 transition-opacity hover:opacity-90"
-              style={{ background: C.btn }}
-            >
+            <Btn type="submit" disabled={loading} loading={loading} className="w-full" size="lg">
               {loading ? "Envoi…" : "Envoyer le lien"}
-            </button>
+            </Btn>
           </form>
         )}
 

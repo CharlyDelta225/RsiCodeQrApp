@@ -1,3 +1,6 @@
+import Spinner from "../ui/Spinner";
+import { C } from "../theme";
+
 export default function ConfirmDialog({
   ouvert,
   titre,
@@ -13,10 +16,13 @@ export default function ConfirmDialog({
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="px-6 pt-6 pb-4 text-center">
-          <div className="mx-auto w-12 h-12 rounded-full bg-rose-50 text-rose-500 ring-1 ring-rose-100 flex items-center justify-center text-xl mb-3">
+          <div className="mx-auto w-12 h-12 rounded-full bg-bordeaux-50 text-bordeaux-700 ring-1 ring-bordeaux-100 flex items-center justify-center text-xl mb-3">
             ⚠
           </div>
-          <h2 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Poppins,sans-serif" }}>
+          <h2
+            className="font-semibold text-slate-800 text-sm"
+            style={{ fontFamily: "Poppins,sans-serif" }}
+          >
             {titre}
           </h2>
           <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{message}</p>
@@ -35,9 +41,16 @@ export default function ConfirmDialog({
             onClick={surConfirmer}
             disabled={enCours}
             className="text-sm font-medium text-white disabled:opacity-50 rounded-full px-5 py-2 shadow-sm transition"
-            style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)" }}
+            style={{ background: C.btn }}
           >
-            {enCours ? "Traitement…" : bouton}
+            {enCours ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Spinner size="xs" light />
+                Traitement…
+              </span>
+            ) : (
+              bouton
+            )}
           </button>
         </div>
       </div>

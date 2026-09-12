@@ -34,16 +34,26 @@ const BADGES_DIR = path.resolve(process.cwd(), "public/badges");
 // Colonnes obligatoires attendues dans le fichier (ordre flexible : on cherche par nom)
 const COLONNES_ATTENDUES = ["Nom", "Prénom", "Département"];
 
-// Générer le fichier QR badge PNG pour un ouvrier
+// Générer le fichier QR badge PNG pour un ouvrier.
+// Cache disque BEST-EFFORT : les badges sont toujours servis à la volée par
+// GET /api/ouvriers/:id/badge (PNG généré en mémoire). Sur un hébergement
+// sans FS persistante (Vercel, FS lecture seule), un échec d'écriture ne doit
+// PAS faire échouer l'import : on capture et on logge silencieusement.
 async function genererBadge(ouvrier) {
-  fs.mkdirSync(BADGES_DIR, { recursive: true });
-  const fichier = path.join(BADGES_DIR, `${ouvrier.matricule}.png`);
-  await QRCode.toFile(fichier, ouvrier.matricule, {
-    width: 600,
-    margin: 2,
-    errorCorrectionLevel: "Q",
-    color: { dark: "#1a1a1a", light: "#ffffff" },
-  });
+  try {
+    fs.mkdirSync(BADGES_DIR, { recursive: true });
+    const fichier = path.join(BADGES_DIR, `${ouvrier.matricule}.png`);
+    await QRCode.toFile(fichier, ouvrier.matricule, {
+      width: 600,
+      margin: 2,
+      errorCorrectionLevel: "Q",
+      color: { dark: "#1a1a1a", light: "#ffffff" },
+    });
+  } catch (err) {
+    console.warn(
+      `[import] badge (cache disque) non écrit pour ${ouvrier.matricule} : ${err.message}`
+    );
+  }
 }
 
 /**
@@ -266,9 +276,14 @@ router.post(
           },
         });
 
-        // Générer le badge s'il n'en a pas encore
+        // Générer le badge s'il n'en a pas encore (best-effort, cf. genererBadge)
         const BADGES_DIR_RESOLVED = path.resolve(process.cwd(), "public/badges");
-        const badgeExiste = fs.existsSync(path.join(BADGES_DIR_RESOLVED, `${ouvrierExistant.matricule}.png`));
+        let badgeExiste = false;
+        try {
+          badgeExiste = fs.existsSync(path.join(BADGES_DIR_RESOLVED, `${ouvrierExistant.matricule}.png`));
+        } catch {
+          badgeExiste = false;
+        }
         if (!badgeExiste) {
           await genererBadge(ouvrierExistant);
         }

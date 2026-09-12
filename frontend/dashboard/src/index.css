@@ -1,6 +1,34 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
 @import "tailwindcss";
 
+/* ─── Tokens d'IDENTITÉ RSI — toute l'UI tourne autour de ces deux familles ── */
+/* Bordeaux (action, primaire) et Or (accent, secondaire) : déclinés du logo.
+   Les utilities générées (bg-bordeaux-*, text-gold-*, ring-*, border-*, …)
+   unifient les pages : plus de roses/skies/verts arbitraires. */
+@theme {
+  --color-bordeaux-50: #FBF1F0;
+  --color-bordeaux-100: #F6DDD8;
+  --color-bordeaux-200: #EDB9B1;
+  --color-bordeaux-300: #E0958A;
+  --color-bordeaux-400: #D06E5F;
+  --color-bordeaux-500: #C05443;
+  --color-bordeaux-600: #B23A2B;
+  --color-bordeaux-700: #932A1F;
+  --color-bordeaux-800: #7B1515;
+  --color-bordeaux-900: #5A0A0A;
+
+  --color-gold-50: #FBF7E8;
+  --color-gold-100: #F6ECCB;
+  --color-gold-200: #EED89B;
+  --color-gold-300: #E4C468;
+  --color-gold-400: #DCB23F;
+  --color-gold-500: #D4A017;
+  --color-gold-600: #B08612;
+  --color-gold-700: #8B6914;
+  --color-gold-800: #6B5110;
+  --color-gold-900: #4A3A0C;
+}
+
 html {
   overflow-x: hidden;
   max-width: 100vw;

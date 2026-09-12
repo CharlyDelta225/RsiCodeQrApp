@@ -6,6 +6,11 @@ import { getAdmin } from "../lib/auth";
 
 import { usePagination } from "../lib/pagination";
 import PaginationBar from "../components/PaginationBar";
+import TableShell from "../ui/TableShell";
+import Pill from "../ui/Pill";
+import Btn from "../ui/Btn";
+import { Select, Input } from "../ui/inputs";
+import { C } from "../theme";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -27,11 +32,11 @@ function libelleRole(role) {
 function styleRole(role) {
   return (
     {
-      RESPONSABLE: "bg-rose-50 text-rose-600 ring-1 ring-rose-100",
-      ADJOINT: "bg-amber-50 text-amber-600 ring-1 ring-amber-100",
-      SECRETAIRE: "bg-sky-50 text-sky-600 ring-1 ring-sky-100",
-      MEMBRE: "bg-slate-100 text-slate-500 ring-1 ring-slate-200",
-    }[role] || "bg-slate-100 text-slate-500"
+      RESPONSABLE: "text-gold-800 bg-gold-50 ring-1 ring-gold-200",
+      ADJOINT: "text-bordeaux-700 bg-bordeaux-50 ring-1 ring-bordeaux-200",
+      SECRETAIRE: "text-sky-700 bg-sky-50 ring-1 ring-sky-200",
+      MEMBRE: "text-slate-600 bg-slate-100 ring-1 ring-slate-200",
+    }[role] || "text-slate-600 bg-slate-100"
   );
 }
 
@@ -189,7 +194,13 @@ export default function DepartementsPage() {
   return (
     <div className="p-4 md:p-8 space-y-5 max-w-6xl mx-auto">
       {/* Bandeau titre */}
-      <div className="rounded-2xl p-5 md:p-6 shadow-sm" style={{ background: "linear-gradient(135deg,#fff7f7 0%,#fdecec 60%,#fbe3e3 100%)", border: "1px solid #fce7e7" }}>
+      <div
+        className="rounded-2xl p-5 md:p-6 shadow-sm"
+        style={{
+          background: "linear-gradient(135deg,#FFF6F4 0%,#FBE7E3 55%,#F4CFC7 100%)",
+          border: "1px solid #F1C4BB",
+        }}
+      >
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
@@ -199,7 +210,7 @@ export default function DepartementsPage() {
             {peutEcrire() && (
             <Link
               to="/gestion-departements"
-              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-rose-600 bg-rose-50 ring-1 ring-rose-100 hover:bg-rose-100 rounded-full px-4 py-2 transition"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-bordeaux-700 bg-white ring-1 ring-bordeaux-200 hover:bg-bordeaux-50 rounded-full px-4 py-2 transition"
             >
               Créer / renommer / exporter les départements
               <span className="text-xs">→</span>
@@ -222,8 +233,8 @@ export default function DepartementsPage() {
         <div
           className={`text-sm rounded-xl px-4 py-3 border ${
             erreur
-              ? "text-rose-700 bg-rose-50 border-rose-100"
-              : "text-emerald-700 bg-emerald-50 border-emerald-100"
+              ? "text-bordeaux-700 bg-bordeaux-50 border-bordeaux-200"
+              : "text-emerald-700 bg-emerald-50 border-emerald-200"
           }`}
         >
           {erreur || succes}
@@ -238,21 +249,21 @@ export default function DepartementsPage() {
         {chargement ? (
           <div className="text-sm text-slate-400 py-1.5">Chargement…</div>
         ) : (
-          <select
+          <Select
             id="select-departement"
             value={selectedId}
             onChange={(e) => {
               setSelectedId(e.target.value);
               setSucces(null);
             }}
-            className="w-full md:max-w-md px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition"
+            className="w-full md:max-w-md"
           >
             {departements.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.nom} — {d._count?.membres ?? 0} membre(s)
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
 
@@ -278,48 +289,38 @@ export default function DepartementsPage() {
         )}
 
         {!chargementDetail && selection && nbMembres > 0 && (
-          <div className="border border-slate-100 rounded-xl overflow-hidden overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-left text-xs uppercase tracking-wide">
-                <tr>
-                  <th className="px-3 py-2.5 font-medium">Matricule</th>
-                  <th className="px-3 py-2.5 font-medium">Nom</th>
-                  <th className="px-3 py-2.5 font-medium">Prénom</th>
-                  <th className="px-3 py-2.5 font-medium">Poste</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagination.elementsPage.map((m) => (
-                  <tr key={m.id} className="border-t border-slate-100 hover:bg-rose-50/30 transition">
-                    <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{m.ouvrier?.matricule}</td>
-                    <td className="px-3 py-2.5 text-slate-700">{m.ouvrier?.nom}</td>
-                    <td className="px-3 py-2.5 text-slate-700">{m.ouvrier?.prenom}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`text-xs px-2 py-1 rounded-full ${styleRole(m.roleDansDepartement)}`}>
-                        {libelleRole(m.roleDansDepartement)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {peutEcrire() ? (
-                        <button
-                          onClick={() => ouvrirEdition(m)}
-                          title={`Modifier ${m.ouvrier?.prenom} ${m.ouvrier?.nom}`}
-                          className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-white hover:border-transparent transition ml-auto"
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "linear-gradient(135deg,#fb7185,#f43f5e)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "")}
-                        >
-                          ⚙
-                        </button>
-                      ) : (
-                        <span className="inline-block" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TableShell
+            colonnes={["Matricule", "Nom", "Prénom", "Poste", "Actions"]}
+            className="border-slate-100"
+          >
+            {pagination.elementsPage.map((m) => (
+              <tr key={m.id} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
+                <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{m.ouvrier?.matricule}</td>
+                <td className="px-3 py-2.5 text-slate-700">{m.ouvrier?.nom}</td>
+                <td className="px-3 py-2.5 text-slate-700">{m.ouvrier?.prenom}</td>
+                <td className="px-3 py-2.5">
+                  <Pill tonalite="gris" className={styleRole(m.roleDansDepartement)}>
+                    {libelleRole(m.roleDansDepartement)}
+                  </Pill>
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  {peutEcrire() ? (
+                    <button
+                      onClick={() => ouvrirEdition(m)}
+                      title={`Modifier ${m.ouvrier?.prenom} ${m.ouvrier?.nom}`}
+                      className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-white hover:border-transparent transition ml-auto"
+                      onMouseEnter={(e) => (e.currentTarget.style.background = C.btn)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+                    >
+                      ⚙
+                    </button>
+                  ) : (
+                    <span className="inline-block" />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </TableShell>
         )}
 
         {!chargementDetail && selection && nbMembres > 0 && (
@@ -358,37 +359,23 @@ export default function DepartementsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-500">Nom</label>
-                  <input
-                    required
-                    value={form.nom}
-                    onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition"
-                  />
+                  <Input required value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-500">Prénom</label>
-                  <input
-                    required
-                    value={form.prenom}
-                    onChange={(e) => setForm({ ...form, prenom: e.target.value })}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition"
-                  />
+                  <Input required value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
                 </div>
               </div>
 
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-slate-500">Poste dans le département</label>
-                <select
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
-                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition"
-                >
+                <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                   {ROLES.map((r) => (
                     <option key={r.valeur} value={r.valeur}>
                       {r.libelle}
                     </option>
                   ))}
-                </select>
+                </Select>
                 <p className="text-[11px] text-slate-400">
                   Un seul responsable et un seul adjoint par département.
                 </p>
@@ -401,49 +388,30 @@ export default function DepartementsPage() {
               >
                 <span className="text-slate-500">Badge actif</span>
                 <span
-                  className={`w-10 h-6 rounded-full p-0.5 flex items-center transition ${form.actif ? "bg-rose-500 justify-end" : "bg-slate-200 justify-start"}`}
+                  className={`w-10 h-6 rounded-full p-0.5 flex items-center transition ${form.actif ? "bg-bordeaux-600 justify-end" : "bg-slate-200 justify-start"}`}
                 >
                   <span className="w-5 h-5 rounded-full bg-white shadow" />
                 </span>
               </button>
 
               {formErreur && (
-                <p className="text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">{formErreur}</p>
+                <p className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">{formErreur}</p>
               )}
 
               <div className="flex flex-wrap items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEdition(null)}
-                  className="text-sm text-slate-500 px-3 py-2 rounded-xl hover:bg-slate-50 transition"
-                >
+                <Btn variant="ghost" size="sm" onClick={() => setEdition(null)}>
                   Annuler
-                </button>
+                </Btn>
                 <div className="flex-1" />
-                <button
-                  type="button"
-                  onClick={() => handleRetirer(edition)}
-                  disabled={enregistrement}
-                  className="text-xs text-amber-600 bg-amber-50 border border-amber-100 px-3 py-2 rounded-xl hover:bg-amber-100 disabled:opacity-40 transition"
-                >
+                <Btn variant="secondary" size="sm" onClick={() => handleRetirer(edition)} disabled={enregistrement}>
                   Retirer du département
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSupprimer(edition)}
-                  disabled={enregistrement}
-                  className="text-xs text-rose-600 bg-rose-50 border border-rose-100 px-3 py-2 rounded-xl hover:bg-rose-100 disabled:opacity-40 transition"
-                >
+                </Btn>
+                <Btn variant="softDanger" size="sm" onClick={() => handleSupprimer(edition)} disabled={enregistrement}>
                   Supprimer
-                </button>
-                <button
-                  type="submit"
-                  disabled={enregistrement}
-                  className="text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm disabled:opacity-50 transition"
-                  style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)" }}
-                >
+                </Btn>
+                <Btn type="submit" loading={enregistrement}>
                   {enregistrement ? "Enregistrement…" : "Enregistrer"}
-                </button>
+                </Btn>
               </div>
             </form>
           </div>

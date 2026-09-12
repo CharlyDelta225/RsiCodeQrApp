@@ -2,9 +2,9 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Terminal — Scan Badge</title>
-<script src="html5-qrcode.min.js"></script>
+<script src="/terminal/html5-qrcode.min.js"></script>
 <style>
   body {
     margin: 0;
@@ -33,19 +33,156 @@
   .succes { background: #eaf3de; color: #27500a; }
   .erreur { background: #fde2e2; color: #7a1a1a; }
   #statut { font-size: 12px; color: #D4A017; margin-top: 12px; }
+  #sonBtn {
+    position: fixed; top: 10px; right: 10px;
+    background: rgba(255,255,255,0.14); color: #F3E3B3;
+    border: 1px solid #D4A017; border-radius: 999px;
+    font-size: 18px; padding: 4px 12px; cursor: pointer;
+    z-index: 10;
+  }
+  #sonBtn[data-mute="1"] { opacity: 0.55; }
+  #sonBandeau {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: rgba(12,12,12,0.88); color: #F3E3B3;
+    border: 1px solid #D4A017; border-radius: 999px;
+    padding: 12px 20px; font-size: 15px; white-space: nowrap;
+    display: none; align-items: center; gap: 8px;
+    z-index: 20; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  }
+  #sonBandeau .boutAction {
+    background: #D4A017; color: #3a0606; border: none;
+    border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-left: 6px;
+  }
 </style>
 </head>
 <body>
-  <img id="logo" src="rsi-logo.png" alt="RSI" />
+  <img id="logo" src="/terminal/rsi-logo.png" alt="RSI" />
   <h1>Présentez le QR code du badge devant la caméra</h1>
   <div id="reader"></div>
   <div id="resultat"></div>
   <div id="statut">Initialisation de la caméra…</div>
+  <button id="sonBtn" title="Couper / activer le son">🔊</button>
+  <div id="sonBandeau">🔇 Touchez l'écran pour activer le son<button class="boutAction" type="button">Activer le son</button></div>
 
-<script>
+<script data-audio-son="v2">
   const API_BASE = window.location.origin;
 
   let enTraitement = false;
+
+  // ---------- Sons du terminal ----------
+  // v2 : déblocage audio UNIQUE et PERSISTANT via Web Audio. Le navigateur ne
+  // considère pas un scan caméra comme un "geste utilisateur" : après le premier
+  // contact, l'AudioContext reste déverrouillé et chaque badge sonne tout seul.
+  const AUDIO_BASE = location.origin + "/terminal/audio/";
+  const FICHIERS = {
+    succes:        "succes.wav",
+    deja:          "deja.wav",
+    erreur:        "erreur.wav",
+    annonceSucces: "annonce-succes.wav",
+    annonceDeja:   "annonce-deja.wav",
+    annonceErreur: "annonce-erreur.wav",
+  };
+  const TONALITE = { succes: 0.9, deja: 0.9, erreur: 0.9, annonceSucces: 1, annonceDeja: 1, annonceErreur: 1 };
+
+  let sonCoupe = false;
+  try { sonCoupe = localStorage.getItem("terminal-coupeSon") === "1"; } catch (e) {}
+
+  const bandeauEl = document.getElementById("sonBandeau");
+  let ctx = null;
+  let audioDebloque = false;
+  const BUFFERS = {};
+
+  function obtenirCtx() {
+    if (ctx) return ctx;
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    try { ctx = new Ctor(); } catch (e) { return null; }
+    return ctx;
+  }
+
+  // Décodage des WAV une seule fois → lecture instantanée et durable (iOS compris).
+  async function prechargerAudio() {
+    const c = obtenirCtx();
+    if (!c) return;
+    for (const [cle, fichier] of Object.entries(FICHIERS)) {
+      try {
+        const rep = await fetch(AUDIO_BASE + fichier);
+        const buf = await rep.arrayBuffer();
+        BUFFERS[cle] = await c.decodeAudioData(buf);
+      } catch (e) {}
+    }
+  }
+  prechargerAudio();
+
+  // Lecture via Web Audio : autorisée automatiquement une fois l'AudioContext
+  // démarré (≈ aucune restriction d'autoplay ensuite).
+  function jouerWebAudio(nom) {
+    if (!BUFFERS[nom]) return Promise.resolve(false);
+    const c = obtenirCtx();
+    if (!c || c.state === "suspended") return Promise.resolve(false);
+    try {
+      const src = c.createBufferSource();
+      src.buffer = BUFFERS[nom];
+      const gain = c.createGain();
+      gain.gain.value = TONALITE[nom] ?? 1;
+      src.connect(gain);
+      gain.connect(c.destination);
+      src.start();
+      return Promise.resolve(true);
+    } catch (e) {
+      return Promise.resolve(false);
+    }
+  }
+
+  // Filet de sécurité si le Web Audio n'est pas disponible/encore décodé.
+  function jouerViaElement(nom) {
+    try {
+      const a = new Audio(AUDIO_BASE + FICHIERS[nom]);
+      a.preload = "auto";
+      a.volume = TONALITE[nom] ?? 1;
+      a.currentTime = 0;
+      return a.play().then(
+        () => true,
+        () => false
+      );
+    } catch (e) {
+      return Promise.resolve(false);
+    }
+  }
+
+  function afficherBandeauSon() {
+    if (!sonCoupe && bandeauEl) bandeauEl.style.display = "flex";
+  }
+
+  function cacherBandeauSon() {
+    if (bandeauEl) bandeauEl.style.display = "none";
+  }
+
+  // À appeler sur n'importe quel contact : démarre l'AudioContext UNE fois.
+  // Tous les badges suivants joueront automatiquement, sans retoucher l'écran.
+  function debloquerSon() {
+    cacherBandeauSon();
+    if (sonCoupe || audioDebloque) return;
+    audioDebloque = true;
+    const c = obtenirCtx();
+    if (c && c.state !== "running" && c.resume) {
+      c.resume().then(() => jouerSon("succes", 0)).catch((e) => {});
+    } else {
+      jouerSon("succes", 0);
+    }
+  }
+
+  function jouerSon(nom, delai = 0) {
+    if (sonCoupe) return;
+    // démarre le contexte si nécessaire (moins de latence au premier son).
+    obtenirCtx();
+    setTimeout(async () => {
+      let ok = await jouerWebAudio(nom);
+      if (!ok) ok = await jouerViaElement(nom);
+      if (!ok) afficherBandeauSon();
+    }, delai);
+  }
 
   function afficherResultat(texte, succes) {
     const el = document.getElementById("resultat");
@@ -69,14 +206,24 @@
       if (data.ok) {
         const o = data.ouvrier;
         afficherResultat(`✓ Pointage enregistré : ${o.prenom} ${o.nom} (${o.departement})`, true);
+        jouerSon("succes");
+        jouerSon("annonceSucces", 300);
+      } else if (data.code === "DEJA_BADGE_AUJOURDHUI") {
+        afficherResultat(`⚠ ${data.message || data.code}`, false);
+        jouerSon("deja");
+        jouerSon("annonceDeja", 600);
       } else {
         afficherResultat(`✗ ${data.message || data.code}`, false);
+        jouerSon("erreur");
+        jouerSon("annonceErreur", 150);
       }
     } catch (e) {
       afficherResultat("✗ Impossible de contacter le serveur : " + e.message, false);
+      jouerSon("erreur");
+      jouerSon("annonceErreur", 150);
     } finally {
       document.getElementById("statut").textContent = "Prêt pour le prochain scan…";
-      setTimeout(() => { enTraitement = false; }, 2000); // anti-double-scan
+      setTimeout(() => { enTraitement = false; }, 2000);
     }
   }
 
@@ -90,6 +237,42 @@
     document.getElementById("statut").textContent = "Caméra prête.";
   }).catch((err) => {
     document.getElementById("statut").textContent = "Erreur caméra : " + err;
+  });
+
+  // Déblocage AU PREMIER contact uniquement (tactile, clavier ou souris).
+  // Une fois déverrouillé, chaque badge joue automatiquement sa voix.
+  const EVENEMENTS_DECLENCHEURS = ["pointerdown", "touchstart", "touchend", "keydown", "click"];
+  EVENEMENTS_DECLENCHEURS.forEach((evt) =>
+    window.addEventListener(evt, debloquerSon, { passive: true })
+  );
+
+  // Tente aussi un démarrage immédiat (navigateur qui garde l'autorisation entre
+  // les pages, Media Engagement Index, PWA installée, etc.).
+  jouerSon("succes", 0);
+
+  // Couper / activer le son.
+  const sonBtn = document.getElementById("sonBtn");
+  function majSonBtn() {
+    sonBtn.textContent = sonCoupe ? "🔇" : "🔊";
+    sonBtn.dataset.mute = sonCoupe ? "1" : "0";
+  }
+  sonBtn.addEventListener("click", () => {
+    sonCoupe = !sonCoupe;
+    try { localStorage.setItem("terminal-coupeSon", sonCoupe ? "1" : "0"); } catch (e) {}
+    if (!sonCoupe) {
+      debloquerSon();
+      jouerSon("succes"); // retour sonore immédiat quand on réactive
+    }
+    majSonBtn();
+    cacherBandeauSon();
+  });
+  majSonBtn();
+
+  // Le bouton du bandeau active aussi le son.
+  const boutBandeau = bandeauEl && bandeauEl.querySelector(".boutAction");
+  if (boutBandeau) boutBandeau.addEventListener("click", (e) => {
+    e.stopPropagation();
+    debloquerSon();
   });
 </script>
 </body>

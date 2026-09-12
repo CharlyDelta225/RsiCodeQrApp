@@ -1,13 +1,17 @@
 # Frontend — RsiCodeQrApp
 
-Deux applications distinctes, toutes deux consommant l'API décrite dans
+Deux applications, toutes deux maintenues ici (plus « équipe front » séparée) :
+
+- `dashboard/` — application d'administration : login, ouvriers, badges QR,
+  pointages, départements (membres et postes), rapports, gestion des comptes.
+- `terminal/` — kiosque plein écran de badgeage par caméra avec annonces vocales.
+
+Elles consomment l'API décrite dans
 [`../docs/api-contrat.md`](../docs/api-contrat.md) — **seule source de vérité**
 sur les endpoints, formats et codes d'erreur. En cas de doute, on se réfère à
 ce document, jamais au code du backend directement.
 
-- `dashboard/` — admin (login, gestion des ouvriers, historique). **Étape
-  actuelle : scaffold + login fonctionnel (JWT).** Sidebar/topbar/KPI à venir.
-- `terminal/` — kiosque plein écran pour le badgeage (pas encore commencé).
+---
 
 ## Lancer le dashboard en local
 
@@ -19,72 +23,90 @@ cp .env.example .env
 ```
 
 Éditer `.env` :
-- `DATABASE_URL` : une base PostgreSQL locale ou distante (voir options ci-dessous)
-- `JWT_SECRET` : n'importe quelle chaîne longue en dev (ex. générée avec
+- `DATABASE_URL` : base PostgreSQL (locale, ou pooler Supabase partagé)
+- `JWT_SECRET` : chaîne longue (ex. générée avec
   `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`)
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` : le compte que le script de seed va créer
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD` : compte SUPER_ADMIN du seed
 
-**Option la plus rapide pour une base PostgreSQL locale (Docker) :**
+Base PostgreSQL locale rapide (Docker) :
 ```bash
 docker run --name rsi-postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:16
 ```
 puis `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/rsi_code_qr_dev?schema=public"`
 
-Ensuite :
+Puis :
 ```bash
 npm install
-npx prisma migrate dev      # applique la migration déjà présente dans prisma/migrations/
-npm run seed                # crée les ouvriers d'exemple + l'admin depuis .env
-npm run dev                 # démarre sur http://localhost:3000
+npx prisma migrate dev      # applique les migrations de prisma/migrations/
+npm run seed                # ouvriers d'exemple + admin depuis .env
+npm run dev                 # http://localhost:3000
 ```
 
 > ⚠️ Les scripts `prisma:migrate` / `prisma:generate` / `prisma:deploy` du
-> `package.json` du backend utilisent `set VAR=...` (syntaxe Windows/cmd).
-> Sur macOS/Linux, ça échoue avec `set: command not found`. Utilise
-> directement `npx prisma migrate dev` comme ci-dessus (le `PRISMA_ENGINES_MIRROR`
-> n'est utile que si le téléchargement des engines Prisma est bloqué — pas le
-> cas par défaut). À signaler à ton frère si vous voulez que ça marche sur
-> les deux OS sans y penser.
+> `package.json` du backend utilisent la syntaxe `set VAR=...` (Windows/cmd).
+> Sur macOS/Linux, utiliser directement `npx prisma migrate dev`.
 
-Vérifie que ça tourne : `curl http://localhost:3000/api/health` → `{"status":"ok",...}`
+Vérifier : `curl http://localhost:3000/api/health` → `{"status":"ok",...}`
 
 ### 2. Dashboard
-
-Dans un second terminal :
 
 ```bash
 cd frontend/dashboard
 npm install
-npm run dev                 # démarre sur http://localhost:5174
+npm run dev                 # http://localhost:5174
 ```
 
-Ouvre `http://localhost:5174` → tu dois arriver sur `/login`. Connecte-toi
-avec `ADMIN_EMAIL` / `ADMIN_PASSWORD` (ceux du `.env` backend, utilisés par
-le seed). Si ça fonctionne, tu es redirigé sur `/` et tu vois "Connexion
-réussie" avec ton email — ça confirme que le login → JWT → route protégée
-(`/api/auth/me`) fonctionne de bout en bout.
+Ouvre `http://localhost:5174` → `/login`. Le proxy Vite (`vite.config.js`)
+redirige `/api/...` vers `http://localhost:3000` : pas besoin de configurer
+`VITE_API_URL` en local (il sert uniquement si le dashboard est servi par un
+autre hôte que l'API).
 
-Le proxy Vite (`vite.config.js`) redirige automatiquement `/api/...` vers
-`http://localhost:3000` en dev — pas besoin de configurer `VITE_API_URL` en
-local. Il ne sert qu'en production (Vercel → URL Railway/Render).
+### 3. Terminal
 
-## Ce qui est fait / pas fait (étape 1)
+Le kiosque est servi **par le backend** : `http://localhost:3000/terminal`.
+Il se teste indépendamment (aucun build requis en dev).
 
-- ✅ Scaffold Vite + React + Tailwind v4 (même base que ce qu'on utilisera
-  pour l'identité visuelle à l'étape 2)
-- ✅ Client API (`src/lib/api.js`) conforme au contrat : gère `{ok, code,
-  message}`, ajoute le `Authorization: Bearer` automatiquement, et force la
-  déconnexion sur un 401
-- ✅ Login (`/login`) + route protégée (`/`)
-- ⬜ Sidebar / topbar / cartes KPI (identité visuelle) — étape 2
-- ⬜ Page Ouvriers (liste, création, désactivation, badge PNG) — étape 3
-- ⬜ Page Pointages / historique — étape 5
+---
 
-## Convention de contribution
+## Pages du dashboard
 
-- Une branche par lot de travail (`frontend/dashboard-shell`,
-  `frontend/ouvriers-page`, ...), jamais de push direct sur `main`.
-- On ne modifie jamais `backend/`. Un besoin d'endpoint manquant ou un
-  comportement à clarifier se discute avec l'auteur du backend et se
-  documente dans `docs/api-contrat.md` (journal des changements), pas par une
-  modif directe.
+| Route | Contenu | Accès |
+|---|---|---|
+| `/login` · `/inscription` · `/oublie` · `/reinitialisation` | Auth publique | public |
+| `/` | Tableau de bord : KPIs, pointages récents | tous |
+| `/ouvriers` | CRUD ouvriers, import `.csv`/`.xlsx`, activer/désactiver le badge | lecture : tous · écriture : ADMIN/SUPER |
+| `/badges` | Badges QR (aperçu, ZIP) | tous · export : ADMIN/SUPER |
+| `/pointages` · `/historique` | Pointages du jour · historique filtrable | lecture : tous · export CSV : ADMIN/SUPER |
+| `/departements` | Membres et postes par département (**postes : voir ci-dessous**) | lecture : tous · écriture : ADMIN/SUPER |
+| `/gestion-departements` | Créer / lister / renommer / exporter les départements | ADMIN/SUPER |
+| `/rapports` | Rapport du jour/département, présent/absent, envoi email | lecture : tous · CSV/email : ADMIN/SUPER |
+| `/gestion-admins` | Comptes admin : rôles, activation, déblocage, réinit, suppression | SUPER_ADMIN |
+
+### Postes dans les départements
+
+Chaque ouvrier a **un poste par département** (`roleDansDepartement`) :
+`RESPONSABLE`, `ADJOINT`, `SECRETAIRE`, `MEMBRE` (défaut). La popup d'édition
+d'un membre (bouton ⚙) permet de changer nom/prénom, l'**activation du badge**
+et le **poste** (avec contrainte : un seul RESPONSABLE et un seul ADJOINT par
+département, `409 POSTE_DEJA_PRIS`).
+
+---
+
+## Sons du terminal (politique d'autoplay)
+
+Le terminal joue une tonalité + une **annonce vocale** (WAV) à chaque badge.
+Les navigateurs bloquent l'audio tant que l'utilisateur n'a pas interagi avec
+la page — et un **scan caméra n'est pas une interaction**. Comportement
+attendu :
+
+- Au premier affichage, un bandeau « Touchez l'écran pour activer le son »
+  apparaît si le navigateur bloque la lecture.
+- **Un seul contact suffit** : il démarre l'`AudioContext` Web Audio
+  (persistant) ; **chaque badge suivant joue son annonce automatiquement**,
+  sans retoucher l'écran.
+- Bouton 🔊/🔇 (en haut à droite) pour couper/réactiver le son
+  (mémorisé dans `localStorage`).
+
+> Les fichiers sont dans `frontend/terminal/audio/`. Le build Vercel les copie
+> dans `backend/public/terminal/audio/`. Si le son ne change pas après une mise
+> à jour, vider le cache du navigateur (Ctrl+F5).

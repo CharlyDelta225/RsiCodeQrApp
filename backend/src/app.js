@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "node:fs";
 import { fileURLToPath } from "url";
 
 import badgeageRoutes from "./routes/badgeage.routes.js";
@@ -18,6 +19,11 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
+
+// Derrière un proxy (Vercel, ngrok, reverse proxy), Express doit faire
+// confiance au 1er proxy pour résoudre l'IP cliente (req.ip) — sinon
+// express-rate-limit lève ERR_ERL_UNEXPECTED_X_FORWARDED_FOR sur Vercel.
+app.set("trust proxy", 1);
 
 // Middlewares globaux
 // CORS restreint : seules les origines du dashboard sont acceptées. Le
@@ -76,7 +82,30 @@ app.use(express.json({ limit: "100kb" })); // parse le body JSON des requêtes
 // terminal.html appelle l'API via `window.location.origin` : il doit donc
 // être chargé depuis la même origine que l'API, que ce soit en local
 // (http://localhost:3000/terminal), sur le réseau local, ou via ngrok.
-app.use("/terminal", express.static(path.join(__dirname, "../../frontend/terminal")));
+// En local, le terminal vit dans frontend/terminal ; sur Vercel (Root
+// Directory = backend), scripts/vercel-prep.mjs le copie dans public/terminal.
+const cheminsTerminal = [
+  path.join(__dirname, "../../frontend/terminal"), // dev / repo monorepo
+  path.join(__dirname, "../public/terminal"), // Vercel (après vercel-prep)
+];
+const TERMINAL_DIR = cheminsTerminal.find((p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } }) ?? cheminsTerminal[0];
+app.use("/terminal", express.static(TERMINAL_DIR));
+
+// --- Dashboard admin (SPA React) ---
+// Servi par le backend lui-même (MÊME ORIGINE que l'API) : VITE_API_URL y est
+// laissé vide, le dashboard appelle /api/... en relatif → zéro CORS en prod.
+// Sur Vercel, scripts/vercel-build.mjs copie le build Vite (dist/) dans
+// public/dashboard ; en dev, le dashboard tourne via le serveur Vite (:5174)
+// et ce dossier sert de fallback s'il a été buildé localement.
+const cheminsDashboard = [
+  path.join(__dirname, "../../frontend/dashboard/dist"), // dev / repo monorepo
+  path.join(__dirname, "../public/dashboard"), // Vercel (après vercel-build)
+];
+const DASHBOARD_DIR = cheminsDashboard.find((p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } });
+
+if (DASHBOARD_DIR) {
+  app.use(express.static(DASHBOARD_DIR));
+}
 
 // --- Routes publiques ---
 app.get("/api/health", (_req, res) => {
@@ -112,6 +141,17 @@ app.use("/api/departements", requireAuth, departementsRoutes);
 // Rapports de pointage + envoi programmé — PROTÉGÉ (ADMIN/SUPER_ADMIN)
 app.use("/api/rapports", requireAuth, rapportsRoutes);
 
+// --- Fallback SPA du dashboard (BrowserRouter) ---
+// Toute requête GET non-API et non-terminal reçoit index.html pour que React
+// Router gère la route côté client. Placé AVANT le 404 JSON.
+if (DASHBOARD_DIR) {
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api") || req.path.startsWith("/terminal")) return next();
+    return res.sendFile(path.join(DASHBOARD_DIR, "index.html"));
+  });
+}
+
 // --- 404 : toute route non déclarée ---
 app.use((req, res) => {
   res.status(404).json({
@@ -131,6 +171,15 @@ app.use((err, _req, res, _next) => {
       ok: false,
       code: "CORPS_TROP_GROS",
       message: "La requête est trop volumineuse",
+    });
+  }
+
+  // 400 : JSON malformé envoyé par un client (corps invalide).
+  if (err.type === "entity.parse.failed" || err.status === 400) {
+    return res.status(400).json({
+      ok: false,
+      code: "CORPS_INVALIDE",
+      message: "Corps de requête invalide",
     });
   }
 

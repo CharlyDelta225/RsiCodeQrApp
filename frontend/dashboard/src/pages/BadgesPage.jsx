@@ -5,6 +5,10 @@ import { libelleDepartement } from "../lib/departement";
 import { getAdmin } from "../lib/auth";
 import { usePagination } from "../lib/pagination";
 import PaginationBar from "../components/PaginationBar";
+import TableShell from "../ui/TableShell";
+import Pill from "../ui/Pill";
+import Btn from "../ui/Btn";
+import { Input, Select } from "../ui/inputs";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -108,39 +112,31 @@ export default function BadgesPage() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-gray-700">{total} badge(s)</h2>
+        <h2 className="text-sm font-semibold text-bordeaux-900">{total} badge(s)</h2>
         {peutEcrire() && (
-          <button
-            onClick={handleTelechargerZip}
-            disabled={telechargementZip}
-            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 disabled:opacity-50 transition"
-          >
-            {telechargementZip ? "Préparation du ZIP…" : "⬇ Télécharger tous les QR (ZIP)"}
-          </button>
+          <Btn variant="gold" onClick={handleTelechargerZip} loading={telechargementZip} icon="⬇">
+            {telechargementZip ? "Préparation du ZIP…" : "Télécharger tous les QR (ZIP)"}
+          </Btn>
         )}
       </div>
 
       {erreur && (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erreur}</p>
+        <p className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">{erreur}</p>
       )}
 
       <div className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="text"
+        <Input
           placeholder="Rechercher par nom, prénom, département, matricule…"
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
-          className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm"
         />
-        <select
-          value={filtreActif}
-          onChange={(e) => setFiltreActif(e.target.value)}
-          className="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"
-        >
-          <option value="tous">Tous les badges</option>
-          <option value="actifs">Actifs uniquement</option>
-          <option value="desactives">Désactivés uniquement</option>
-        </select>
+        <div className="sm:w-56">
+          <Select value={filtreActif} onChange={(e) => setFiltreActif(e.target.value)}>
+            <option value="tous">Tous les badges</option>
+            <option value="actifs">Actifs uniquement</option>
+            <option value="desactives">Désactivés uniquement</option>
+          </Select>
+        </div>
       </div>
 
       <p className="text-xs text-slate-500">
@@ -148,53 +144,33 @@ export default function BadgesPage() {
         <span className="font-mono"> matricule_NOM_Prenom.png</span> pour l'attribution précise à chaque ouvrier.
       </p>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100 text-slate-600 text-left">
-            <tr>
-              <th className="px-3 py-2">Matricule</th>
-              <th className="px-3 py-2">Nom</th>
-              <th className="px-3 py-2">Prénom</th>
-              <th className="px-3 py-2">Département</th>
-              <th className="px-3 py-2">Statut</th>
-              <th className="px-3 py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chargement && (
-              <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400">Chargement…</td></tr>
-            )}
-            {!chargement && ouvriers.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400">Aucun badge trouvé</td></tr>
-            )}
-            {pagination.elementsPage.map((o) => (
-              <tr key={o.id} className="border-t border-slate-100">
-                <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
-                <td className="px-3 py-2">{o.nom}</td>
-                <td className="px-3 py-2">{o.prenom}</td>
-                <td className="px-3 py-2">{libelleDepartement(o)}</td>
-                <td className="px-3 py-2">
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      o.actif ? "bg-green-100 text-green-700" : "bg-slate-200 text-slate-600"
-                    }`}
-                  >
-                    {o.actif ? "Actif" : "Désactivé"}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right whitespace-nowrap">
-                  <button
-                    onClick={() => handleVoirBadge(o)}
-                    className="text-xs font-medium px-2.5 py-1 rounded-full bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-100 transition"
-                  >
-                    Voir le badge
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TableShell
+        colonnes={["Matricule", "Nom", "Prénom", "Département", "Statut", "Actions"]}
+        chargement={chargement}
+        vide="Aucun badge trouvé"
+      >
+        {pagination.elementsPage.map((o) => (
+          <tr key={o.id} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
+            <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
+            <td className="px-3 py-2">{o.nom}</td>
+            <td className="px-3 py-2">{o.prenom}</td>
+            <td className="px-3 py-2">{libelleDepartement(o)}</td>
+            <td className="px-3 py-2">
+              <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
+            </td>
+            <td className="px-3 py-2 text-right whitespace-nowrap">
+              <Btn
+                variant="secondary"
+                size="xs"
+                onClick={() => handleVoirBadge(o)}
+                icon="⊛"
+              >
+                Voir le badge
+              </Btn>
+            </td>
+          </tr>
+        ))}
+      </TableShell>
 
       <PaginationBar
         page={pagination.page}
@@ -218,20 +194,13 @@ export default function BadgesPage() {
             )}
             <div className="flex justify-center gap-3 pt-1">
               {peutEcrire() && (
-                <button
-                  onClick={handleTelechargerUnBadge}
-                  disabled={telechargementUnite}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-100 disabled:opacity-50 transition"
-                >
-                  {telechargementUnite ? "Téléchargement…" : "⬇ Télécharger ce badge"}
-                </button>
+                <Btn variant="gold" onClick={handleTelechargerUnBadge} loading={telechargementUnite} icon="⬇">
+                  {telechargementUnite ? "Téléchargement…" : "Télécharger ce badge"}
+                </Btn>
               )}
-              <button
-                onClick={fermerModal}
-                className="text-sm font-medium px-4 py-2 rounded-full bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition"
-              >
+              <Btn variant="secondary" onClick={fermerModal}>
                 Fermer
-              </button>
+              </Btn>
             </div>
           </div>
         </div>

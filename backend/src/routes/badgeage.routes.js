@@ -1,34 +1,26 @@
 import { Router } from "express";
+import { rateLimit } from "express-rate-limit";
 import prisma from "../lib/prisma.js";
+import { ipReelle } from "../lib/ip.js";
 
 const router = Router();
 
-/**
- * POST /api/badgeage
- *
- * Contrat API (stable — utilisé par le terminal).
- *
- * Body attendu :
- *   { "matricule": "RSI-0001" }
- *
- * Cas de succès (HTTP 200) — badge valide, pointage enregistré :
- *   {
- *     "ok": true,
- *     "ouvrier": {
- *       "id": "...",
- *       "matricule": "RSI-0001",
- *       "nom": "...",
- *       "prenom": "...",
- *       "departement": "..."   // premier département trouvé (ou null)
- *     }
- *   }
- *
- * Cas d'erreur (HTTP 4xx/5xx) — le badge est inconnu ou désactivé :
- *   { "ok": false, "code": "BADGE_INCONNU",     "message": "Badge inconnu" }
- *   { "ok": false, "code": "BADGE_DESACTIVE",   "message": "Badge désactivé" }
- *   { "ok": false, "code": "MATRICULE_MANQUANT", "message": "Le champ matricule est requis" }
- */
-router.post("/", async (req, res) => {
+// Limite de débit du kiosque : blocage raisonnable d'un inondation d'écritures
+// (un badgeage légitime = 1 requête/jour/ouvrier). La clé est l'IP RÉELLE du
+// client (X-Vercel-Forwarded-For), non forgable — X-Forwarded-For est ignoré.
+const limiterBadgeage = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  keyGenerator: (req) => `badgeage:${ipReelle(req)}`,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    code: "TROP_DE_TENTATIVES",
+    message: "Trop de badgeages en même temps. Réessayez dans une minute.",
+  },
+});
+router.post("/", limiterBadgeage, async (req, res) => {
   try {
     const matricule = String(req.body?.matricule ?? "").trim();
 
@@ -69,40 +61,58 @@ router.post("/", async (req, res) => {
       });
     }
 
-        // 3bis. Un seul badgeage autorisé par jour civil
-    const debutJournee = new Date();
-    debutJournee.setHours(0, 0, 0, 0);
-    const finJournee = new Date();
-    finJournee.setHours(23, 59, 59, 999);
+    // 3bis. Un seul badgeage par jour civil (UTC). La colonne `jour` (Date) +
+    // l'index UNIQUE (ouvrierId, jour) rendent cette règle ATOMIQUE en base :
+    // deux requêtes simultanées ne peuvent pas créer deux pointages.
+    const jourISO = new Date().toISOString().slice(0, 10); // AAAA-MM-JJ (UTC)
+    const jour = new Date(`${jourISO}T00:00:00.000Z`);
 
-    const dejaBadgeAujourdhui = await prisma.pointage.findFirst({
-      where: {
-        ouvrierId: ouvrier.id,
-        dateHeure: { gte: debutJournee, lte: finJournee },
-      },
-      orderBy: { dateHeure: "desc" },
+    const existant = await prisma.pointage.findUnique({
+      where: { ouvrierId_jour: { ouvrierId: ouvrier.id, jour } },
     });
 
-    if (dejaBadgeAujourdhui) {
-      const heure = dejaBadgeAujourdhui.dateHeure.toLocaleTimeString("fr-FR", {
+    if (existant) {
+      const heure = existant.dateHeure.toLocaleTimeString("fr-FR", {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "UTC",
       });
       return res.status(409).json({
         ok: false,
         code: "DEJA_BADGE_AUJOURDHUI",
-        message: `Vous avez déjà badgé aujourd'hui à ${heure}`,
+        message: `Vous avez déjà badgé aujourd'hui à ${heure} (heure UTC)`,
       });
     }
-    
-    // 4. Badge valide => on enregistre le pointage (dateHeure = heure serveur)
-    //    L'heure vient du serveur, pas du terminal : évite les horloges déréglées.
-    await prisma.pointage.create({
-      data: {
-        ouvrierId: ouvrier.id,
-        dateHeure: new Date(),
-      },
-    });
+
+    try {
+      // 4. Badge valide => pointage (heure serveur). L'écriture est
+      //    conditionnée par la contrainte unique : en cas de course entre deux
+      //    requêtes, seule la première aboutit, l'autre reçoit P2002.
+      await prisma.pointage.create({
+        data: {
+          ouvrierId: ouvrier.id,
+          dateHeure: new Date(),
+          jour,
+        },
+      });
+    } catch (err) {
+      if (err.code === "P2002") {
+        const vainqueur = await prisma.pointage.findUnique({
+          where: { ouvrierId_jour: { ouvrierId: ouvrier.id, jour } },
+        });
+        const heure = vainqueur.dateHeure.toLocaleTimeString("fr-FR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "UTC",
+        });
+        return res.status(409).json({
+          ok: false,
+          code: "DEJA_BADGE_AUJOURDHUI",
+          message: `Vous avez déjà badgé aujourd'hui à ${heure} (heure UTC)`,
+        });
+      }
+      throw err;
+    }
 
     // 5. Réponse au terminal : uniquement les infos nécessaires à l'affichage
     return res.status(200).json({

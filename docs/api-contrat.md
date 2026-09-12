@@ -5,9 +5,10 @@ Toute modification d'endpoint ou de format de réponse est annoncée ici, en
 versionnant la date de changement.
 
 - Base URL (dev local) : `http://localhost:3000`
-- Base URL (production) : fournie après déploiement Railway
+- Base URL (production) : `https://rsi-app-phi.vercel.app`
 - Format des corps : JSON (`Content-Type: application/json`)
 - CORS : activé (autorise le terminal et le dashboard)
+- Rate-limits : par **IP réelle** du client (derrière le proxy) — voir le journal 2026-09-12
 
 ---
 
@@ -58,8 +59,11 @@ Appelé à chaque scan du QR par le terminal.
 | 500 | `ERREUR_INTERNE` | Erreur interne |
 
 > **Anti double-badge** : un ouvrier ne peut badger qu'**une seule fois par jour
-> civil** (heure serveur). Le second scan renvoie `409 DEJA_BADGE_AUJOURDHUI` avec
-> l'heure du premier badgeage — le terminal doit l'afficher (ex : fond orange).
+> civil** (heure serveur, UTC). La règle est **verrouillée en base** (colonne
+> `jour` Date + index unique `(ouvrierId, jour)`) : même deux requêtes
+> simultanées, une seule crée le pointage, l'autre reçoit `409 DEJA_BADGE_AUJOURDHUI`
+> avec l'heure du premier badgeage (message suffixé « (heure UTC) ») — le
+> terminal doit l'afficher (ex : fond orange).
 >
 > Le terminal affiche nom/prénom/département sur fond vert ; sur `BADGE_INCONNU`
 > ou `BADGE_DESACTIVE`, il affiche le `message` sur fond rouge.
@@ -91,7 +95,12 @@ Hiérarchie : `SUPER_ADMIN` > `ADMIN` > `LECTEUR`
 // 423 { "ok": false, "code": "COMPTE_BLOQUE", "reste": 15, ... }
 //      compte gelé 15 min après 3 échecs (reste = minutes)
 // 403 { "ok": false, "code": "COMPTE_DESACTIVE", ... } compte désactivé
+// 429 { "ok": false, "code": "TROP_DE_TENTATIVES", ... } rate-limit par IP réelle (défaut 10/min, AUTH_RATE_LIMIT_MAX)
 ```
+
+> Le rate-limit utilise l'**IP réelle** du client derrière le proxy
+> (`X-Vercel-Forwarded-For`, non forgeable côté client) → une limite par visiteur,
+> pas par instance.
 
 > **Blocage anti brute-force** : après **3 mots de passe erronés**, le compte
 > est gelé **15 minutes** (`423 COMPTE_BLOQUE`, `reste` = minutes restantes).
@@ -101,16 +110,20 @@ Hiérarchie : `SUPER_ADMIN` > `ADMIN` > `LECTEUR`
 
 ### `POST /api/auth/reset-demand` (PUBLIC, rate-limité)
 Demande d'un lien de réinitialisation de mot de passe par email (lien à usage
-unique, valable **1 heure**). Répond **toujours** `{ ok: true }` (même si
-l'email est inconnu) pour ne pas révéler quels comptes existent.
+unique, valable **1 heure**). Réponse **strictement identique** que l'email
+existe ou non (**zéro oracle d'énumération**) : même statut `200`, même corps,
+aucun champ distinctif (`emailEnvoye` notamment n'est plus renvoyé).
 ```json
 // Body
 { "email": "admin@example.com" }
 
-// Réponse 200
-{ "ok": true, "emailEnvoye": true,
+// Réponse 200 (identique dans TOUS les cas)
+{ "ok": true,
   "message": "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé." }
-// emailEnvoye=false si SMTP non configuré ou échec d'envoi (le compte existe)
+
+// Erreurs
+// 400 { "ok": false, "code": "CHAMPS_MANQUANTS", ... }   email omis
+// 429 TROP_DE_TENTATIVES (rate-limit par IP)
 ```
 
 ### `POST /api/auth/reset` (PUBLIC)
@@ -132,21 +145,25 @@ consommé (stocké haché en base, à usage unique), et le blocage éventuel est
 ### `GET /api/auth/me` (protégé)
 Renvoie l'admin connecté : `{ "ok": true, "admin": { "id", "email", "role", "createdAt" } }`
 
-### `POST /api/auth/register` (PUBLIC)
+### `POST /api/auth/register` (PUBLIC, rate-limité)
 Création d'un compte. Tout nouveau compte naît **`LECTEUR`** et **`actif`**.
 L'élévation vers `ADMIN`/`SUPER_ADMIN` se fait ensuite par un `SUPER_ADMIN`
 via `PATCH /api/admins/:id/role`.
+
+**Anti-énumération** : réponse **strictement identique** que l'email soit déjà
+un compte admin ou non (même code HTTP `200`, même corps) — impossible de
+savoir si une adresse est déjà enregistrée.
 ```json
 // Body
 { "email": "lambda@eglise.com", "motDePasse": "lambda123" }
 // (rôle NON accepté ici : tout inscrit est LECTEUR, le rôle fourni est ignoré)
 
-// Réponse 201
-{ "ok": true, "admin": { "id": "...", "email": "...", "role": "LECTEUR", "actif": true, "createdAt": "..." } }
+// Réponse 200 (identique dans TOUS les cas)
+{ "ok": true, "message": "Si votre adresse n'était pas déjà enregistrée, un compte vient d'être créé. Vous pouvez vous connecter." }
 
 // Erreurs
-// 400 motDePasse < 8 → MOT_DE_PASSE_TROP_COURT
-// 409 email déjà pris → EMAIL_EXISTANT
+// 400 motDePasse < 8 → MOT_DE_PASSE_TROP_COURT ; email/motDePasse manquants → CHAMPS_MANQUANTS
+// 429 TROP_DE_TENTATIVES (rate-limit par IP réelle)
 ```
 
 ### `POST /api/admins` (protégé — **SUPER_ADMIN uniquement**)
@@ -607,6 +624,9 @@ RAPPORT_EMAIL_DESTINATAIRES=responsable@eglise.ci,secretariat@eglise.ci
 
 | Date | Changement |
 |---|---|
+| 2026-09-12 | **Anti double-badgeage verrouillé en base** : colonne `jour` (Date) + index unique `(ouvrierId, jour)` → la règle « une fois par jour civil » devient **atomique** (deux requêtes simultanées : une seule aboutit, l'autre `409 DEJA_BADGE_AUJOURDHUI`) ; message suffixé « (heure UTC) » |
+| 2026-09-12 | **Rate-limits par IP réelle** : les limites d'authentification (`login`/`register`/`reset-demand`) et de badgeage utilisent l'IP du client derrière le proxy (`X-Vercel-Forwarded-For`) → `429 TROP_DE_TENTATIVES` par visiteur, non par instance serveur. Défaut **10/min** (`AUTH_RATE_LIMIT_MAX`) |
+| 2026-09-12 | **Zéro oracle d'énumération** : `register` ne renvoie plus `409 EMAIL_EXISTANT` (réponse `200` strictement identique email nouveau/déjà enregistré) ; `reset-demand` ne renvoie plus `emailEnvoye` (corps identique email connu/inconnu) |
 | 2026-09-11 | **Sécurité authentification** : login avec compteur de tentatives (`reste`), blocage 15 min après 3 échecs (`423 COMPTE_BLOQUE`), déblocage manuel `PATCH /admins/:id/debloquer` ; demandation reset par email `POST /reset-demand` + lien à usage unique (1h) + `POST /reset` ; `POST /admins` crée un compte et envoie le mot de passe par email ; `PATCH /admins/:id/activer|desactiver`, `POST /admins/:id/reinitialiser-mot-de-passe`, `DELETE /admins/:id` ; tableau rôles enrichi (Départements gestion, Gestion comptes) ; role `actif` ajouté au modèle Admin |
 | 2026-09-11 | **Extractions réservées à ADMIN/SUPER_ADMIN** : `GET /api/ouvriers/badges/zip` passe de « tous » à **ADMIN/SUPER_ADMIN** (`403 ACCES_REFUSE` pour LECTEUR). Côté dashboard, les exports CSV (rapports, historique, départements) et les téléchargements de badges sont masqués pour un `LECTEUR` (lecture seule) |
 | 2026-09-08 | **Page Rapport (dashboard `/rapports`)** : ajout de `GET /api/rapports/journalier` (lecture, filtre `date` + `departementId`, `recap` recalculé), tableau présent/absent, export CSV (colonne `Date`), envoi email manuel ; `RAPPORT_EMAIL_DESTINATAIRES` multi-adresses (séparées par des virgules) |

@@ -5,6 +5,9 @@ import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
 import ConfirmDialog from "../components/ConfirmDialog";
 import PaginationBar from "../components/PaginationBar";
+import TableShell from "../ui/TableShell";
+import Btn from "../ui/Btn";
+import { Field, Input } from "../ui/inputs";
 import { usePagination } from "../lib/pagination";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
@@ -133,7 +136,13 @@ export default function GestionDepartementsPage() {
   return (
     <div className="p-4 md:p-8 space-y-5 max-w-6xl mx-auto">
       {/* Bandeau titre */}
-      <div className="rounded-2xl p-5 md:p-6 shadow-sm" style={{ background: "linear-gradient(135deg,#fff7f7 0%,#fdecec 60%,#fbe3e3 100%)", border: "1px solid #fce7e7" }}>
+      <div
+        className="rounded-2xl p-5 md:p-6 shadow-sm"
+        style={{
+          background: "linear-gradient(135deg,#FFF6F4 0%,#FBE7E3 55%,#F4CFC7 100%)",
+          border: "1px solid #F1C4BB",
+        }}
+      >
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
@@ -144,7 +153,7 @@ export default function GestionDepartementsPage() {
             </p>
             <Link
               to="/departements"
-              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-rose-600 bg-rose-50 ring-1 ring-rose-100 hover:bg-rose-100 rounded-full px-4 py-2 transition"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-bordeaux-700 bg-white ring-1 ring-bordeaux-200 hover:bg-bordeaux-50 rounded-full px-4 py-2 transition"
             >
               Gérer les membres et postes
               <span className="text-xs">→</span>
@@ -152,25 +161,25 @@ export default function GestionDepartementsPage() {
           </div>
           <div className="flex items-center gap-2">
             {peutEcrire() && (
-              <button
+              <Btn
                 onClick={() => {
                   setGestionErreur(null);
                   setCreationErreur(null);
                   setCreationOuvert(true);
                 }}
-                className="text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm transition"
-                style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)" }}
+                icon="+"
               >
-                + Créer un département
-              </button>
+                Créer un département
+              </Btn>
             )}
-            <button
+            <Btn
+              variant="secondary"
               onClick={handleExporterListe}
               disabled={departementsFiltres.length === 0}
-              className="text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 disabled:opacity-50 rounded-xl px-4 py-2 shadow-sm transition"
+              icon="⬇"
             >
-              ⬇ Exporter la liste
-            </button>
+              Exporter la liste
+            </Btn>
           </div>
         </div>
       </div>
@@ -179,8 +188,8 @@ export default function GestionDepartementsPage() {
         <div
           className={`text-sm rounded-xl px-4 py-3 border ${
             erreur
-              ? "text-rose-700 bg-rose-50 border-rose-100"
-              : "text-emerald-700 bg-emerald-50 border-emerald-100"
+              ? "text-bordeaux-700 bg-bordeaux-50 border-bordeaux-200"
+              : "text-emerald-700 bg-emerald-50 border-emerald-200"
           }`}
         >
           {erreur || succes}
@@ -189,16 +198,16 @@ export default function GestionDepartementsPage() {
 
       {/* Liste des départements */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5 space-y-4">
-        <input
+        <Input
           type="search"
           value={filtre}
           onChange={(e) => setFiltre(e.target.value)}
           placeholder="Filtrer les départements par nom…"
-          className="w-full md:max-w-md px-4 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition"
+          className="w-full md:max-w-md"
         />
 
         {gestionErreur && (
-          <p className="text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">{gestionErreur}</p>
+          <p className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">{gestionErreur}</p>
         )}
 
         {chargement ? (
@@ -206,55 +215,46 @@ export default function GestionDepartementsPage() {
         ) : departementsFiltres.length === 0 ? (
           <div className="text-sm text-slate-400 text-center py-10">Aucun département.</div>
         ) : (
-          <div className="border border-slate-100 rounded-xl overflow-hidden overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-left text-xs uppercase tracking-wide">
-                <tr>
-                  <th className="px-3 py-2.5 font-medium">Nom</th>
-                  <th className="px-3 py-2.5 font-medium">Description</th>
-                  <th className="px-3 py-2.5 font-medium">Membres</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagination.elementsPage.map((d) => (
-                  <tr key={d.id} className="border-t border-slate-100 hover:bg-rose-50/30 transition">
-                    <td className="px-3 py-2.5 text-slate-700">{d.nom}</td>
-                    <td className="px-3 py-2.5 text-slate-400 text-xs">{d.description || "—"}</td>
-                    <td className="px-3 py-2.5 text-slate-500">{d._count?.membres ?? 0}</td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                      {peutEcrire() ? (
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            onClick={() => {
-                              setGestionErreur(null);
-                              setRenommageErreur(null);
-                              setRenommage(d);
-                              setFormRenommage({ nom: d.nom });
-                            }}
-                            title={`Renommer ${d.nom}`}
-                            className="w-8 h-8 rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-sky-600 hover:border-sky-200 transition"
-                          >
-                            ✏
-                          </button>
-                          <button
-                            onClick={() => demanderSuppression(d)}
-                            disabled={enGestion}
-                            title={`Supprimer ${d.nom}`}
-                            className="w-8 h-8 rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-rose-600 hover:border-rose-200 disabled:opacity-40 transition"
-                          >
-                            🗑
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="inline-block" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TableShell
+            colonnes={["Nom", "Description", "Membres", "Actions"]}
+            className="border-slate-100"
+          >
+            {pagination.elementsPage.map((d) => (
+              <tr key={d.id} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
+                <td className="px-3 py-2.5 text-slate-700">{d.nom}</td>
+                <td className="px-3 py-2.5 text-slate-400 text-xs">{d.description || "—"}</td>
+                <td className="px-3 py-2.5 text-slate-500">{d._count?.membres ?? 0}</td>
+                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  {peutEcrire() ? (
+                    <div className="inline-flex items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          setGestionErreur(null);
+                          setRenommageErreur(null);
+                          setRenommage(d);
+                          setFormRenommage({ nom: d.nom });
+                        }}
+                        title={`Renommer ${d.nom}`}
+                        className="w-8 h-8 rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-bordeaux-700 hover:border-bordeaux-200 transition"
+                      >
+                        ✏
+                      </button>
+                      <button
+                        onClick={() => demanderSuppression(d)}
+                        disabled={enGestion}
+                        title={`Supprimer ${d.nom}`}
+                        className="w-8 h-8 rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-bordeaux-700 hover:border-bordeaux-200 disabled:opacity-40 transition"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="inline-block" />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </TableShell>
         )}
 
         <PaginationBar
@@ -282,45 +282,32 @@ export default function GestionDepartementsPage() {
               </button>
             </div>
             <form onSubmit={handleCreer} className="p-6 space-y-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Nom *</label>
-                <input
+              <Field label="Nom *">
+                <Input
                   required
                   value={formCreation.nom}
                   onChange={(e) => setFormCreation({ ...formCreation, nom: e.target.value })}
                   placeholder="Ex : Sonorisation"
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition"
                 />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Description (optionnel)</label>
-                <input
+              </Field>
+              <Field label="Description (optionnel)">
+                <Input
                   value={formCreation.description}
                   onChange={(e) => setFormCreation({ ...formCreation, description: e.target.value })}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition"
                 />
-              </div>
+              </Field>
               {creationErreur && (
-                <p className="text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+                <p className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">
                   {creationErreur}
                 </p>
               )}
               <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setCreationOuvert(false)}
-                  className="text-sm text-slate-500 px-3 py-2 rounded-xl hover:bg-slate-50 transition"
-                >
+                <Btn variant="ghost" size="sm" onClick={() => setCreationOuvert(false)}>
                   Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={enGestion}
-                  className="text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm disabled:opacity-50 transition"
-                  style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)" }}
-                >
+                </Btn>
+                <Btn type="submit" loading={enGestion}>
                   {enGestion ? "Création…" : "Créer"}
-                </button>
+                </Btn>
               </div>
             </form>
           </div>
@@ -343,36 +330,25 @@ export default function GestionDepartementsPage() {
               </button>
             </div>
             <form onSubmit={handleRenommer} className="p-6 space-y-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Nom *</label>
-                <input
+              <Field label="Nom *">
+                <Input
                   required
                   value={formRenommage.nom}
                   onChange={(e) => setFormRenommage({ ...formRenommage, nom: e.target.value })}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 transition"
                 />
-              </div>
+              </Field>
               {renommageErreur && (
-                <p className="text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+                <p className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">
                   {renommageErreur}
                 </p>
               )}
               <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setRenommage(null)}
-                  className="text-sm text-slate-500 px-3 py-2 rounded-xl hover:bg-slate-50 transition"
-                >
+                <Btn variant="ghost" size="sm" onClick={() => setRenommage(null)}>
                   Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={enGestion}
-                  className="text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm disabled:opacity-50 transition"
-                  style={{ background: "linear-gradient(135deg,#fb7185,#f43f5e)" }}
-                >
+                </Btn>
+                <Btn type="submit" loading={enGestion}>
                   {enGestion ? "Renommage…" : "Renommer"}
-                </button>
+                </Btn>
               </div>
             </form>
           </div>

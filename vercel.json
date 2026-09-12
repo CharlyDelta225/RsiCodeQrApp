@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": "backend/public/**"
+    }
+  },
+  "buildCommand": "node scripts/vercel-build.mjs",
+  "outputDirectory": "backend/public",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
+}
