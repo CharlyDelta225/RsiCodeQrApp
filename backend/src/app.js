@@ -13,6 +13,7 @@ import importRoutes from "./routes/import.routes.js";
 import adminsRoutes from "./routes/admins.routes.js";
 import departementsRoutes from "./routes/departements.routes.js";
 import rapportsRoutes from "./routes/rapports.routes.js";
+import cronRoutes from "./routes/cron.routes.js";
 
 dotenv.config();
 
@@ -140,6 +141,9 @@ app.use("/api/departements", requireAuth, departementsRoutes);
 
 // Rapports de pointage + envoi programmé — PROTÉGÉ (ADMIN/SUPER_ADMIN)
 app.use("/api/rapports", requireAuth, rapportsRoutes);
+
+// Cron Vercel (envoi automatique J+1) — publique mais protégée par CRON_SECRET
+app.use("/api/cron", cronRoutes);
 
 // --- Fallback SPA du dashboard (BrowserRouter) ---
 // Toute requête GET non-API et non-terminal reçoit index.html pour que React

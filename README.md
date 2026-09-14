@@ -35,7 +35,7 @@ RsiCodeQrApp/
 - **Auth** : JWT (jsonwebtoken) + bcryptjs + `express-rate-limit` (anti brute-force)
 - **QR codes** : `qrcode` (PNG) + `archiver` (ZIP bulk)
 - **Import** : `multer` (upload) + `xlsx` (parse .csv et .xlsx)
-- **Rapports** : `pdfkit` (PDF par département + récap), `nodemailer` (envoi email SMTP), `node-cron` (envoi auto 06h00)
+- **Rapports** : `pdfkit` (PDF par département + récap), `nodemailer` (envoi email SMTP), `node-cron` (envoi auto 06h00) + **Vercel Cron Job** en production
 - **Sécurité** : CORS restreint, limites de corps/fichier, rôles (moindre privilège)
 - **Déploiement** : **Vercel** (serverless — entrée `api/index.js`, build `scripts/vercel-build.mjs` ; migrations appliquées manuellement via le pooler Supabase)
 
@@ -280,6 +280,14 @@ UNIQUE (ouvrierId, jour)   → migration 20260912090000_anti_double_badgeage
 | `GET` | `/api/rapports/journalier` | tous | Structure d'un rapport (filtres `date`, `departementId`) pour la page `/rapports` |
 | `POST` | `/api/rapports/journalier` | ADMIN/SUPER | Génère les PDF par département + récap et les envoie par email (destinataires ou `RAPPORT_EMAIL_DESTINATAIRES`) |
 
+**Envoi automatique à J+1.** Chaque matin à **06h00**, le rapport du **jour de
+programme précédent** (Mercredi → jeudi, Vendredi → samedi, Dimanche → lundi)
+est envoyé automatiquement. En production (Vercel serverless) c'est un
+**Vercel Cron Job** (`vercel.json` → `crons`) qui appelle `GET
+/api/cron/rapports`, protégé par l'en-tête `Authorization: Bearer <CRON_SECRET>`;
+en auto-hébergement c'est `node-cron` dans `backend/src/server.js`. Les
+destinataires sont ceux de `RAPPORT_EMAIL_DESTINATAIRES`.
+
 Le contrat détaillé (formats de requête/réponse, codes d'erreur) est dans **`docs/api-contrat.md`**.
 
 ---
@@ -331,6 +339,10 @@ URL Vercel (ex. `https://rsi-app-phi.vercel.app`).
 - **Config** : `vercel.json` — `functions.api/index.js.maxDuration=60`,
   `includeFiles=backend/public/**` (les assets servis par Express sont empaquetés
   avec la fonction), rewrite `/(.*)` → `/api/index`, `outputDirectory=backend/public`.
+- **Cron J+1** : `vercel.json` déclare le job `GET /api/cron/rapports` à
+  `0 6 * * *` (06h00 UTC) — Vercel Cron appelle la route avec l'en-tête
+  `Authorization: Bearer <CRON_SECRET>` ; la route exige ce secret, sinon 401.
+  Le planificateur n'envoie que si la veille était un jour de programme.
 - **Build** : `scripts/vercel-build.mjs` :
   1. `npm install` (backend + dashboard, registre npmjs) puis `npx prisma generate`,
   2. `vite build` du dashboard (`VITE_API_URL` vide → mêmes-origine `/api/...`),
@@ -353,7 +365,8 @@ Variables d'environnement (à renseigner dans le projet Vercel / le `.env`) :
 - `APP_URL` (URL du dashboard, ex. `https://rsi-app-phi.vercel.app` — liens de réinitialisation)
 - `CORS_ORIGINES` (origines du dashboard, ex. `https://rsi-app-phi.vercel.app`)
 - `AUTH_RATE_LIMIT_MAX` (optionnel, défaut 10/min par IP sur l'authentification)
-- `RAPPORT_EMAIL_DESTINATAIRES` (destinataires par défaut des rapports, séparés par des virgules)
+- `RAPPORT_EMAIL_DESTINATAIRES` (destinataires par défaut des rapports, séparés par des virgules) — liste de base : `menzancharle@gmail.com,broujeanmarie697@gmail.com`
+- `CRON_SECRET` (secret partagé qui protège `GET /api/cron/rapports`, le déclencheur du job Vercel Cron de 06h00)
 - `ADMIN_EMAIL` / `ADMIN_PASSWORD` (création/rotation du compte SUPER_ADMIN via `npm --prefix backend run seed` ou `node backend/src/scripts/set-admin.js`)
 
 Comptes : création d'un SUPER_ADMIN idempotente (`set-admin.js`, upsert d'après

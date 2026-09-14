@@ -602,8 +602,8 @@ sur un jour de programme le seuil s'applique, sur un autre jour « badgé » suf
 
 ### Envoi programmé (automatique)
 
-Chaque matin à **06h00** (heure locale du serveur), le backend envoie
-automatiquement le rapport du **jour de programme précédent** :
+Chaque matin à **06h00** (fuseau UTC en production — Côte d'Ivoire = UTC+0),
+le rapport du **jour de programme précédent** est envoyé automatiquement :
 
 | Matin | Rapport envoyé |
 |---|---|
@@ -615,6 +615,11 @@ Destinataires : `RAPPORT_EMAIL_DESTINATAIRES` (variable d'environnement,
 **plusieurs adresses séparées par des virgules**).
 Un même rapport n'est envoyé **qu'une fois** par session serveur.
 
+**Déclenchement** : en auto-hébergement, `node-cron` dans `server.js` ; sur
+Vercel (serverless), un **Vercel Cron Job** appelle `GET /api/cron/rapports`
+chaque matin à 06h00 UTC — cette route exige l'en-tête
+`Authorization: Bearer <CRON_SECRET>` (sans env, refusée en 401).
+
 **Variables `.env` requises** :
 ```
 SMTP_HOST=smtp.gmail.com
@@ -624,6 +629,7 @@ SMTP_USER=moncompte@gmail.com
 SMTP_PASS=xxxx
 SMTP_EXPEDITEUR="Rapports <moncompte@gmail.com>"  # optionnel (défaut : SMTP_USER)
 RAPPORT_EMAIL_DESTINATAIRES=responsable@eglise.ci,secretariat@eglise.ci
+CRON_SECRET=secret-partage-pour-la-route-cron
 ```
 
 ---

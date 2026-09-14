@@ -9,5 +9,8 @@
   "outputDirectory": "backend/public",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
+  ],
+  "crons": [
+    { "path": "/api/cron/rapports", "schedule": "0 6 * * *" }
   ]
 }
