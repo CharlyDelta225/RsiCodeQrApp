@@ -16,6 +16,7 @@ const PointagesJourPage = lazy(() => import("./pages/PointagesJourPage.jsx"));
 const HistoriquePage = lazy(() => import("./pages/HistoriquePage.jsx"));
 const DepartementsPage = lazy(() => import("./pages/DepartementsPage.jsx"));
 const GestionDepartementsPage = lazy(() => import("./pages/GestionDepartementsPage.jsx"));
+const MigrationOuvrierPage = lazy(() => import("./pages/MigrationOuvrierPage.jsx"));
 const GestionAdminsPage = lazy(() => import("./pages/GestionAdminsPage.jsx"));
 const RapportPage = lazy(() => import("./pages/RapportPage.jsx"));
 
@@ -55,6 +56,14 @@ export default function App() {
             element={
               <RequireRole roles={["ADMIN", "SUPER_ADMIN"]}>
                 <GestionDepartementsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/migration-ouvrier"
+            element={
+              <RequireRole roles={["ADMIN", "SUPER_ADMIN"]}>
+                <MigrationOuvrierPage />
               </RequireRole>
             }
           />

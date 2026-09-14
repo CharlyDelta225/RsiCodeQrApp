@@ -25,6 +25,7 @@ function extraireChamps(body) {
   if (body.nom !== undefined) donnees.nom = String(body.nom).trim();
   if (body.prenom !== undefined) donnees.prenom = String(body.prenom).trim();
   if (body.photoUrl !== undefined) donnees.photoUrl = String(body.photoUrl).trim() || null;
+  if (body.telephone !== undefined) donnees.telephone = String(body.telephone).trim() || null;
   if (body.actif !== undefined) donnees.actif = Boolean(body.actif);
   return donnees;
 }

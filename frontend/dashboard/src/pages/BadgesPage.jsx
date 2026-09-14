@@ -175,7 +175,7 @@ export default function BadgesPage() {
       </p>
 
       <TableShell
-        colonnes={["Matricule", "Nom", "Prénom", "Département", "Statut", "Actions"]}
+        colonnes={["Matricule", "Nom", "Prénom", "Téléphone", "Département", "Statut", "Actions"]}
         chargement={chargement}
         vide="Aucun badge trouvé"
       >
@@ -184,6 +184,7 @@ export default function BadgesPage() {
             <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
             <td className="px-3 py-2">{o.nom}</td>
             <td className="px-3 py-2">{o.prenom}</td>
+            <td className="px-3 py-2 whitespace-nowrap">{o.telephone || "—"}</td>
             <td className="px-3 py-2">{libelleDepartement(o)}</td>
             <td className="px-3 py-2">
               <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
@@ -220,7 +221,10 @@ export default function BadgesPage() {
             <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-auto" />
             <p className="text-xs font-mono text-slate-500">{badgeOuvrier?.matricule}</p>
             {badgeOuvrier && (
-              <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>
+              <>
+                <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>
+                {badgeOuvrier.telephone && <p className="text-xs text-slate-500">Tél. {badgeOuvrier.telephone}</p>}
+              </>
             )}
             <div className="flex justify-center gap-3 pt-1">
               {peutEcrire() && (

@@ -27,7 +27,7 @@ function raisonEchec(err, fallback) {
     FORMAT_INVALIDE: "Le fichier est illisible ou corrompu. Vérifiez le fichier avant de le recharger.",
     FICHIER_VIDE: "Le fichier ne contient aucune donnée. Vérifiez qu'il comporte au moins une ligne.",
     TROP_DE_LIGNES: "Le fichier est trop volumineux : maximum 2000 lignes autorisées.",
-    COLONNES_MANQUANTES: "Colonnes attendues manquantes. Le fichier doit contenir : Nom, Prénom, Département.",
+    COLONNES_MANQUANTES: "Colonnes attendues manquantes. Le fichier doit contenir : Nom, Prénom, Département, Téléphone.",
     DEPARTEMENT_INCONNU: "Un ou plusieurs départements ne sont pas dans la liste. Veuillez choisir des départements corrects.",
     DOUBLON_DEPARTEMENT: "Un ouvrier avec ce nom et ce prénom existe déjà dans ce département",
     MATRICULE_EXISTANT: "Ce matricule existe déjà",
@@ -86,11 +86,11 @@ export default function OuvriersPage() {
   const [succes, setSucces] = useState(null);
 
   const [modalOuvert, setModalOuvert] = useState(false);
-  const [form, setForm] = useState({ nom: "", prenom: "", departement: "" });
+  const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", departement: "" });
   const [envoi, setEnvoi] = useState(false);
 
   const [modification, setModification] = useState(null); // ouvrier en cours de modification
-  const [formModification, setFormModification] = useState({ nom: "", prenom: "", departement: "", matricule: "" });
+  const [formModification, setFormModification] = useState({ nom: "", prenom: "", telephone: "", departement: "", matricule: "" });
   const [envoiModification, setEnvoiModification] = useState(false);
 
   const [importEnCours, setImportEnCours] = useState(false);
@@ -134,13 +134,18 @@ export default function OuvriersPage() {
     setEnvoi(true);
     setAlerte(null);
     try {
+      if (!form.telephone.trim()) {
+        setAlerte({ titre: "Champ manquant", message: "Le téléphone est obligatoire." });
+        return;
+      }
       await api.createOuvrier({
         nom: form.nom,
         prenom: form.prenom,
+        telephone: form.telephone,
         departementNom: form.departement,
       });
       setModalOuvert(false);
-      setForm({ nom: "", prenom: "", departement: "" });
+      setForm({ nom: "", prenom: "", telephone: "", departement: "" });
       setSucces({ titre: "Ajout réussi", message: `L'ouvrier ${form.prenom} ${form.nom} a bien été ajouté(e).` });
       charger();
     } catch (err) {
@@ -154,6 +159,7 @@ export default function OuvriersPage() {
     setFormModification({
       nom: o.nom || "",
       prenom: o.prenom || "",
+      telephone: o.telephone || "",
       departement: o.departements?.[0]?.departement?.nom || "",
       matricule: o.matricule || "",
     });
@@ -170,6 +176,7 @@ export default function OuvriersPage() {
       await api.updateOuvrier(modification.id, {
         nom: formModification.nom,
         prenom: formModification.prenom,
+        telephone: formModification.telephone,
         matricule: formModification.matricule,
         departementNom: formModification.departement,
       });
@@ -348,7 +355,7 @@ export default function OuvriersPage() {
       />
 
       <TableShell
-        colonnes={["Matricule", "Nom", "Prénom", "Département", "Statut", "Actions"]}
+        colonnes={["Matricule", "Nom", "Prénom", "Téléphone", "Département", "Statut", "Actions"]}
         chargement={chargement}
         vide="Aucun ouvrier trouvé"
       >
@@ -357,6 +364,7 @@ export default function OuvriersPage() {
             <td className="px-3 py-2 font-mono text-xs">{o.matricule}</td>
             <td className="px-3 py-2">{o.nom}</td>
             <td className="px-3 py-2">{o.prenom}</td>
+            <td className="px-3 py-2 whitespace-nowrap">{o.telephone || "—"}</td>
             <td className="px-3 py-2">{libelleDepartement(o)}</td>
             <td className="px-3 py-2">
               <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
@@ -405,6 +413,9 @@ export default function OuvriersPage() {
             </Field>
             <Field label="Prénom">
               <Input required placeholder="Prénom" value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
+            </Field>
+            <Field label="Téléphone">
+              <Input type="tel" required placeholder="Téléphone" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
             </Field>
             <Field label="Département">
               <Input
@@ -464,6 +475,14 @@ export default function OuvriersPage() {
                 onChange={(e) => setFormModification({ ...formModification, prenom: e.target.value })}
               />
             </Field>
+            <Field label="Téléphone (optionnel)">
+              <Input
+                type="tel"
+                placeholder="Téléphone"
+                value={formModification.telephone}
+                onChange={(e) => setFormModification({ ...formModification, telephone: e.target.value })}
+              />
+            </Field>
             <Field label="Département">
               <Input
                 list="departements"
@@ -502,7 +521,10 @@ export default function OuvriersPage() {
             <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-auto" />
             <p className="text-xs font-mono text-slate-500">{badgeOuvrier?.matricule}</p>
             {badgeOuvrier && (
-              <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>
+              <>
+                <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>
+                {badgeOuvrier.telephone && <p className="text-xs text-slate-500">Tél. {badgeOuvrier.telephone}</p>}
+              </>
             )}
             <Btn
               variant="secondary"

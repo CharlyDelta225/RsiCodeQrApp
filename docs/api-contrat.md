@@ -276,8 +276,9 @@ Query optionnels :
 // Body (matricule optionnel — généré automatiquement)
 // Pour rattacher dès la création : departementId (uuid) OU departementNom (texte).
 // Sans lien : on omet les deux champs.
-{ "nom": "YAO", "prenom": "Esther", "departementId": "3fa8...", "photoUrl": null, "actif": true }
-// Réponse 201 : { "ok": true, "ouvrier": { ... , departements: [...] } }
+{ "nom": "YAO", "prenom": "Esther", "telephone": "06 12 34 56 78",
+  "departementId": "3fa8...", "photoUrl": null, "actif": true }
+// Réponse 201 : { "ok": true, "ouvrier": { ... , telephone, departements: [...] } }
 // Erreurs : 400 CHAMPS_MANQUANTS (nom/prenom manquant), 409 MATRICULE_EXISTANT
 //           409 DOUBLON_DEPARTEMENT (même nom+prénom déjà rattaché à ce département,
 //           comparaison insensible à la casse — aligné sur l'import)
@@ -289,7 +290,7 @@ Query optionnels :
 Détail complet d'un ouvrier (avec `departements`).
 
 ### `PATCH /api/ouvriers/:id`
-Met à jour tout ou partie (nom, prenom, photoUrl, actif, matricule).
+Met à jour tout ou partie (nom, prenom, telephone, photoUrl, actif, matricule).
 **Désactivation d'un badge** : `{ "actif": false }`.
 **Changement de département** : `{ "departementId": "<uuid>" }` ou
 `{ "departementNom": "MÉDIA" }` (normalisé, insensible à la casse/accents). La ou
@@ -329,9 +330,11 @@ Import **massif** d'ouvriers depuis un fichier `.csv` ou `.xlsx` (multipart/form
 
 Colonnes **obligatoires** dans le fichier (1re ligne = en-tête) :
 ```
-Nom,Prénom,Département
-KEITA,Awa,Chorale
+Nom,Prénom,Département,Téléphone
+KEITA,Awa,Chorale,0612345678
 ```
+Le numéro de téléphone est stocké tel quel ; les zéros initiaux (numéros
+français `06…` / `07…`) sont préservés.
 
 Règles :
 - Extension autres que `.csv`/`.xlsx` → `400 TYPE_FICHIER_NON_SUPPORTE`
@@ -343,7 +346,8 @@ Règles :
 - Si un ouvrier (même Nom+Prénom) existe déjà **et** est déjà dans ce
   département → ligne **ignorée** (doublon). S'il existe mais pas dans ce
   département → on ajoute juste la liaison.
-- Champ requis vide → ligne marquée en **erreur**
+- Champ requis vide → ligne marquée en **erreur** (`"raison": "téléphone manquant"`,
+  `"nom manquant"`, `"prénom manquant"` ou `"département manquant"`)
 
 ```json
 {
@@ -356,9 +360,11 @@ Règles :
 {
   "ok": true, "creees": 2, "ignorees": 1, "erreurs": 1,
   "detail": [
-    { "nom": "KEITA", "prenom": "Awa", "departement": "Chorale", "matricule": "RSI-671C", "statut": "cree" },
-    { "nom": "KOUAME", "prenom": "Jean", "departement": "Louange", "statut": "ignore", "raison": "doublon" },
-    { "nom": "", "prenom": "X", "departement": "Y", "statut": "erreur", "raison": "nom manquant" }
+    { "nom": "KEITA", "prenom": "Awa", "departement": "Chorale", "telephone": "0612345678",
+      "matricule": "RSI-671C", "statut": "cree" },
+    { "nom": "KOUAME", "prenom": "Jean", "departement": "Louange", "telephone": "0700112233",
+      "statut": "ignore", "raison": "doublon" },
+    { "nom": "", "prenom": "X", "departement": "Y", "telephone": "", "statut": "erreur", "raison": "nom manquant" }
   ]
 }
 ```
@@ -434,7 +440,8 @@ Détail du département **avec ses membres** (chaque membre inclut l'ouvrier et 
     "id": "...", "nom": "Louange", "description": null,
     "membres": [
       { "id": "...", "roleDansDepartement": "RESPONSABLE",
-        "ouvrier": { "id": "...", "matricule": "RSI-0001", "nom": "KOUAME", "prenom": "Aya", "actif": true } }
+        "ouvrier": { "id": "...", "matricule": "RSI-0001", "nom": "KOUAME", "prenom": "Aya",
+                     "telephone": "0612345678", "actif": true } }
     ]
   }
 }
@@ -632,6 +639,7 @@ RAPPORT_EMAIL_DESTINATAIRES=responsable@eglise.ci,secretariat@eglise.ci
 
 | Date | Changement |
 |---|---|
+| 2026-09-14 | **Téléphone des ouvriers** : champ `telephone` (optionnel, string) ajouté au modèle Ouvrier (migration `20260914170000_ajout_telephone_ouvrier`). Retourné par `GET/POST/PATCH /api/ouvriers` et dans les membres des départements. **Import devenu 4 colonnes obligatoires** : `Nom,Prénom,Département,Téléphone` (numéros « propres » lus en mode `raw:false` → les `0` initiaux des numéros français `06…`/`07…` sont préservés). Écran ouvriers du dashboard : colonne Téléphone + champ (obligatoire à la création manuelle) partout où les ouvriers sont listés (Ouvriers, Badges, Migration, Départements). **Migration ouvrier** : nouvelle page `/migration-ouvrier` (ADMIN/SUPER_ADMIN) pour affecter un ouvrier à un département (poste au choix, popup « déjà membre », retrait par département) via `POST /api/departements/:id/membres` |
 | 2026-09-14 | **Badges par département** : la page `/badges` du dashboard gagne un filtre département (liste + compteur + ZIP) ; `GET /api/ouvriers` accepte `departementId` ; le ZIP est re-nommé `badges-qr-<departement>-<date>.zip`. **Réinitialisation de mot de passe par lien (plus de temporaire)** : `POST /api/admins/:id/reinitialiser-mot-de-passe` envoie un lien `/reinitialisation?token=...` (1 h, usage unique) au lieu d'un mot de passe provisoire ; `lien` renvoyé dans la réponse si l'email échoue. **Annonces vocales terminal** : succès « Citoyen remarquable, bon service à vous », déjà badgé « Vous avez déjà badgé », nouveau fichier `annonce-inconnu.wav` (« Ouvrier inconnu ») pour `BADGE_INCONNU` |
 | 2026-09-14 | **Édition d'un ouvrier + badges nommés** : `PATCH /api/ouvriers/:id` accepte `departementId`/`departementNom` (rattachement unique, anti doublon `409 DOUBLON_DEPARTEMENT`, `force:true` pour homonymes) ; la popup `/ouvriers` permet d'éditer nom/prénom/matricule/département ; les PNG de badge (individuel, ZIP, import, `scripts/generate-badges.js`) intègrent désormais le nom/prénom imprimés sous le QR (nouveau `src/lib/badge.js`, détail `sharp`/composite) |
 | 2026-09-12 | **Anti double-badgeage verrouillé en base** : colonne `jour` (Date) + index unique `(ouvrierId, jour)` → la règle « une fois par jour civil » devient **atomique** (deux requêtes simultanées : une seule aboutit, l'autre `409 DEJA_BADGE_AUJOURDHUI`) ; message suffixé « (heure UTC) » |

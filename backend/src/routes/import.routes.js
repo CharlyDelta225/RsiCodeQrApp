@@ -32,7 +32,7 @@ const upload = multer({
 const BADGES_DIR = path.resolve(process.cwd(), "public/badges");
 
 // Colonnes obligatoires attendues dans le fichier (ordre flexible : on cherche par nom)
-const COLONNES_ATTENDUES = ["Nom", "Prénom", "Département"];
+const COLONNES_ATTENDUES = ["Nom", "Prénom", "Département", "Téléphone"];
 
 // Générer le fichier QR badge PNG pour un ouvrier.
 // Cache disque BEST-EFFORT : les badges sont toujours servis à la volée par
@@ -128,7 +128,10 @@ router.post(
     // /!\ ne PAS valider les colonnes via Object.keys(rows[0]) : une cellule
     // vide dans la première ligne de données ferait disparaître la clé et on
     // croirait à tort une colonne manquante. On lit donc d'abord l'en-tête.
-    const lignesTab = xlsx.utils.sheet_to_json(feuille, { header: 1 });
+    // header: 1 => premier tableau de valeurs ; raw: false => on lit le texte
+    // affiché (et non la valeur typée), sinon un téléphone type "0661234567"
+    // serait converti en nombre et perdrait son 0 initial.
+    const lignesTab = xlsx.utils.sheet_to_json(feuille, { header: 1, raw: false });
     const entete = (lignesTab[0] || []).map((v) => String(v ?? "").trim());
     const lignes = lignesTab.slice(1).filter((l) => l.some((v) => String(v ?? "").trim() !== ""));
 
@@ -172,11 +175,13 @@ router.post(
       nom: entete.indexOf("Nom"),
       prenom: entete.indexOf("Prénom"),
       departement: entete.indexOf("Département"),
+      telephone: entete.indexOf("Téléphone"),
     };
     const ligneVersObjet = (l) => ({
       nom: String(l[idx.nom] ?? "").trim().toUpperCase(),
       prenom: String(l[idx.prenom] ?? "").trim(),
       departementNom: String(l[idx.departement] ?? "").trim().toUpperCase(),
+      telephone: String(l[idx.telephone] ?? "").trim(),
     });
 
     // --- 5-bis. Vérifier que tous les départements du fichier existent dans
@@ -212,7 +217,7 @@ router.post(
       const donnees = ligneVersObjet(ligneBrute);
 
       // Validation : tous les champs requis présents
-      if (!donnees.nom || !donnees.prenom || !donnees.departementNom) {
+      if (!donnees.nom || !donnees.prenom || !donnees.departementNom || !donnees.telephone) {
         erreurs++;
         detail.push({
           ...donnees,
@@ -221,7 +226,9 @@ router.post(
             ? "nom manquant"
             : !donnees.prenom
             ? "prénom manquant"
-            : "département manquant",
+            : !donnees.departementNom
+            ? "département manquant"
+            : "téléphone manquant",
         });
         continue;
       }
@@ -262,6 +269,14 @@ router.post(
           }
         }
 
+        // Compléter le téléphone s'il manque et que le fichier en fournit un.
+        if (donnees.telephone && !ouvrierExistant.telephone) {
+          await prisma.ouvrier.update({
+            where: { id: ouvrierExistant.id },
+            data: { telephone: donnees.telephone },
+          });
+        }
+
         // L'ouvrier existe mais pas dans ce département : on ajoute juste la liaison
         await prisma.ouvrierDepartement.create({
           data: {
@@ -298,10 +313,11 @@ router.post(
       const departement = departementParCle.get(normaliserNomDepartement(donnees.departementNom));
 
       // Créer l'ouvrier (matricule auto-généré avec retry sur collision P2002,
-      // actif par défaut)
+      // actif par défaut). Le téléphone est optionnel et normalisé (null si vide).
       const ouvrier = await creerAvecMatricule({
         nom: donnees.nom,
         prenom: donnees.prenom,
+        telephone: donnees.telephone || undefined,
       });
 
       // Créer la liaison OuvrierDepartement

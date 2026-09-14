@@ -129,6 +129,15 @@ export const api = {
     return request(`/api/departements${qs ? `?${qs}` : ""}`);
   },
   getDepartement: (id) => request(`/api/departements/${id}`),
+  // POST /api/departements/:id/membres — rattache un ouvrier à un département.
+  // Body : { ouvrierId, roleDansDepartement? } (défaut "MEMBRE"). C'est un upsert
+  // côté serveur (change le poste si le couple existe déjà). 409 POSTE_DEJA_PRIS
+  // si le département a déjà un responsable (resp.) ou un adjoint.
+  ajouterMembre: (departementId, ouvrierId, roleDansDepartement = "MEMBRE") =>
+    request(`/api/departements/${departementId}/membres`, {
+      method: "POST",
+      body: JSON.stringify({ ouvrierId, roleDansDepartement }),
+    }),
   // PATCH /api/departements/:id/membres/:ouvrierId — change le poste d'un membre.
   // Rôles : RESPONSABLE, ADJOINT, SECRETAIRE, MEMBRE. 409 POSTE_DEJA_PRIS si le
   // département a déjà un responsable (resp.) ou un adjoint.

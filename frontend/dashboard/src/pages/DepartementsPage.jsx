@@ -57,7 +57,7 @@ export default function DepartementsPage() {
 
   // Popup d'édition d'un membre
   const [edition, setEdition] = useState(null);
-  const [form, setForm] = useState({ nom: "", prenom: "", actif: true, role: "MEMBRE" });
+  const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", actif: true, role: "MEMBRE" });
   const [formErreur, setFormErreur] = useState(null);
   const [enregistrement, setEnregistrement] = useState(false);
 
@@ -110,7 +110,7 @@ export default function DepartementsPage() {
   function ouvrirEdition(liaison) {
     const o = liaison.ouvrier;
     setEdition(liaison);
-    setForm({ nom: o.nom, prenom: o.prenom, actif: Boolean(o.actif), role: liaison.roleDansDepartement });
+    setForm({ nom: o.nom, prenom: o.prenom, telephone: o.telephone || "", actif: Boolean(o.actif), role: liaison.roleDansDepartement });
     setFormErreur(null);
   }
 
@@ -122,8 +122,8 @@ export default function DepartementsPage() {
     try {
       const updates = [];
       const o = edition.ouvrier;
-      if (form.nom !== o.nom || form.prenom !== o.prenom || form.actif !== Boolean(o.actif)) {
-        updates.push(api.updateOuvrier(o.id, { nom: form.nom, prenom: form.prenom, actif: form.actif }));
+      if (form.nom !== o.nom || form.prenom !== o.prenom || form.telephone !== (o.telephone || "") || form.actif !== Boolean(o.actif)) {
+        updates.push(api.updateOuvrier(o.id, { nom: form.nom, prenom: form.prenom, telephone: form.telephone, actif: form.actif }));
       }
       if (form.role !== edition.roleDansDepartement) {
         updates.push(api.changerRoleMembre(selectedId, o.id, form.role));
@@ -175,9 +175,9 @@ export default function DepartementsPage() {
 
   function handleExporterCsv() {
     if (!selection || selection.membres.length === 0) return;
-    const entete = ["Matricule", "Nom", "Prénom", "Poste"];
+    const entete = ["Matricule", "Nom", "Prénom", "Téléphone", "Poste"];
     const lignes = selection.membres.map((m) =>
-      [m.ouvrier?.matricule, m.ouvrier?.nom, m.ouvrier?.prenom, libelleRole(m.roleDansDepartement)]
+      [m.ouvrier?.matricule, m.ouvrier?.nom, m.ouvrier?.prenom, m.ouvrier?.telephone || "", libelleRole(m.roleDansDepartement)]
         .map(csvValeur)
         .join(";")
     );
@@ -290,7 +290,7 @@ export default function DepartementsPage() {
 
         {!chargementDetail && selection && nbMembres > 0 && (
           <TableShell
-            colonnes={["Matricule", "Nom", "Prénom", "Poste", "Actions"]}
+            colonnes={["Matricule", "Nom", "Prénom", "Téléphone", "Poste", "Actions"]}
             className="border-slate-100"
           >
             {pagination.elementsPage.map((m) => (
@@ -298,6 +298,7 @@ export default function DepartementsPage() {
                 <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{m.ouvrier?.matricule}</td>
                 <td className="px-3 py-2.5 text-slate-700">{m.ouvrier?.nom}</td>
                 <td className="px-3 py-2.5 text-slate-700">{m.ouvrier?.prenom}</td>
+                <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{m.ouvrier?.telephone || "—"}</td>
                 <td className="px-3 py-2.5">
                   <Pill tonalite="gris" className={styleRole(m.roleDansDepartement)}>
                     {libelleRole(m.roleDansDepartement)}
@@ -365,6 +366,11 @@ export default function DepartementsPage() {
                   <label className="text-xs font-medium text-slate-500">Prénom</label>
                   <Input required value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-500">Téléphone</label>
+                <Input type="tel" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
               </div>
 
               <div className="flex flex-col gap-1">

@@ -244,8 +244,8 @@ UNIQUE (ouvrierId, jour)   → migration 20260912090000_anti_double_badgeage
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
 | `GET` | `/api/ouvriers` | tous | Liste paginée + recherche (`?departementId=`, `?actif=true\|false`) |
-| `POST` | `/api/ouvriers` | ADMIN/SUPER | Créer (accepte `departementId` ou `departementNom`) |
-| `PATCH` | `/api/ouvriers/:id` | ADMIN/SUPER | Modifier (nom, prénom, matricule, actif, département via `departementId`/`departementNom`) |
+| `POST` | `/api/ouvriers` | ADMIN/SUPER | Créer (accepte `departementId` ou `departementNom`, `telephone`) |
+| `PATCH` | `/api/ouvriers/:id` | ADMIN/SUPER | Modifier (nom, prénom, matricule, téléphone, actif, département via `departementId`/`departementNom`) |
 | `PATCH` | `/api/ouvriers/:id/activer` | ADMIN/SUPER | Activer le badge |
 | `PATCH` | `/api/ouvriers/:id/desactiver` | ADMIN/SUPER | Désactiver le badge |
 | `DELETE` | `/api/ouvriers/:id` | ADMIN/SUPER | Supprimer (+ pointages + liaisons) |
@@ -286,15 +286,16 @@ Le contrat détaillé (formats de requête/réponse, codes d'erreur) est dans **
 
 ### Import massif d'ouvriers
 
-Le fichier (`.csv` ou `.xlsx`) doit contenir **exactement** 3 colonnes dans l'en-tête :
+Le fichier (`.csv` ou `.xlsx`) doit contenir **exactement** 4 colonnes dans l'en-tête :
 
 ```csv
-Nom,Prénom,Département
-KEITA,Awa,Chorale
-FOFANA,Ibrahim,Logistique
+Nom,Prénom,Département,Téléphone
+KEITA,Awa,Chorale,0612345678
+FOFANA,Ibrahim,Logistique,0700112233
 ```
 
 - Le **matricule** est auto-généré (`RSI-XXXX`) et le **QR badge** créé automatiquement.
+- Le **téléphone** est obligatoire ; les zéros initiaux (`06…`/`07…`) sont préservés.
 - **Limites** : fichier ≤ 5 Mo et ≤ 2000 lignes de données.
 - Le département doit **exister dans la base** (table `Departement`) : si le
   fichier en référence un d'inconnu, **tout l'import est refusé**
@@ -302,7 +303,8 @@ FOFANA,Ibrahim,Logistique
   La page « Gestion des départements » du dashboard permet de créer/renommer
   la liste avant l'import.
 - Si l'ouvrier (nom+prénom) existe déjà, on ajoute juste la liaison au département.
-- Doublons (même Nom+Prénom+Département) → ignorés ; champs vides → ligne en erreur.
+- Doublons (même Nom+Prénom+Département) → ignorés ; champs vides → ligne en erreur
+  (`"raison": "téléphone manquant"`, `"nom manquant"`, …).
 
 ```powershell
 curl.exe -X POST http://localhost:3000/api/ouvriers/import `

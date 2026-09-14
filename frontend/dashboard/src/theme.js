@@ -23,6 +23,7 @@ export const navItems = [
   { path: "/historique", label: "Historique", icon: "⊡", short: "Historique" },
   { path: "/departements", label: "Départements", icon: "▣", short: "Départ." },
   { path: "/gestion-departements", label: "Gestion départements", icon: "◫", short: "Gest. dép.", minRole: "ADMIN" },
+  { path: "/migration-ouvrier", label: "Migration ouvrier", icon: "⇄", short: "Migration", minRole: "ADMIN" },
   { path: "/rapports", label: "Rapport de pointage", icon: "▤", short: "Rapport" },
   { path: "/gestion-admins", label: "Gestion admins", icon: "⚙", short: "Comptes", minRole: "SUPER_ADMIN" },
 ];
@@ -36,6 +37,7 @@ export const pageTitles = {
   "/historique": { title: "Historique", subtitle: "Filtrable · Exportable" },
   "/departements": { title: "Départements", subtitle: "Membres et postes" },
   "/gestion-departements": { title: "Gestion des départements", subtitle: "Créer · Lister · Exporter" },
+  "/migration-ouvrier": { title: "Migration ouvrier", subtitle: "Affecter aux départements" },
   "/rapports": { title: "Rapport de pointage", subtitle: "Filtrer · Exporter · Envoyer" },
   "/gestion-admins": { title: "Gestion des comptes", subtitle: "Créer · Rôles · Accès" },
 };
