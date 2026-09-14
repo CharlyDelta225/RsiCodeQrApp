@@ -1,8 +1,9 @@
+import crypto from "node:crypto";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
 import { requireRole } from "../middleware/auth.middleware.js";
-import { envoyerEmailSimple, genererMotDePasse } from "../lib/mailer.js";
+import { envoyerEmailSimple, genererMotDePasse, urlDashboard } from "../lib/mailer.js";
 
 const router = Router();
 
@@ -10,6 +11,14 @@ const router = Router();
 const SUPER_SEULEMENT = requireRole("SUPER_ADMIN");
 
 const ROLES_VALIDES = ["SUPER_ADMIN", "ADMIN", "LECTEUR"];
+
+const DUREE_LIEN_RESET_MS = 60 * 60 * 1000; // lien de réinitialisation valide 1h
+
+// Les tokens de réinitialisation ne sont JAMAIS stockés en clair : seule leur
+// empreinte SHA-256 est conservée (diffusée par route auth.routes.js).
+function sha256Hex(texte) {
+  return crypto.createHash("sha256").update(texte).digest("hex");
+}
 
 function roleValide(role) {
   return ROLES_VALIDES.includes(String(role || "").toUpperCase());
@@ -260,9 +269,12 @@ router.patch("/:id/debloquer", SUPER_SEULEMENT, async (req, res) => {
 
 /**
  * POST /api/admins/:id/reinitialiser-mot-de-passe
- * Génère un nouveau mot de passe temporaire et l'envoie par email, sans
- * passer par un lien (cas "j'ai perdu mon accès" géré par le SUPER_ADMIN).
- * Remet aussi à zéro blocage/tentatives. Réservé au SUPER_ADMIN.
+ * Envoie à l'admin concerné un LIEN de réinitialisation vers la plateforme
+ * (/reinitialisation?token=...&email=...) où il saisira lui-même son nouveau
+ * mot de passe (deux fois). Le lien est à usage unique et valable 1 heure.
+ * Débloque aussi le compte (tentatives/blocage à zéro). Réservé au SUPER_ADMIN.
+ * Si l'email ne part pas, le lien est renvoyé dans la réponse (emailEnvoye:false)
+ * pour que le SUPER_ADMIN le transmette lui-même.
  */
 router.post("/:id/reinitialiser-mot-de-passe", SUPER_SEULEMENT, async (req, res) => {
   try {
@@ -271,33 +283,47 @@ router.post("/:id/reinitialiser-mot-de-passe", SUPER_SEULEMENT, async (req, res)
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
 
-    const motDePasseTemporaire = genererMotDePasse();
-    const hash = await bcrypt.hash(motDePasseTemporaire, 10);
-
+    const token = crypto.randomBytes(32).toString("hex");
     await prisma.admin.update({
       where: { id: cible.id },
       data: {
-        motDePasse: hash,
-        resetTokenHash: null,
-        resetTokenExpire: null,
+        resetTokenHash: sha256Hex(token),
+        resetTokenExpire: new Date(Date.now() + DUREE_LIEN_RESET_MS),
         tentativesEchouees: 0,
         bloqueJusqua: null,
       },
     });
 
-    const envoi = await envoyerIdentifiants({
-      email: cible.email,
-      motDePasse: motDePasseTemporaire,
-      type: "reinitialisation",
-    });
+    const lien = `${urlDashboard()}/reinitialisation?token=${token}&email=${encodeURIComponent(cible.email)}`;
+    let emailEnvoye = false;
+    try {
+      await envoyerEmailSimple({
+        to: cible.email,
+        sujet: "Réinitialisation de votre mot de passe — RSI",
+        texte: [
+          `Bonjour,`,
+          ``,
+          `${req.admin.email} a déclenché la réinitialisation de votre mot de passe RSI.`,
+          `Cliquez sur ce lien (valable 1 heure) pour choisir votre nouveau mot de passe :`,
+          ``,
+          `${lien}`,
+          ``,
+          `Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
+          `L'équipe technique RSI.`,
+        ].join("\n"),
+      });
+      emailEnvoye = true;
+    } catch (err) {
+      console.error("[ADMINS/REINITIALISER_MDP/EMAIL]", err);
+    }
 
     return res.json({
       ok: true,
-      emailEnvoye: envoi.emailEnvoye,
-      ...(envoi.emailEnvoye ? {} : { motDePasseTemporaire: envoi.motDePasseTemporaire }),
-      message: envoi.emailEnvoye
-        ? "Mot de passe réinitialisé et envoyé par email."
-        : "Mot de passe réinitialisé mais l'email n'a pas pu être envoyé : transmettez le mot de passe temporaire affiché.",
+      emailEnvoye,
+      ...(emailEnvoye ? {} : { lien }),
+      message: emailEnvoye
+        ? "Un lien de réinitialisation (valable 1 heure) a été envoyé par email."
+        : "L'email n'a pas pu être envoyé : transmettez le lien ci-dessous à l'utilisateur.",
     });
   } catch (err) {
     console.error("[ADMINS/REINITIALISER_MDP]", err);

@@ -137,7 +137,7 @@ Pages publiques (hors authentification) :
 Le terminal est servi directement par le backend : dev `http://localhost:3000/terminal`, prod `https://<app>/terminal`.
 
 - Scan du QR badge par **caméra** (html5-qrcode) ; le matricule est envoyé à `POST /api/badgeage`.
-- **Sons + annonces vocales** (WAV dans `frontend/terminal/audio/`) selon le résultat : succès, déjà badgé, erreur, avec annonce du prénom.
+- **Sons + annonces vocales** (WAV dans `frontend/terminal/audio/`) selon le résultat : succès (« Citoyen remarquable, bon service à vous »), déjà badgé (« Vous avez déjà badgé »), badge inconnu (« Ouvrier inconnu »), erreur réseau (annonce générique).
 - **Politique d'autoplay** : un scan caméra n'est **pas** compté comme geste utilisateur par le navigateur (et iOS/tablettes sont stricts). Le terminal demande **un seul contact** au premier affichage (bandeau « Touchez l'écran pour activer le son »), qui démarre l'`AudioContext` Web Audio de façon **persistante** → chaque badge suivant joue sa voix **automatiquement**, sans retoucher l'écran. Bouton 🔊/🔇 en haut à droite.
 
 > Sur Windows, npm 11 bloque les scripts d'installation des moteurs Prisma : la config `allowScripts` dans `backend/package.json` règle ce point. Le miroir `registry.npmmirror.com` dans `.npmrc` facilite l'install si le réseau est instable.
@@ -236,21 +236,21 @@ UNIQUE (ouvrierId, jour)   → migration 20260912090000_anti_double_badgeage
 | `PATCH` | `/api/admins/:id/activer` | Réactiver un compte |
 | `PATCH` | `/api/admins/:id/desactiver` | Désactiver un compte |
 | `PATCH` | `/api/admins/:id/debloquer` | Déverrouiller un compte gelé (3 échecs) |
-| `POST` | `/api/admins/:id/reinitialiser-mot-de-passe` | Nouveau mot de passe temporaire (envoyé par email) |
+| `POST` | `/api/admins/:id/reinitialiser-mot-de-passe` | Envoyer un lien de réinitialisation (valable 1 h, à usage unique) par email |
 | `DELETE` | `/api/admins/:id` | Supprimer un compte |
 
 ### Ouvriers
 
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
-| `GET` | `/api/ouvriers` | tous | Liste paginée + recherche |
+| `GET` | `/api/ouvriers` | tous | Liste paginée + recherche (`?departementId=`, `?actif=true\|false`) |
 | `POST` | `/api/ouvriers` | ADMIN/SUPER | Créer (accepte `departementId` ou `departementNom`) |
-| `PATCH` | `/api/ouvriers/:id` | ADMIN/SUPER | Modifier |
+| `PATCH` | `/api/ouvriers/:id` | ADMIN/SUPER | Modifier (nom, prénom, matricule, actif, département via `departementId`/`departementNom`) |
 | `PATCH` | `/api/ouvriers/:id/activer` | ADMIN/SUPER | Activer le badge |
 | `PATCH` | `/api/ouvriers/:id/desactiver` | ADMIN/SUPER | Désactiver le badge |
 | `DELETE` | `/api/ouvriers/:id` | ADMIN/SUPER | Supprimer (+ pointages + liaisons) |
 | `GET` | `/api/ouvriers/:id/badge` | tous | PNG du QR code |
-| `GET` | `/api/ouvriers/badges/zip` | ADMIN/SUPER | ZIP de tous les badges QR (extraction) |
+| `GET` | `/api/ouvriers/badges/zip` | ADMIN/SUPER | ZIP des badges QR filtrable (`?departementId=`, `?actif=`) |
 | `POST` | `/api/ouvriers/import` | ADMIN/SUPER | Import massif .csv/.xlsx + QR auto |
 
 ### Départements

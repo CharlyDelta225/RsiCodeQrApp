@@ -89,6 +89,10 @@ export default function OuvriersPage() {
   const [form, setForm] = useState({ nom: "", prenom: "", departement: "" });
   const [envoi, setEnvoi] = useState(false);
 
+  const [modification, setModification] = useState(null); // ouvrier en cours de modification
+  const [formModification, setFormModification] = useState({ nom: "", prenom: "", departement: "", matricule: "" });
+  const [envoiModification, setEnvoiModification] = useState(false);
+
   const [importEnCours, setImportEnCours] = useState(false);
 
   const [badgeUrl, setBadgeUrl] = useState(null);
@@ -143,6 +147,45 @@ export default function OuvriersPage() {
       setAlerte({ titre: "Échec de l'ajout", message: raisonEchec(err, "La création de l'ouvrier a échoué") });
     } finally {
       setEnvoi(false);
+    }
+  }
+
+  function ouvrirModification(o) {
+    setFormModification({
+      nom: o.nom || "",
+      prenom: o.prenom || "",
+      departement: o.departements?.[0]?.departement?.nom || "",
+      matricule: o.matricule || "",
+    });
+    setModification(o);
+    setAlerte(null);
+  }
+
+  async function handleModifier(e) {
+    e.preventDefault();
+    if (!modification) return;
+    setEnvoiModification(true);
+    setAlerte(null);
+    try {
+      await api.updateOuvrier(modification.id, {
+        nom: formModification.nom,
+        prenom: formModification.prenom,
+        matricule: formModification.matricule,
+        departementNom: formModification.departement,
+      });
+      setSucces({
+        titre: "Modification réussie",
+        message: `L'ouvrier ${formModification.prenom} ${formModification.nom} (${formModification.matricule}) a bien été mis(e) à jour.`,
+      });
+      setModification(null);
+      charger();
+    } catch (err) {
+      setAlerte({
+        titre: "Échec de la modification",
+        message: raisonEchec(err, "La modification de l'ouvrier a échoué"),
+      });
+    } finally {
+      setEnvoiModification(false);
     }
   }
 
@@ -319,6 +362,11 @@ export default function OuvriersPage() {
               <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
             </td>
             <td className="px-3 py-2 text-right whitespace-nowrap space-x-1.5">
+              {peutEcrire() && (
+                <Btn variant="secondary" size="xs" onClick={() => ouvrirModification(o)} icon="✎">
+                  Modifier
+                </Btn>
+              )}
               <Btn variant="secondary" size="xs" onClick={() => handleVoirBadge(o)} icon="⊛">
                 Badge
               </Btn>
@@ -384,6 +432,66 @@ export default function OuvriersPage() {
         </div>
       )}
 
+      {/* Modal modification d'un ouvrier */}
+      {modification && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleModifier} className="bg-white rounded-xl p-6 w-full max-w-sm space-y-3">
+            <h2 className="font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
+              Modifier l'ouvrier
+            </h2>
+            <p className="text-sm text-slate-500">Vous modifiez le badge <b>{modification.matricule}</b>.</p>
+            <Field label="Matricule">
+              <Input
+                required
+                placeholder="Matricule"
+                value={formModification.matricule}
+                onChange={(e) => setFormModification({ ...formModification, matricule: e.target.value })}
+              />
+            </Field>
+            <Field label="Nom">
+              <Input
+                required
+                placeholder="Nom"
+                value={formModification.nom}
+                onChange={(e) => setFormModification({ ...formModification, nom: e.target.value })}
+              />
+            </Field>
+            <Field label="Prénom">
+              <Input
+                required
+                placeholder="Prénom"
+                value={formModification.prenom}
+                onChange={(e) => setFormModification({ ...formModification, prenom: e.target.value })}
+              />
+            </Field>
+            <Field label="Département">
+              <Input
+                list="departements"
+                placeholder="Département"
+                value={formModification.departement}
+                onChange={(e) => setFormModification({ ...formModification, departement: e.target.value })}
+              />
+            </Field>
+            <datalist id="departements">
+              {departements.map((d) => (
+                <option key={d} value={d} />
+              ))}
+            </datalist>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Un changement de matricule génère un nouveau QR code : pensez à ré-imprimer le badge.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Btn variant="ghost" onClick={() => setModification(null)}>
+                Annuler
+              </Btn>
+              <Btn type="submit" loading={envoiModification}>
+                {envoiModification ? "Enregistrement…" : "Enregistrer"}
+              </Btn>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Modal badge */}
       {badgeUrl && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
@@ -391,7 +499,7 @@ export default function OuvriersPage() {
             <h2 className="font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
               Badge — {badgeOuvrier?.prenom} {badgeOuvrier?.nom}
             </h2>
-            <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-64" />
+            <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-auto" />
             <p className="text-xs font-mono text-slate-500">{badgeOuvrier?.matricule}</p>
             {badgeOuvrier && (
               <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>

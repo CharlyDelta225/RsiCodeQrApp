@@ -20,9 +20,11 @@ function peutEcrire() {
 
 export default function BadgesPage() {
   const [ouvriers, setOuvriers] = useState([]);
+  const [departements, setDepartements] = useState([]);
   const [total, setTotal] = useState(0);
   const [recherche, setRecherche] = useState("");
   const [filtreActif, setFiltreActif] = useState("tous"); // tous | actifs | desactives
+  const [filtreDepartement, setFiltreDepartement] = useState("tous"); // "tous" | uuid
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
 
@@ -42,6 +44,7 @@ export default function BadgesPage() {
       if (recherche) params.recherche = recherche;
       if (filtreActif === "actifs") params.actif = "true";
       if (filtreActif === "desactives") params.actif = "false";
+      if (filtreDepartement !== "tous") params.departementId = filtreDepartement;
       const data = await api.getOuvriers(params);
       setOuvriers(data.ouvriers);
       setTotal(data.total);
@@ -50,11 +53,20 @@ export default function BadgesPage() {
     } finally {
       setChargement(false);
     }
-  }, [recherche, filtreActif]);
+  }, [recherche, filtreActif, filtreDepartement]);
+
+  useEffect(() => {
+    api
+      .getDepartements({ limit: 100 })
+      .then((d) => setDepartements(d.departements || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     charger();
   }, [charger]);
+
+  const departementChoisi = departements.find((d) => d.id === filtreDepartement)?.nom;
 
   async function handleTelechargerZip() {
     setTelechargementZip(true);
@@ -63,9 +75,13 @@ export default function BadgesPage() {
       const params = {};
       if (filtreActif === "actifs") params.actif = "true";
       if (filtreActif === "desactives") params.actif = "false";
+      if (filtreDepartement !== "tous") params.departementId = filtreDepartement;
       const blob = await api.getBadgesZipBlob(params);
       const date = new Date().toISOString().slice(0, 10);
-      telechargerBlob(blob, `badges-qr-${date}.zip`);
+      const base = departementChoisi
+        ? departementChoisi.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-")
+        : "tous";
+      telechargerBlob(blob, `badges-qr-${base}-${date}.zip`);
     } catch (err) {
       setErreur(
         err instanceof ApiError
@@ -115,7 +131,11 @@ export default function BadgesPage() {
         <h2 className="text-sm font-semibold text-bordeaux-900">{total} badge(s)</h2>
         {peutEcrire() && (
           <Btn variant="gold" onClick={handleTelechargerZip} loading={telechargementZip} icon="⬇">
-            {telechargementZip ? "Préparation du ZIP…" : "Télécharger tous les QR (ZIP)"}
+            {telechargementZip
+              ? "Préparation du ZIP…"
+              : departementChoisi
+              ? `Télécharger les QR ${departementChoisi} (ZIP)`
+              : "Télécharger tous les QR (ZIP)"}
           </Btn>
         )}
       </div>
@@ -130,7 +150,17 @@ export default function BadgesPage() {
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
         />
-        <div className="sm:w-56">
+        <div className="sm:w-64">
+          <Select value={filtreDepartement} onChange={(e) => setFiltreDepartement(e.target.value)}>
+            <option value="tous">Tous les départements</option>
+            {departements.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.nom}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="sm:w-48">
           <Select value={filtreActif} onChange={(e) => setFiltreActif(e.target.value)}>
             <option value="tous">Tous les badges</option>
             <option value="actifs">Actifs uniquement</option>
@@ -140,7 +170,7 @@ export default function BadgesPage() {
       </div>
 
       <p className="text-xs text-slate-500">
-        Le ZIP respecte le filtre sélectionné ci-dessus et nomme chaque fichier
+        Le ZIP respecte les filtres de département et de statut ci-dessus et nomme chaque fichier
         <span className="font-mono"> matricule_NOM_Prenom.png</span> pour l'attribution précise à chaque ouvrier.
       </p>
 
@@ -187,7 +217,7 @@ export default function BadgesPage() {
             <h2 className="font-bold text-slate-900">
               Badge — {badgeOuvrier?.prenom} {badgeOuvrier?.nom}
             </h2>
-            <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-64" />
+            <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-auto" />
             <p className="text-xs font-mono text-slate-500">{badgeOuvrier?.matricule}</p>
             {badgeOuvrier && (
               <p className="text-xs text-slate-500">{libelleDepartement(badgeOuvrier)}</p>

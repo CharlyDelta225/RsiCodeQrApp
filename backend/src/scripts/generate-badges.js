@@ -4,14 +4,15 @@ dotenv.config();
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import QRCode from "qrcode";
 import prisma from "../lib/prisma.js";
+import { genererBadgePng } from "../lib/badge.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SORTIE_DIR = path.resolve(__dirname, "../../public/badges");
 
 /**
- * Génère un fichier PNG par ouvrier actif, contenant le QR code de son matricule.
+ * Génère un fichier PNG par ouvrier actif, contenant le QR code de son matricule
+ * et son nom imprimé en bas du badge.
  * Usage : npm run badges:generate
  *
  * Le QR encode UNIQUEMENT le matricule (ex: "RSI-0001") : c'est exactement
@@ -34,12 +35,8 @@ async function main() {
 
   for (const o of ouvriers) {
     const fichier = path.join(SORTIE_DIR, `${o.matricule}.png`);
-    await QRCode.toFile(fichier, o.matricule, {
-      width: 600,
-      margin: 2,
-      errorCorrectionLevel: "Q",
-      color: { dark: "#1a1a1a", light: "#ffffff" },
-    });
+    const png = await genererBadgePng(o);
+    fs.writeFileSync(fichier, png);
   }
 
   console.log(`✓ ${ouvriers.length} badge(s) généré(s) dans public/badges/ :`);

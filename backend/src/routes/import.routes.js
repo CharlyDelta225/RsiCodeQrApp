@@ -3,10 +3,10 @@ import multer from "multer";
 import xlsx from "xlsx";
 import fs from "node:fs";
 import path from "node:path";
-import QRCode from "qrcode";
 import prisma from "../lib/prisma.js";
 import { creerAvecMatricule } from "../lib/matricule.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
+import { genererBadgePng } from "../lib/badge.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -43,12 +43,7 @@ async function genererBadge(ouvrier) {
   try {
     fs.mkdirSync(BADGES_DIR, { recursive: true });
     const fichier = path.join(BADGES_DIR, `${ouvrier.matricule}.png`);
-    await QRCode.toFile(fichier, ouvrier.matricule, {
-      width: 600,
-      margin: 2,
-      errorCorrectionLevel: "Q",
-      color: { dark: "#1a1a1a", light: "#ffffff" },
-    });
+    fs.writeFileSync(fichier, await genererBadgePng(ouvrier));
   } catch (err) {
     console.warn(
       `[import] badge (cache disque) non écrit pour ${ouvrier.matricule} : ${err.message}`

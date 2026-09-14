@@ -74,8 +74,8 @@ Il se teste indépendamment (aucun build requis en dev).
 |---|---|---|
 | `/login` · `/inscription` · `/oublie` · `/reinitialisation` | Auth publique | public |
 | `/` | Tableau de bord : KPIs, pointages récents | tous |
-| `/ouvriers` | CRUD ouvriers, import `.csv`/`.xlsx`, activer/désactiver le badge | lecture : tous · écriture : ADMIN/SUPER |
-| `/badges` | Badges QR (aperçu, ZIP) | tous · export : ADMIN/SUPER |
+| `/ouvriers` | CRUD ouvriers, **édition** (nom/prénom/matricule/département), import `.csv`/`.xlsx`, activer/désactiver le badge | lecture : tous · écriture : ADMIN/SUPER |
+| `/badges` | Badges QR (aperçu, **filtre département**, ZIP) | tous · export : ADMIN/SUPER |
 | `/pointages` · `/historique` | Pointages du jour · historique filtrable | lecture : tous · export CSV : ADMIN/SUPER |
 | `/departements` | Membres et postes par département (**postes : voir ci-dessous**) | lecture : tous · écriture : ADMIN/SUPER |
 | `/gestion-departements` | Créer / lister / renommer / exporter les départements | ADMIN/SUPER |
@@ -95,9 +95,11 @@ département, `409 POSTE_DEJA_PRIS`).
 ## Sons du terminal (politique d'autoplay)
 
 Le terminal joue une tonalité + une **annonce vocale** (WAV) à chaque badge.
-Les navigateurs bloquent l'audio tant que l'utilisateur n'a pas interagi avec
-la page — et un **scan caméra n'est pas une interaction**. Comportement
-attendu :
+Annonces par résultat : succès = « Citoyen remarquable, bon service à vous »,
+déjà badgé = « Vous avez déjà badgé », badge inconnu = « Ouvrier inconnu »
+(erreur réseau = annonce générique). Les navigateurs bloquent l'audio tant que
+l'utilisateur n'a pas interagi avec la page — et un **scan caméra n'est pas une
+interaction**. Comportement attendu :
 
 - Au premier affichage, un bandeau « Touchez l'écran pour activer le son »
   apparaît si le navigateur bloque la lecture.

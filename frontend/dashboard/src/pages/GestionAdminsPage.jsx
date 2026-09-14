@@ -14,7 +14,7 @@ const ROLES = [
 
 const SUJETS = {
   create: { titre: "Créer un compte", message: "Un mot de passe temporaire sera généré et envoyé par email." },
-  reinit: { titre: "Réinitialiser le mot de passe", message: "Un nouveau mot de passe temporaire sera généré et envoyé par email." },
+  reinit: { titre: "Réinitialiser le mot de passe", message: "Un lien de réinitialisation (valable 1 heure) sera envoyé par email. L'utilisateur choisira lui-même son nouveau mot de passe sur la plateforme." },
   delete: { titre: "Supprimer ce compte", message: "Le compte sera définitivement supprimé. Cette action est irréversible." },
   desactiver: { titre: "Désactiver ce compte", message: "Le compte ne pourra plus se connecter. Vous pourrez le réactiver à tout moment." },
 };
@@ -141,7 +141,7 @@ export default function GestionAdminsPage() {
   const [envoi, setEnvoi] = useState(false);
 
   const [confirm, setConfirm] = useState(null); // { type, admin }
-  const [mdpTemporaire, setMdpTemporaire] = useState(null); // { email, motDePasse }
+  const [mdpTemporaire, setMdpTemporaire] = useState(null); // { email, motDePasse } ou { email, lien }
 
   const charger = async () => {
     setChargement(true);
@@ -213,12 +213,15 @@ export default function GestionAdminsPage() {
       const data = await actions[type]();
       if (type === "delete") {
         setSucces({ titre: "Compte supprimé", message: `${admin.email} a bien été supprimé.` });
+      } else if (type === "reinit") {
+        if (data.emailEnvoye === false) {
+          setMdpTemporaire({ email: admin.email, lien: data.lien });
+          setAlerte({ titre: "Email non envoyé", message: "Transmettez ce lien de réinitialisation à l'utilisateur." });
+        } else {
+          setSucces({ titre: "Lien envoyé", message: `Un lien de réinitialisation (valable 1 heure) vient d'être envoyé à ${admin.email}.` });
+        }
       } else {
         setSucces({ titre: "Action effectuée", message: `Opération réussie sur ${admin.email}.` });
-        if (type === "reinit" && data.emailEnvoye === false) {
-          setMdpTemporaire({ email: admin.email, motDePasse: data.motDePasseTemporaire });
-          setAlerte({ titre: "Email non envoyé", message: "Transmettez le nouveau mot de passe temporaire ci-dessous." });
-        }
       }
       await charger();
     } catch (err) {
@@ -294,8 +297,19 @@ export default function GestionAdminsPage() {
           <p className="mt-0.5">{alerte.message}</p>
           {mdpTemporaire && (
             <div className="mt-3 p-3 rounded-lg bg-white ring-1 ring-bordeaux-200">
-              <p className="text-xs text-slate-500 mb-1">Mot de passe temporaire pour {mdpTemporaire.email} :</p>
-              <code className="text-sm font-mono font-semibold break-all">{mdpTemporaire.motDePasse}</code>
+              {mdpTemporaire.motDePasse ? (
+                <>
+                  <p className="text-xs text-slate-500 mb-1">Mot de passe temporaire pour {mdpTemporaire.email} :</p>
+                  <code className="text-sm font-mono font-semibold break-all">{mdpTemporaire.motDePasse}</code>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-slate-500 mb-1">
+                    Lien de réinitialisation pour {mdpTemporaire.email} (valable 1 heure) :
+                  </p>
+                  <code className="text-xs font-mono break-all">{mdpTemporaire.lien}</code>
+                </>
+              )}
             </div>
           )}
         </div>

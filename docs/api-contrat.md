@@ -226,13 +226,16 @@ Déverrouille un compte gelé après 3 échecs.
 ```
 
 ### `POST /api/admins/:id/reinitialiser-mot-de-passe` (protégé — **SUPER_ADMIN uniquement**)
-Génère un nouveau mot de passe temporaire et l'envoie par email.
+Envoie à l'admin concerné un **lien de réinitialisation** (valable 1 h, à usage unique)
+vers `/reinitialisation?token=...&email=...` où il choisit lui-même son nouveau
+mot de passe. Débloque aussi le compte (tentatives/blocage à zéro).
+Si l'email échoue, le lien est renvoyé dans la réponse (`emailEnvoye:false`).
 ```json
 // Réponse 200
-{ "ok": true, "admin": { "id": "...", "email": "...", "role": "..." },
-  "emailEnvoye": true, "motDePasseTemporaire": "AbCDe123" }
-// motDePasseTemporaire : présent SEULEMENT si l'envoi email a échoué
-// Erreurs : 404 ADMIN_INCONNU, 403 ACTION_IMPOSSIBLE (auto-réinitialisation)
+{ "ok": true, "emailEnvoye": true,
+  "message": "Un lien de réinitialisation (valable 1 heure) a été envoyé par email." }
+// Si email échoue : { "ok": true, "emailEnvoye": false, "lien": "https://...", "message": "..." }
+// Erreurs : 404 ADMIN_INCONNU
 ```
 
 ### `DELETE /api/admins/:id` (protégé — **SUPER_ADMIN uniquement**)
@@ -261,6 +264,7 @@ Supprime un compte admin.
 Query optionnels :
 - `actif=true|false` — filtre par état
 - `recherche=texte` — nom, prénom, matricule (insensible à la casse)
+- `departementId=uuid` — filtre par département (relation)
 - `page=1&limit=50` — pagination (défauts : `page=1`, `limit=50`, max `limit=200`)
 
 ```json
@@ -287,8 +291,12 @@ Détail complet d'un ouvrier (avec `departements`).
 ### `PATCH /api/ouvriers/:id`
 Met à jour tout ou partie (nom, prenom, photoUrl, actif, matricule).
 **Désactivation d'un badge** : `{ "actif": false }`.
-> Le rattachement à un département ne se fait **pas** ici : utiliser les
-> endpoints de la section 4‑bis (`/api/departements/:id/membres`).
+**Changement de département** : `{ "departementId": "<uuid>" }` ou
+`{ "departementNom": "MÉDIA" }` (normalisé, insensible à la casse/accents). La ou
+les liaisons existantes sont **remplacées** par cette unique liaison (poste
+`MEMBRE`). Anti doublon : si un ouvrier de même nom+prénom vit déjà dans le
+département ciblé → `409 DOUBLON_DEPARTEMENT` (contournable par `{ "force": true }`).
+Erreurs : `404 OUVRIER_INCONNU` / `DEPARTEMENT_INCONNU`, `400 CHAMPS_MANQUANTS` (nom/prénom vides), `400 AUCUNE_DONNEE`.
 
 ### `PATCH /api/ouvriers/:id/activer` (protégé — ADMIN/SUPER_ADMIN)
 Active le badge d'un ouvrier. Réponse : `{ "ok": true, "actif": true, "ouvrier": {...} }`.
@@ -624,6 +632,8 @@ RAPPORT_EMAIL_DESTINATAIRES=responsable@eglise.ci,secretariat@eglise.ci
 
 | Date | Changement |
 |---|---|
+| 2026-09-14 | **Badges par département** : la page `/badges` du dashboard gagne un filtre département (liste + compteur + ZIP) ; `GET /api/ouvriers` accepte `departementId` ; le ZIP est re-nommé `badges-qr-<departement>-<date>.zip`. **Réinitialisation de mot de passe par lien (plus de temporaire)** : `POST /api/admins/:id/reinitialiser-mot-de-passe` envoie un lien `/reinitialisation?token=...` (1 h, usage unique) au lieu d'un mot de passe provisoire ; `lien` renvoyé dans la réponse si l'email échoue. **Annonces vocales terminal** : succès « Citoyen remarquable, bon service à vous », déjà badgé « Vous avez déjà badgé », nouveau fichier `annonce-inconnu.wav` (« Ouvrier inconnu ») pour `BADGE_INCONNU` |
+| 2026-09-14 | **Édition d'un ouvrier + badges nommés** : `PATCH /api/ouvriers/:id` accepte `departementId`/`departementNom` (rattachement unique, anti doublon `409 DOUBLON_DEPARTEMENT`, `force:true` pour homonymes) ; la popup `/ouvriers` permet d'éditer nom/prénom/matricule/département ; les PNG de badge (individuel, ZIP, import, `scripts/generate-badges.js`) intègrent désormais le nom/prénom imprimés sous le QR (nouveau `src/lib/badge.js`, détail `sharp`/composite) |
 | 2026-09-12 | **Anti double-badgeage verrouillé en base** : colonne `jour` (Date) + index unique `(ouvrierId, jour)` → la règle « une fois par jour civil » devient **atomique** (deux requêtes simultanées : une seule aboutit, l'autre `409 DEJA_BADGE_AUJOURDHUI`) ; message suffixé « (heure UTC) » |
 | 2026-09-12 | **Rate-limits par IP réelle** : les limites d'authentification (`login`/`register`/`reset-demand`) et de badgeage utilisent l'IP du client derrière le proxy (`X-Vercel-Forwarded-For`) → `429 TROP_DE_TENTATIVES` par visiteur, non par instance serveur. Défaut **10/min** (`AUTH_RATE_LIMIT_MAX`) |
 | 2026-09-12 | **Zéro oracle d'énumération** : `register` ne renvoie plus `409 EMAIL_EXISTANT` (réponse `200` strictement identique email nouveau/déjà enregistré) ; `reset-demand` ne renvoie plus `emailEnvoye` (corps identique email connu/inconnu) |

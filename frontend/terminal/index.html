@@ -81,9 +81,10 @@
     erreur:        "erreur.wav",
     annonceSucces: "annonce-succes.wav",
     annonceDeja:   "annonce-deja.wav",
+    annonceInconnu:"annonce-inconnu.wav",
     annonceErreur: "annonce-erreur.wav",
   };
-  const TONALITE = { succes: 0.9, deja: 0.9, erreur: 0.9, annonceSucces: 1, annonceDeja: 1, annonceErreur: 1 };
+  const TONALITE = { succes: 0.9, deja: 0.9, erreur: 0.9, annonceSucces: 1, annonceDeja: 1, annonceInconnu: 1, annonceErreur: 1 };
 
   let sonCoupe = false;
   try { sonCoupe = localStorage.getItem("terminal-coupeSon") === "1"; } catch (e) {}
@@ -212,6 +213,10 @@
         afficherResultat(`⚠ ${data.message || data.code}`, false);
         jouerSon("deja");
         jouerSon("annonceDeja", 600);
+      } else if (data.code === "BADGE_INCONNU") {
+        afficherResultat("✗ Ouvrier inconnu", false);
+        jouerSon("erreur");
+        jouerSon("annonceInconnu", 150);
       } else {
         afficherResultat(`✗ ${data.message || data.code}`, false);
         jouerSon("erreur");
