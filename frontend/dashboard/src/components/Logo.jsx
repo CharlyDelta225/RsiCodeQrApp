@@ -11,7 +11,6 @@ export default function Logo({ className, style, decoratif = false, hautePriorit
         aria-hidden={decoratif || undefined}
         className={className}
         style={style}
-        loading={decoratif ? "lazy" : undefined}
         {...(hautePriorite ? { fetchPriority: "high", decoding: "sync" } : {})}
       />
     </picture>
