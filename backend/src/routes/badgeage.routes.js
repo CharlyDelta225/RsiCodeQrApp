@@ -73,15 +73,10 @@ router.post("/", limiterBadgeage, async (req, res) => {
     });
 
     if (existant) {
-      const heure = existant.dateHeure.toLocaleTimeString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "UTC",
-      });
       return res.status(409).json({
         ok: false,
         code: "DEJA_BADGE_AUJOURDHUI",
-        message: `Vous avez déjà badgé aujourd'hui à ${heure} (heure UTC)`,
+        message: "Vous avez déjà badgé",
       });
     }
 
@@ -98,18 +93,10 @@ router.post("/", limiterBadgeage, async (req, res) => {
       });
     } catch (err) {
       if (err.code === "P2002") {
-        const vainqueur = await prisma.pointage.findUnique({
-          where: { ouvrierId_jour: { ouvrierId: ouvrier.id, jour } },
-        });
-        const heure = vainqueur.dateHeure.toLocaleTimeString("fr-FR", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "UTC",
-        });
         return res.status(409).json({
           ok: false,
           code: "DEJA_BADGE_AUJOURDHUI",
-          message: `Vous avez déjà badgé aujourd'hui à ${heure} (heure UTC)`,
+          message: "Vous avez déjà badgé",
         });
       }
       throw err;
