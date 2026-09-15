@@ -18,6 +18,7 @@ RsiCodeQrApp/
 │   ├── data/               ← exemple de fichier CSV
 │   └── public/             ← assemblage dashboard/ + terminal/ (produit par le build Vercel, non commité)
 ├── frontend/dashboard/     ← gestion + historique (Vite + React + Tailwind)
+│   ├── public/             ← SEO : robots.txt, sitemap.xml, favicon.svg, og-image.png
 │   └── src/ui/             ← composants UI réutilisables (TableShell, Btn, Pill, inputs…)
 ├── frontend/terminal/      ← kiosque de badgeage (caméra + annonces vocales)
 │   └── audio/              ← sons et annonces vocales (WAV)
@@ -123,6 +124,12 @@ Pages publiques (hors authentification) :
 | `/inscription` | Créer un compte — le compte naît **LECTEUR** (moindre privilège) |
 | `/oublie` | Demander un lien de réinitialisation de mot de passe (envoyé par email) |
 | `/reinitialisation` | Poser un nouveau mot de passe grâce au lien reçu (usage unique, 1 h) |
+| `/confidentialite` | Politique de confidentialité (RGPD) : données collectées, finalités, durées de conservation, droits, hébergeur |
+| `/cgv-cgu` | Conditions générales d'utilisation + mentions légales (éditeur, hébergeur) |
+
+> La page de connexion affiche la mention de consentement avec les liens
+> `/cgv-cgu` et `/confidentialite` ; le menu du dashboard reprend ces deux liens.
+> Toute autre URL (route inconnue) affiche une **page 404** dédiée avec bouton retour.
 
 > Les listes du dashboard sont **paginées à 17 éléments par page** ; les
 > actions sensibles passent par un **popup de confirmation** : désactiver /
@@ -132,13 +139,29 @@ Pages publiques (hors authentification) :
 > extraction (import, export CSV/PDF, ZIP des badges) est réservée aux rôles
 > à écriture, côté interface **et** côté API.
 
+### SEO, partage et finitions
+
+- **`<title>` + meta description par page** (hook `usePageMeta`) : connexion,
+  inscription, mot de passe oublié/réinitialisation et chaque page du
+  dashboard ont leur propre titre et description.
+- **`index.html`** : canonical, favicon (`favicon.svg`), `theme-color`,
+  balises `og:*` + `twitter:*` (titre, description, image
+  `og-image.png`, URL) pour des aperçus propres sur WhatsApp/Facebook.
+- **`public/` du dashboard** (`robots.txt`, `sitemap.xml` 6 URLs,
+  `favicon.svg`, `og-image.png`) : servis par Express à la racine
+  (`/robots.txt`…), indexation correcte sans fichier HTML tombant sur la SPA.
+- **Page 404** dédiée (route catch-all `*`) au lieu d'une redirection muette.
+- **Contraste WCAG AA** sur l'ensemble (boutons or, sidebar, textes
+  secondaires `slate`/`gray`) — lisibilité, notamment pour les membres âgés.
+
 ### Terminal kiosque
 
 Le terminal est servi directement par le backend : dev `http://localhost:3000/terminal`, prod `https://<app>/terminal`.
 
 - Scan du QR badge par **caméra** (html5-qrcode) ; le matricule est envoyé à `POST /api/badgeage`.
 - **Sons + annonces vocales** (WAV dans `frontend/terminal/audio/`) selon le résultat : succès (« Citoyen remarquable, bon service à vous »), déjà badgé (« Vous avez déjà badgé »), badge inconnu (« Ouvrier inconnu »), erreur réseau (annonce générique).
-- **Politique d'autoplay** : un scan caméra n'est **pas** compté comme geste utilisateur par le navigateur (et iOS/tablettes sont stricts). Le terminal demande **un seul contact** au premier affichage (bandeau « Touchez l'écran pour activer le son »), qui démarre l'`AudioContext` Web Audio de façon **persistante** → chaque badge suivant joue sa voix **automatiquement**, sans retoucher l'écran. Bouton 🔊/🔇 en haut à droite.
+- **Politique d'autoplay** : un scan caméra n'est **pas** compté comme geste utilisateur par le navigateur (et iOS/tablettes sont stricts). Le terminal demande **un seul contact** au premier affichage (bandeau « Touchez l'écran pour activer le son »), qui démarre l'`AudioContext` Web Audio de façon **persistante** → chaque badge suivant joue sa voix **automatiquement**, sans retoucher l'écran. Les fichiers WAV ne sont **téléchargés qu'à ce premier contact** : la page (et son QR-scanner) démarre sans attendre ~690 ko d'audio au chargement. Bouton 🔊/🔇 en haut à droite.
+- **Accessibilité** : le zoom tactile reste permis (`maximum-scale=5`, plus de `user-scalable=no`). La page est marquée `noindex` (et bloquée par `robots.txt`) — seul outil interne, pas d'indexation.
 
 > Sur Windows, npm 11 bloque les scripts d'installation des moteurs Prisma : la config `allowScripts` dans `backend/package.json` règle ce point. Le miroir `registry.npmmirror.com` dans `.npmrc` facilite l'install si le réseau est instable.
 

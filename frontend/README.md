@@ -73,6 +73,8 @@ Il se teste indépendamment (aucun build requis en dev).
 | Route | Contenu | Accès |
 |---|---|---|
 | `/login` · `/inscription` · `/oublie` · `/reinitialisation` | Auth publique | public |
+| `/confidentialite` | Politique de confidentialité (RGPD) — liens depuis `/login` et le menu | public |
+| `/cgv-cgu` | CGU + mentions légales — idem | public |
 | `/` | Tableau de bord : KPIs, pointages récents | tous |
 | `/ouvriers` | CRUD ouvriers, **édition** (nom/prénom/matricule/téléphone, **départements multi-coches**), import `.csv`/`.xlsx`, activer/désactiver le badge | lecture : tous · écriture : ADMIN/SUPER |
 | `/badges` | Badges QR (aperçu, **filtre département**, ZIP) | tous · export : ADMIN/SUPER |
@@ -81,6 +83,12 @@ Il se teste indépendamment (aucun build requis en dev).
 | `/gestion-departements` | Créer / lister / renommer / exporter les départements | ADMIN/SUPER |
 | `/rapports` | Rapport du jour/département, présent/absent, envoi email | lecture : tous · CSV/email : ADMIN/SUPER |
 | `/gestion-admins` | Comptes admin : rôles, activation, déblocage, réinit, suppression | SUPER_ADMIN |
+
+Toute URL inconnue affiche la **page 404** (`NotFoundPage`). Les pages du
+dashboard définissent chacune un `<title>` + meta description (`usePageMeta`
+dans `src/hooks/`) ; `index.html` porte les balises **OG**/**Twitter**,
+`favicon.svg`, `theme-color` et le canonical, et `public/` contient
+`robots.txt` + `sitemap.xml`.
 
 ### Postes dans les départements
 
@@ -105,9 +113,15 @@ interaction**. Comportement attendu :
   apparaît si le navigateur bloque la lecture.
 - **Un seul contact suffit** : il démarre l'`AudioContext` Web Audio
   (persistant) ; **chaque badge suivant joue son annonce automatiquement**,
-  sans retoucher l'écran.
+  sans retoucher l'écran. Les WAV ne sont **chargés qu'à ce premier contact**
+  (page allégée au démarrage).
 - Bouton 🔊/🔇 (en haut à droite) pour couper/réactiver le son
   (mémorisé dans `localStorage`).
+
+> **Accessibilité & indexation** : le zoom tactile est conservé
+> (`maximum-scale=5`) ; le terminal est `noindex` (outil interne, pas de
+> référencement) et bloque le suivi dans `robots.txt`. La page porte les
+> balises `theme-color`, favicon SVG et meta description.
 
 > Les fichiers sont dans `frontend/terminal/audio/`. Le build Vercel les copie
 > dans `backend/public/terminal/audio/`. Si le son ne change pas après une mise

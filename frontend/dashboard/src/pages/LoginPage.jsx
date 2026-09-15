@@ -3,11 +3,16 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { setSession } from "../lib/auth";
 import { C } from "../theme";
+import { usePageMeta } from "../hooks/usePageMeta";
 import Btn from "../ui/Btn";
 import { Input } from "../ui/inputs";
 import rsiLogo from "../assets/rsi-logo.png";
 
 export default function LoginPage() {
+  usePageMeta(
+    "Connexion — RSI",
+    "Espace d'administration de l'application de présence par badgeage QR de la RSI."
+  );
   const navigate = useNavigate();
   const location = useLocation();
   const inscription = Boolean(location.state?.inscription);
@@ -136,6 +141,18 @@ export default function LoginPage() {
           <Link to="/inscription" className="font-medium hover:text-red-700 transition-colors">
             Créer un compte
           </Link>
+        </p>
+
+        <p className="text-center text-[10px] leading-relaxed text-slate-500 border-t border-slate-100 pt-3">
+          En vous connectant, vous acceptez les{" "}
+          <Link to="/cgv-cgu" className="underline hover:text-red-700 transition-colors">
+            conditions d'utilisation
+          </Link>{" "}
+          et notre{" "}
+          <Link to="/confidentialite" className="underline hover:text-red-700 transition-colors">
+            politique de confidentialité
+          </Link>
+          . Vos données restent hébergées par la RSI, aucun cookie publicitaire n'est utilisé.
         </p>
       </form>
     </div>

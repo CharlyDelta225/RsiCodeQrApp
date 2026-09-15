@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { C } from "../theme";
+import { usePageMeta } from "../hooks/usePageMeta";
 import Btn from "../ui/Btn";
 import { Input } from "../ui/inputs";
 import rsiLogo from "../assets/rsi-logo.png";
@@ -12,6 +13,10 @@ import rsiLogo from "../assets/rsi-logo.png";
  * Pose un nouveau mot de passe ; le lien est à usage unique et expire au bout d'une heure.
  */
 export default function ReinitialisationPage() {
+  usePageMeta(
+    "Réinitialiser le mot de passe — RSI",
+    "Définition d'un nouveau mot de passe pour l'application de présence RSI."
+  );
   const [params] = useSearchParams();
   const token = params.get("token") || "";
   const email = params.get("email") || "";

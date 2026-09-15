@@ -18,7 +18,7 @@ export default function PaginationBar({ page, totalPages, onPage, total, label =
   return (
     <div className="flex flex-wrap items-center justify-center gap-1.5 pt-2 text-sm">
       {total !== undefined && (
-        <span className="text-xs text-slate-400 mr-2 whitespace-nowrap">
+        <span className="text-xs text-slate-500 mr-2 whitespace-nowrap">
           {total} {label}
         </span>
       )}

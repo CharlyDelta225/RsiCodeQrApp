@@ -84,7 +84,7 @@ export default function PointagesJourPage() {
             {total} pointage(s) sur la période
           </h2>
           {derniereMaj && (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Actualisé à {derniereMaj.toLocaleTimeString("fr-FR")} · rafraîchissement automatique toutes les 15s
             </p>
           )}

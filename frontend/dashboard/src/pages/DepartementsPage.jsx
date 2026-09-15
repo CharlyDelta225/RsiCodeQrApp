@@ -272,7 +272,7 @@ export default function DepartementsPage() {
           Département
         </label>
         {chargement ? (
-          <div className="text-sm text-slate-400 py-1.5">Chargement…</div>
+          <div className="text-sm text-slate-500 py-1.5">Chargement…</div>
         ) : (
           <Select
             id="select-departement"
@@ -306,11 +306,11 @@ export default function DepartementsPage() {
         </div>
 
         {chargementDetail && (
-          <div className="text-sm text-slate-400 text-center py-10">Chargement des membres…</div>
+          <div className="text-sm text-slate-500 text-center py-10">Chargement des membres…</div>
         )}
 
         {!chargementDetail && selection && nbMembres === 0 && (
-          <div className="text-sm text-slate-400 text-center py-10">Aucun membre dans ce département.</div>
+          <div className="text-sm text-slate-500 text-center py-10">Aucun membre dans ce département.</div>
         )}
 
         {!chargementDetail && selection && nbMembres > 0 && (
@@ -334,7 +334,7 @@ export default function DepartementsPage() {
                     <button
                       onClick={() => ouvrirEdition(m)}
                       title={`Modifier ${m.ouvrier?.prenom} ${m.ouvrier?.nom}`}
-                      className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-white hover:border-transparent transition ml-auto"
+                      className="w-9 h-9 flex items-center justify-center rounded-full text-slate-500 bg-slate-50 border border-slate-200 hover:text-white hover:border-transparent transition ml-auto"
                       onMouseEnter={(e) => (e.currentTarget.style.background = C.btn)}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                     >
@@ -369,13 +369,13 @@ export default function DepartementsPage() {
                 <h2 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Poppins,sans-serif" }}>
                   {edition.ouvrier?.prenom} {edition.ouvrier?.nom}
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   {edition.ouvrier?.matricule} · {selection?.nom}
                 </p>
               </div>
               <button
                 onClick={() => setEdition(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
               >
                 ✕
               </button>
@@ -407,7 +407,7 @@ export default function DepartementsPage() {
                     </option>
                   ))}
                 </Select>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500">
                   Un seul responsable et un seul adjoint par département.
                 </p>
               </div>

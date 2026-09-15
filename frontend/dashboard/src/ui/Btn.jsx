@@ -44,7 +44,9 @@ export default function Btn({
 
   const isSolide = variant in solides;
   const cls = isSolide
-    ? "text-white shadow-sm hover:opacity-90"
+    ? variant === "gold"
+      ? "text-[#3A0606] font-semibold shadow-sm hover:opacity-90"
+      : "text-white shadow-sm hover:opacity-90"
     : neutres[variant] || neutres.ghost;
 
   return (

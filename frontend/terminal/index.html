@@ -2,8 +2,12 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
 <title>Terminal — Scan Badge</title>
+<meta name="description" content="Terminal de badgeage QR de la RSI : présentez le badge devant la caméra pour pointer votre présence." />
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#5A0A0A" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <script src="/terminal/html5-qrcode.min.js"></script>
 <style>
   body {
@@ -102,7 +106,7 @@
     return ctx;
   }
 
-  // Décodage des WAV une seule fois → lecture instantanée et durable (iOS compris).
+  // Décodage des WAV (lazy) : appelé au premier contact (voir debloquerSon).
   async function prechargerAudio() {
     const c = obtenirCtx();
     if (!c) return;
@@ -114,7 +118,6 @@
       } catch (e) {}
     }
   }
-  prechargerAudio();
 
   // Lecture via Web Audio : autorisée automatiquement une fois l'AudioContext
   // démarré (≈ aucune restriction d'autoplay ensuite).
@@ -162,10 +165,16 @@
 
   // À appeler sur n'importe quel contact : démarre l'AudioContext UNE fois.
   // Tous les badges suivants joueront automatiquement, sans retoucher l'écran.
+  // Les WAV ne sont chargés qu'à ce moment-là → la page (re)charge vite.
+  let audioCharge = false;
   function debloquerSon() {
     cacherBandeauSon();
     if (sonCoupe || audioDebloque) return;
     audioDebloque = true;
+    if (!audioCharge) {
+      audioCharge = true;
+      prechargerAudio();
+    }
     const c = obtenirCtx();
     if (c && c.state !== "running" && c.resume) {
       c.resume().then(() => jouerSon("succes", 0)).catch((e) => {});

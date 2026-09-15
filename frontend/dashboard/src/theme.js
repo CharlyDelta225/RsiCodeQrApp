@@ -9,7 +9,7 @@ export const C = {
   header: "linear-gradient(135deg,#5A0A0A 0%,#8B1A1A 100%)",
   btn: "linear-gradient(135deg,#C0392B,#922B21)",
   gold: "linear-gradient(135deg,#D4A017 0%,#8B6914 100%)",
-  avatar: "linear-gradient(135deg,#D4A017,#C0392B)",
+  avatar: "linear-gradient(135deg,#B08612,#932A1F)",
 };
 
 // Navigation adaptée à nos vraies entités (ouvriers/pointages/badges/

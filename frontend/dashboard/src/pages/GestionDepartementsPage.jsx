@@ -211,9 +211,9 @@ export default function GestionDepartementsPage() {
         )}
 
         {chargement ? (
-          <div className="text-sm text-slate-400 text-center py-10">Chargement…</div>
+          <div className="text-sm text-slate-500 text-center py-10">Chargement…</div>
         ) : departementsFiltres.length === 0 ? (
-          <div className="text-sm text-slate-400 text-center py-10">Aucun département.</div>
+          <div className="text-sm text-slate-500 text-center py-10">Aucun département.</div>
         ) : (
           <TableShell
             colonnes={["Nom", "Description", "Membres", "Actions"]}
@@ -222,7 +222,7 @@ export default function GestionDepartementsPage() {
             {pagination.elementsPage.map((d) => (
               <tr key={d.id} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
                 <td className="px-3 py-2.5 text-slate-700">{d.nom}</td>
-                <td className="px-3 py-2.5 text-slate-400 text-xs">{d.description || "—"}</td>
+                <td className="px-3 py-2.5 text-slate-500 text-xs">{d.description || "—"}</td>
                 <td className="px-3 py-2.5 text-slate-500">{d._count?.membres ?? 0}</td>
                 <td className="px-3 py-2.5 text-right whitespace-nowrap">
                   {peutEcrire() ? (
@@ -235,7 +235,7 @@ export default function GestionDepartementsPage() {
                           setFormRenommage({ nom: d.nom });
                         }}
                         title={`Renommer ${d.nom}`}
-                        className="w-8 h-8 rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-bordeaux-700 hover:border-bordeaux-200 transition"
+                        className="w-8 h-8 rounded-full text-slate-500 bg-slate-50 border border-slate-200 hover:text-bordeaux-700 hover:border-bordeaux-200 transition"
                       >
                         ✏
                       </button>
@@ -243,7 +243,7 @@ export default function GestionDepartementsPage() {
                         onClick={() => demanderSuppression(d)}
                         disabled={enGestion}
                         title={`Supprimer ${d.nom}`}
-                        className="w-8 h-8 rounded-full text-slate-400 bg-slate-50 border border-slate-200 hover:text-bordeaux-700 hover:border-bordeaux-200 disabled:opacity-40 transition"
+                        className="w-8 h-8 rounded-full text-slate-500 bg-slate-50 border border-slate-200 hover:text-bordeaux-700 hover:border-bordeaux-200 disabled:opacity-40 transition"
                       >
                         🗑
                       </button>
@@ -276,7 +276,7 @@ export default function GestionDepartementsPage() {
               </h2>
               <button
                 onClick={() => setCreationOuvert(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
               >
                 ✕
               </button>
@@ -324,7 +324,7 @@ export default function GestionDepartementsPage() {
               </h2>
               <button
                 onClick={() => setRenommage(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
               >
                 ✕
               </button>

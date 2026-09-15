@@ -41,7 +41,7 @@ export default function TableShell({
           {chargement ? (
             <tr>
               <td colSpan={n} className="px-3 py-8 text-center">
-                <span className="inline-flex items-center gap-2 text-slate-400">
+                <span className="inline-flex items-center gap-2 text-slate-500">
                   <Spinner size="sm" />
                   <span className="text-xs">Chargement…</span>
                 </span>
@@ -49,7 +49,7 @@ export default function TableShell({
             </tr>
           ) : nbLignes === 0 && vide ? (
             <tr>
-              <td colSpan={n} className="px-3 py-8 text-center text-sm text-slate-400">
+              <td colSpan={n} className="px-3 py-8 text-center text-sm text-slate-500">
                 {vide}
               </td>
             </tr>

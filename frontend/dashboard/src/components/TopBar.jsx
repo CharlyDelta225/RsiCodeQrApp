@@ -22,7 +22,7 @@ export default function TopBar({ title, subtitle, onMenuToggle, onDeconnexion, a
         <h1 className="text-sm md:text-base font-bold text-gray-900 truncate" style={{ fontFamily: "Poppins,sans-serif" }}>
           {title}
         </h1>
-        {subtitle && <p className="text-[10px] text-gray-400 hidden sm:block truncate">{subtitle}</p>}
+        {subtitle && <p className="text-[10px] text-gray-600 hidden sm:block truncate">{subtitle}</p>}
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
@@ -35,7 +35,7 @@ export default function TopBar({ title, subtitle, onMenuToggle, onDeconnexion, a
         <button
           onClick={onDeconnexion}
           title="Se déconnecter"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
         >
           <span className="text-base leading-none">⏻</span>
         </button>

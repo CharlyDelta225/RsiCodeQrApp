@@ -323,7 +323,7 @@ export default function GestionAdminsPage() {
       )}
 
       {chargement ? (
-        <p className="text-sm text-slate-400 text-center py-8">Chargement…</p>
+        <p className="text-sm text-slate-500 text-center py-8">Chargement…</p>
       ) : (
         <>
           {/* ─── CARTES MOBILE (<md) ─── */}
@@ -341,7 +341,7 @@ export default function GestionAdminsPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-slate-800 truncate">
-                        {a.email} {moiMeme && <span className="text-[10px] uppercase text-slate-400">(vous)</span>}
+                        {a.email} {moiMeme && <span className="text-[10px] uppercase text-slate-500">(vous)</span>}
                       </p>
                       {a.tentativesEchouees > 0 && !a.bloqueJusqua && (
                         <p className="text-[11px] text-orange-600">
@@ -354,7 +354,7 @@ export default function GestionAdminsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <SelecteurRole admin={a} moiMeme={moiMeme} surChangement={changerRole} />
                     <Statut admin={a} />
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-slate-500">
                       Créé le {new Date(a.createdAt).toLocaleDateString("fr-FR")}
                     </span>
                   </div>
@@ -386,7 +386,7 @@ export default function GestionAdminsPage() {
                     <tr key={a.id} className="border-b border-slate-100 last:border-b-0 align-middle">
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-800">
-                          {a.email} {moiMeme && <span className="text-[10px] uppercase text-slate-400">(vous)</span>}
+                          {a.email} {moiMeme && <span className="text-[10px] uppercase text-slate-500">(vous)</span>}
                         </p>
                         {a.tentativesEchouees > 0 && !a.bloqueJusqua && (
                           <p className="text-[11px] text-orange-600">

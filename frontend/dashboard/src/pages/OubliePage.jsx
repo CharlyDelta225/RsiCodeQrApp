@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { C } from "../theme";
+import { usePageMeta } from "../hooks/usePageMeta";
 import Btn from "../ui/Btn";
 import { Input } from "../ui/inputs";
 import rsiLogo from "../assets/rsi-logo.png";
@@ -13,6 +14,10 @@ import rsiLogo from "../assets/rsi-logo.png";
  * quels comptes existent).
  */
 export default function OubliePage() {
+  usePageMeta(
+    "Mot de passe oublié — RSI",
+    "Demande de réinitialisation du mot de passe de l'application de présence RSI."
+  );
   const [email, setEmail] = useState("");
   const [envoye, setEnvoye] = useState(false);
   const [erreur, setErreur] = useState(null);

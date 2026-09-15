@@ -253,7 +253,7 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-bordeaux-900">Vue d'ensemble</h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {derniereMaj
               ? `Actualisé à ${derniereMaj.toLocaleTimeString("fr-FR")} · auto toutes les 45 s`
               : "Chargement des indicateurs…"}
@@ -311,7 +311,7 @@ export default function DashboardPage() {
       </div>
 
       {chargement && (
-        <div className="flex items-center justify-center gap-2 text-slate-400 py-8">
+        <div className="flex items-center justify-center gap-2 text-slate-500 py-8">
           <Spinner size="sm" />
           <span className="text-sm">Chargement des graphiques…</span>
         </div>
@@ -326,7 +326,7 @@ export default function DashboardPage() {
                 <h3 className="text-sm font-semibold text-gray-800 mb-1">
                   Présences — {echelle === "30" ? "30" : "7"} derniers jours
                 </h3>
-                <p className="text-xs text-slate-400 mb-3">Nombre de badgeages par jour</p>
+                <p className="text-xs text-slate-500 mb-3">Nombre de badgeages par jour</p>
               </div>
               <EchelleSelector echelle={echelle} onEchelle={setEchelle} />
             </div>
@@ -355,7 +355,7 @@ export default function DashboardPage() {
             <h3 className="text-sm font-semibold text-gray-800 mb-1">
               Arrivées aujourd'hui par heure
             </h3>
-            <p className="text-xs text-slate-400 mb-3">Pic d'activité de la journée</p>
+            <p className="text-xs text-slate-500 mb-3">Pic d'activité de la journée</p>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dataParHeure} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
@@ -377,13 +377,13 @@ export default function DashboardPage() {
             <h3 className="text-sm font-semibold text-gray-800 mb-1">
               Présents aujourd'hui par département
             </h3>
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-slate-500 mb-3">
               {pointagesAuj.length === 0
                 ? "Aucun badgeage pour le moment"
                 : `${pointagesAuj.length} badgeage(s) enregistré(s) — cliquez sur un segment pour les détails`}
             </p>
             {dataParDept.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-10">
+              <p className="text-sm text-slate-500 text-center py-10">
                 Les données apparaîtront dès les premiers scans de la journée
               </p>
             ) : (
@@ -434,7 +434,7 @@ export default function DashboardPage() {
                       >
                         {centreValeur ?? "…"}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-1">{centreLibelle}</p>
+                      <p className="text-[10px] text-slate-500 mt-1">{centreLibelle}</p>
                     </div>
                   </div>
 
@@ -465,7 +465,7 @@ export default function DashboardPage() {
                           <span className="text-[11px] font-semibold text-gray-800 tabular-nums flex-shrink-0">
                             {d.value}
                           </span>
-                          <span className="w-11 text-right text-[11px] text-slate-400 tabular-nums flex-shrink-0">
+                          <span className="w-11 text-right text-[11px] text-slate-500 tabular-nums flex-shrink-0">
                             {pct.toFixed(0)}%
                           </span>
                         </button>
@@ -484,7 +484,7 @@ export default function DashboardPage() {
                       <button
                         type="button"
                         onClick={() => setDeptSelectionne(null)}
-                        className="text-[11px] font-medium text-slate-400 hover:text-bordeaux-700 transition-colors"
+                        className="text-[11px] font-medium text-slate-500 hover:text-bordeaux-700 transition-colors"
                       >
                         ✕ Fermer
                       </button>
@@ -498,7 +498,7 @@ export default function DashboardPage() {
                           <span className="text-xs text-slate-700 truncate flex-1 min-w-0">
                             {m.nom}
                           </span>
-                          <span className="text-[10px] font-mono text-slate-400 flex-shrink-0">
+                          <span className="text-[10px] font-mono text-slate-500 flex-shrink-0">
                             {m.matricule}
                           </span>
                           <span className="text-[10px] font-semibold text-bordeaux-700 tabular-nums flex-shrink-0">

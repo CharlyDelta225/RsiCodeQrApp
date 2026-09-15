@@ -4,6 +4,7 @@ import { Sidebar, MobileDrawer } from "../components/Sidebar";
 import TopBar from "../components/TopBar";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { pageTitles } from "../theme";
+import { usePageMeta } from "../hooks/usePageMeta";
 import { getAdmin, logout, startInactivityWatcher, stopInactivityWatcher } from "../lib/auth";
 
 export default function DashboardLayout() {
@@ -12,6 +13,11 @@ export default function DashboardLayout() {
   const location = useLocation();
   const admin = getAdmin();
   const { title, subtitle } = pageTitles[location.pathname] || { title: "RsiCodeQrApp" };
+
+  usePageMeta(
+    `${title} — RSI`,
+    `${subtitle || "Application de présence par badgeage QR"}. RSI — Présence.`
+  );
 
   // Déconnexion auto après 10 min d'inactivité
   useEffect(() => {

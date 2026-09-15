@@ -515,7 +515,7 @@ export default function OuvriersPage() {
             <Field label="Département(s)" hint="Cochez les départements auquels l'ouvrier appartient — appliqué lors de l'enregistrement.">
               <div className="border border-slate-200 rounded-lg p-2 max-h-44 overflow-y-auto space-y-1 bg-white">
                 {departements.length === 0 && (
-                  <p className="text-xs text-slate-400">Aucun département configuré.</p>
+                  <p className="text-xs text-slate-500">Aucun département configuré.</p>
                 )}
                 {departements.map((d) => {
                   const coche = formModification.departements.includes(d.nom);
@@ -538,7 +538,7 @@ export default function OuvriersPage() {
                 })}
               </div>
             </Field>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
+            <p className="text-[11px] text-slate-500 leading-relaxed">
               Un changement de matricule génère un nouveau QR code : pensez à ré-imprimer le badge.
             </p>
             <div className="flex justify-end gap-2 pt-2">

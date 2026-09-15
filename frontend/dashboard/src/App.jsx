@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import RequireRole from "./components/RequireRole.jsx";
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
@@ -9,6 +9,9 @@ const LoginPage = lazy(() => import("./pages/LoginPage.jsx"));
 const InscriptionPage = lazy(() => import("./pages/InscriptionPage.jsx"));
 const OubliePage = lazy(() => import("./pages/OubliePage.jsx"));
 const ReinitialisationPage = lazy(() => import("./pages/ReinitialisationPage.jsx"));
+const ConfidentialitePage = lazy(() => import("./pages/ConfidentialitePage.jsx"));
+const CguPage = lazy(() => import("./pages/CguPage.jsx"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage.jsx"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
 const OuvriersPage = lazy(() => import("./pages/OuvriersPage.jsx"));
 const BadgesPage = lazy(() => import("./pages/BadgesPage.jsx"));
@@ -24,7 +27,7 @@ function PageChargement() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-[#FDF6F0]">
       <Spinner />
-      <p className="text-xs text-slate-400">Chargement…</p>
+      <p className="text-xs text-slate-500">Chargement…</p>
     </div>
   );
 }
@@ -37,6 +40,8 @@ export default function App() {
         <Route path="/inscription" element={<InscriptionPage />} />
         <Route path="/oublie" element={<OubliePage />} />
         <Route path="/reinitialisation" element={<ReinitialisationPage />} />
+        <Route path="/confidentialite" element={<ConfidentialitePage />} />
+        <Route path="/cgv-cgu" element={<CguPage />} />
 
         <Route
           element={
@@ -78,7 +83,7 @@ export default function App() {
           />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
   );

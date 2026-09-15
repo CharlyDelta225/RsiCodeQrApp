@@ -23,7 +23,7 @@ export default function Card({
               </h3>
             )}
             {description && (
-              <p className="text-xs text-slate-400 mt-0.5">{description}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{description}</p>
             )}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}

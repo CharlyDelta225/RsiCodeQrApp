@@ -232,7 +232,7 @@ export default function MigrationOuvrierPage() {
                           onClick={() => demanderRetrait(o, l)}
                           disabled={enMise}
                           title={`Retirer ${o.nom} ${o.prenom} du département ${l.departement?.nom ?? ""}`}
-                          className="w-4 h-4 rounded-full text-slate-400 hover:bg-bordeaux-600 hover:text-white transition disabled:opacity-40"
+                          className="w-4 h-4 rounded-full text-slate-500 hover:bg-bordeaux-600 hover:text-white transition disabled:opacity-40"
                         >
                           ✕
                         </button>
@@ -240,7 +240,7 @@ export default function MigrationOuvrierPage() {
                     ))}
                   </span>
                 ) : (
-                  <span className="text-xs text-slate-400">Aucun département</span>
+                  <span className="text-xs text-slate-500">Aucun département</span>
                 )}
               </td>
               <td className="px-3 py-2.5 text-right whitespace-nowrap">
@@ -272,13 +272,13 @@ export default function MigrationOuvrierPage() {
                 <h2 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Poppins,sans-serif" }}>
                   Affecter à un département
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   {migration.matricule} · {migration.nom} {migration.prenom}
                 </p>
               </div>
               <button
                 onClick={fermerMigration}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
               >
                 ✕
               </button>

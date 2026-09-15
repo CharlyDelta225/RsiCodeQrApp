@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { C, navItems } from "../theme";
 import { roleAdmin, libelleRole } from "../lib/auth";
 import rsiLogo from "../assets/rsi-logo.png";
@@ -62,7 +62,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
           <img src={rsiLogo} alt="RSI" className="w-9 h-9 object-contain rounded-full flex-shrink-0" />
           <div className="min-w-0">
             <p className="text-white font-bold text-sm leading-tight">RSI</p>
-            <p className="text-white/50 text-[10px] leading-tight truncate">Présence — Badgeage QR</p>
+            <p className="text-white/80 text-[10px] leading-tight truncate">Présence — Badgeage QR</p>
           </div>
         </div>
         {onClose && (
@@ -88,7 +88,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-white text-xs font-semibold truncate">{admin?.email || "…"}</p>
-            <p className="text-white/50 text-[10px]">{libelleRole(admin?.role)}</p>
+            <p className="text-white/80 text-[10px]">{libelleRole(admin?.role)}</p>
           </div>
           <button
             onClick={onDeconnexion}
@@ -98,6 +98,14 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
             <span className="text-sm leading-none">⏻</span>
           </button>
         </div>
+        <p className="mt-2.5 pt-2.5 border-t border-white/10 text-[10px] flex flex-wrap gap-x-3">
+          <Link to="/confidentialite" className="text-white/70 hover:text-white transition-colors">
+            Confidentialité
+          </Link>
+          <Link to="/cgv-cgu" className="text-white/70 hover:text-white transition-colors">
+            CGU
+          </Link>
+        </p>
       </div>
     </>
   );

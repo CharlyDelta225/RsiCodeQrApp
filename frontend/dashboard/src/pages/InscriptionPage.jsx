@@ -2,11 +2,16 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { C } from "../theme";
+import { usePageMeta } from "../hooks/usePageMeta";
 import Btn from "../ui/Btn";
 import { Input } from "../ui/inputs";
 import rsiLogo from "../assets/rsi-logo.png";
 
 export default function InscriptionPage() {
+  usePageMeta(
+    "Créer un compte — RSI",
+    "Création d'un compte administrateur pour l'application de présence par badgeage QR de la RSI."
+  );
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
