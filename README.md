@@ -237,7 +237,7 @@ UNIQUE (ouvrierId, jour)   → migration 20260912090000_anti_double_badgeage
 
 | Méthode | Route | Description |
 |---|---|---|
-| `POST` | `/api/badgeage` | Badgeage : `{ "matricule" }` → infos ouvrier + pointage. **Un seul badgeage par jour civil**, verrouillé en base (colonne `jour` + index unique `(ouvrierId, jour)`) : même deux requêtes simultanées, une seule aboutit, l'autre reçoit `409 DEJA_BADGE_AUJOURDHUI` (heure UTC) |
+| `POST` | `/api/badgeage` | Badgeage : `{ "matricule" }` → infos ouvrier + pointage. **Un seul badgeage par jour civil**, verrouillé en base (colonne `jour` + index unique `(ouvrierId, jour)`) : même deux requêtes simultanées, une seule aboutit, l'autre reçoit `409 DEJA_BADGE_AUJOURDHUI` (« Vous avez déjà badgé ») |
 
 ### Authentification
 

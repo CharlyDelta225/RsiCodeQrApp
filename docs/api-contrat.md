@@ -55,15 +55,15 @@ Appelé à chaque scan du QR par le terminal.
 | 400 | `MATRICULE_MANQUANT` | Le champ matricule est requis |
 | 404 | `BADGE_INCONNU` | Badge inconnu |
 | 403 | `BADGE_DESACTIVE` | Badge désactivé |
-| 409 | `DEJA_BADGE_AUJOURDHUI` | Vous avez déjà badgé aujourd'hui à HH:MM |
+| 409 | `DEJA_BADGE_AUJOURDHUI` | Vous avez déjà badgé |
 | 500 | `ERREUR_INTERNE` | Erreur interne |
 
 > **Anti double-badge** : un ouvrier ne peut badger qu'**une seule fois par jour
 > civil** (heure serveur, UTC). La règle est **verrouillée en base** (colonne
 > `jour` Date + index unique `(ouvrierId, jour)`) : même deux requêtes
 > simultanées, une seule crée le pointage, l'autre reçoit `409 DEJA_BADGE_AUJOURDHUI`
-> avec l'heure du premier badgeage (message suffixé « (heure UTC) ») — le
-> terminal doit l'afficher (ex : fond orange).
+> avec le message « Vous avez déjà badgé » — le terminal doit l'afficher
+> (ex : fond orange).
 >
 > Le terminal affiche nom/prénom/département sur fond vert ; sur `BADGE_INCONNU`
 > ou `BADGE_DESACTIVE`, il affiche le `message` sur fond rouge.
@@ -645,6 +645,7 @@ CRON_SECRET=secret-partage-pour-la-route-cron
 
 | Date | Changement |
 |---|---|
+| 2026-09-15 | **Message « déjà badgé » simplifié** : `409 DEJA_BADGE_AUJOURDHUI` ne renvoie plus l'heure UTC du premier badgeage ; message fixe **« Vous avez déjà badgé »** (terminal plus simple à lire) |
 | 2026-09-15 | **Système de logs** : mini-logger maison (`backend/src/lib/logger.js`, zéro dépendance) remplaçant tous les `console.*`. Sortie **toujours** en stdout (capturée par Vercel en prod) + fichier tournant `backend/logs/app-<jour>.log` par défaut hors prod. Middleware HTTP ajouté dans `app.js` : chaque requête reçoit un `requestId` (UUID, renvoyé dans l'en-tête `X-Request-Id`) et est logguée (méthode, path, status, durée, IP, admin). Variables `LOG_LEVEL` (défaut `info`) et `LOG_FILE` ajoutées au `.env.example` ; les erreurs du handler central logguent désormais avec `requestId` |
 | 2026-09-15 | **UX ouvriers & départements** : dans la page `/ouvriers`, le champ département de la popup **Modifier** passe en liste déroulante puis en **multi-départements par cases à cocher** — à l'enregistrement, les départements cochés sont affectés via `POST /api/departements/:id/membres` et les décochés retirés via `DELETE /api/departements/:id/membres/:ouvrierId` (un ouvrier peut appartenir à plusieurs départements). Popup `ConfirmDialog` sur **Retirer du département** et **Supprimer** dans la page `/departements`. Filtre **Département** (tous / sans département / un département précis) ajouté sur `/migration-ouvrier` |
 | 2026-09-14 | **Téléphone des ouvriers** : champ `telephone` (optionnel, string) ajouté au modèle Ouvrier (migration `20260914170000_ajout_telephone_ouvrier`). Retourné par `GET/POST/PATCH /api/ouvriers` et dans les membres des départements. **Import devenu 4 colonnes obligatoires** : `Nom,Prénom,Département,Téléphone` (numéros « propres » lus en mode `raw:false` → les `0` initiaux des numéros français `06…`/`07…` sont préservés). Écran ouvriers du dashboard : colonne Téléphone + champ (obligatoire à la création manuelle) partout où les ouvriers sont listés (Ouvriers, Badges, Migration, Départements). **Migration ouvrier** : nouvelle page `/migration-ouvrier` (ADMIN/SUPER_ADMIN) pour affecter un ouvrier à un département (poste au choix, popup « déjà membre », retrait par département) via `POST /api/departements/:id/membres` |
