@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
 import prisma from "../lib/prisma.js";
@@ -126,7 +127,7 @@ router.post("/", limiterBadgeage, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("[BADGEAGE]", err);
+    logger.error("[BADGEAGE]", err);
     return res.status(500).json({
       ok: false,
       code: "ERREUR_INTERNE",

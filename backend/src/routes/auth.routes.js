@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import crypto from "node:crypto";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
@@ -114,7 +115,7 @@ router.post("/register", async (req, res) => {
       "Si votre adresse n'était pas déjà enregistrée, un compte vient d'être créé. Vous pouvez vous connecter.";
     return res.json({ ok: true, message: MESSAGE_NEUTRE });
   } catch (err) {
-    console.error("[AUTH/REGISTER]", err);
+    logger.error("[AUTH/REGISTER]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -219,7 +220,7 @@ router.post("/login", async (req, res) => {
       admin: { id: admin.id, email: admin.email, role: admin.role },
     });
   } catch (err) {
-    console.error("[AUTH/LOGIN]", err);
+    logger.error("[AUTH/LOGIN]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -277,7 +278,7 @@ router.post("/reset-demand", limiterAuth, async (req, res) => {
         ].join("\n"),
       });
     } catch (err) {
-      console.error("[AUTH/RESET_DEMAND/EMAIL]", err);
+      logger.error("[AUTH/RESET_DEMAND/EMAIL]", err);
     }
 
     // Réponse volontairement neutre : pas d'indice (emailEnvoye, statut) qui
@@ -287,7 +288,7 @@ router.post("/reset-demand", limiterAuth, async (req, res) => {
       message: "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.",
     });
   } catch (err) {
-    console.error("[AUTH/RESET_DEMAND]", err);
+    logger.error("[AUTH/RESET_DEMAND]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -340,7 +341,7 @@ router.post("/reset", async (req, res) => {
 
     return res.json({ ok: true, message: "Mot de passe réinitialisé. Vous pouvez vous connecter." });
   } catch (err) {
-    console.error("[AUTH/RESET]", err);
+    logger.error("[AUTH/RESET]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -360,7 +361,7 @@ router.get("/me", requireAuth, async (req, res) => {
     }
     return res.json({ ok: true, admin });
   } catch (err) {
-    console.error("[AUTH/ME]", err);
+    logger.error("[AUTH/ME]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });

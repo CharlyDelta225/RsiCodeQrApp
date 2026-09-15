@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import crypto from "node:crypto";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
@@ -67,7 +68,7 @@ async function envoyerIdentifiants({ email, motDePasse, type }) {
     });
     return { emailEnvoye: true };
   } catch (err) {
-    console.error("[ADMINS/EMAIL]", err);
+    logger.error("[ADMINS/EMAIL]", err);
     return { emailEnvoye: false, motDePasseTemporaire: motDePasse };
   }
 }
@@ -93,7 +94,7 @@ router.get("/", SUPER_SEULEMENT, async (_req, res) => {
     });
     return res.json({ ok: true, admins });
   } catch (err) {
-    console.error("[ADMINS/LISTE]", err);
+    logger.error("[ADMINS/LISTE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -152,7 +153,7 @@ router.post("/", SUPER_SEULEMENT, async (req, res) => {
     if (err.code === "P2002") {
       return res.status(409).json({ ok: false, code: "EMAIL_EXISTANT", message: "Cet email est déjà enregistré" });
     }
-    console.error("[ADMINS/CREATION]", err);
+    logger.error("[ADMINS/CREATION]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -190,7 +191,7 @@ router.patch("/:id/role", SUPER_SEULEMENT, async (req, res) => {
 
     return res.json({ ok: true, admin });
   } catch (err) {
-    console.error("[ADMINS/ROLE]", err);
+    logger.error("[ADMINS/ROLE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -213,7 +214,7 @@ router.patch("/:id/activer", SUPER_SEULEMENT, async (req, res) => {
     });
     return res.json({ ok: true, admin });
   } catch (err) {
-    console.error("[ADMINS/ACTIVER]", err);
+    logger.error("[ADMINS/ACTIVER]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -239,7 +240,7 @@ router.patch("/:id/desactiver", SUPER_SEULEMENT, async (req, res) => {
     });
     return res.json({ ok: true, admin });
   } catch (err) {
-    console.error("[ADMINS/DESACTIVER]", err);
+    logger.error("[ADMINS/DESACTIVER]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -262,7 +263,7 @@ router.patch("/:id/debloquer", SUPER_SEULEMENT, async (req, res) => {
     });
     return res.json({ ok: true, admin });
   } catch (err) {
-    console.error("[ADMINS/DEBLOQUER]", err);
+    logger.error("[ADMINS/DEBLOQUER]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -314,7 +315,7 @@ router.post("/:id/reinitialiser-mot-de-passe", SUPER_SEULEMENT, async (req, res)
       });
       emailEnvoye = true;
     } catch (err) {
-      console.error("[ADMINS/REINITIALISER_MDP/EMAIL]", err);
+      logger.error("[ADMINS/REINITIALISER_MDP/EMAIL]", err);
     }
 
     return res.json({
@@ -326,7 +327,7 @@ router.post("/:id/reinitialiser-mot-de-passe", SUPER_SEULEMENT, async (req, res)
         : "L'email n'a pas pu être envoyé : transmettez le lien ci-dessous à l'utilisateur.",
     });
   } catch (err) {
-    console.error("[ADMINS/REINITIALISER_MDP]", err);
+    logger.error("[ADMINS/REINITIALISER_MDP]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -361,7 +362,7 @@ router.delete("/:id", SUPER_SEULEMENT, async (req, res) => {
     if (err.code === "P2025") {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
-    console.error("[ADMINS/SUPPRESSION]", err);
+    logger.error("[ADMINS/SUPPRESSION]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });

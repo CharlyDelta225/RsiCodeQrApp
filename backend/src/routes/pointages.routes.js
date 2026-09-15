@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import { Router } from "express";
 import prisma from "../lib/prisma.js";
 
@@ -57,7 +58,7 @@ router.get("/", async (req, res) => {
 
     return res.json({ ok: true, total, page, limit, pointages });
   } catch (err) {
-    console.error("[POINTAGES/LISTE]", err);
+    logger.error("[POINTAGES/LISTE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });

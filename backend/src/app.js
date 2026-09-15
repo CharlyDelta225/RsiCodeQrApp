@@ -14,6 +14,7 @@ import adminsRoutes from "./routes/admins.routes.js";
 import departementsRoutes from "./routes/departements.routes.js";
 import rapportsRoutes from "./routes/rapports.routes.js";
 import cronRoutes from "./routes/cron.routes.js";
+import logger from "./lib/logger.js";
 
 dotenv.config();
 
@@ -77,6 +78,26 @@ app.use((req, res, next) => {
   return next();
 });
 app.use(express.json({ limit: "100kb" })); // parse le body JSON des requêtes
+
+// --- Logging HTTP : une ligne par requête (débogage) ---
+// Ajoute un requestId corrélable (et renvoyé dans l'en-tête X-Request-Id),
+// puis loggue méthode, chemin, status, durée et IP. Sortie console capturée
+// par Vercel en prod ; fichier backend/logs/ sinon.
+app.use((req, res, next) => {
+  req.requestId = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  res.setHeader("X-Request-Id", req.requestId);
+  const debut = Date.now();
+  res.on("finish", () => {
+    logger.info(`[HTTP] ${req.method} ${req.originalUrl || req.url}`, {
+      requestId: req.requestId,
+      status: res.statusCode,
+      dureeMs: Date.now() - debut,
+      ip: req.ip,
+      admin: req.admin?.id ?? null,
+    });
+  });
+  return next();
+});
 
 // --- Terminal de scan (kiosque) ---
 // Servi par le backend lui-même (et non un serveur statique séparé) car
@@ -168,7 +189,7 @@ app.use((req, res) => {
 // --- Gestion centralisée des erreurs ---
 // Ne JAMAIS renvoyer la stack technique au client.
 // eslint-disable-next-line no-unused-vars
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   // 413 : corps JSON trop gros (express.json limit)
   if (err.type === "entity.too.large") {
     return res.status(413).json({
@@ -199,7 +220,10 @@ app.use((err, _req, res, _next) => {
   // 403 : origine refusée par le filtre CORS (renvoyé directement par le
   // middleware dédié, aucun passage ici).
 
-  console.error("[ERREUR]", err);
+  logger.error("[API] Erreur interne", {
+    requestId: req.requestId,
+    erreur: err,
+  });
   res.status(500).json({
     ok: false,
     code: "ERREUR_INTERNE",

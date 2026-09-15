@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import { Router } from "express";
 import multer from "multer";
 import xlsx from "xlsx";
@@ -45,7 +46,7 @@ async function genererBadge(ouvrier) {
     const fichier = path.join(BADGES_DIR, `${ouvrier.matricule}.png`);
     fs.writeFileSync(fichier, await genererBadgePng(ouvrier));
   } catch (err) {
-    console.warn(
+    logger.warn(
       `[import] badge (cache disque) non écrit pour ${ouvrier.matricule} : ${err.message}`
     );
   }

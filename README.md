@@ -369,6 +369,21 @@ Variables d'environnement (à renseigner dans le projet Vercel / le `.env`) :
 - `CRON_SECRET` (secret partagé qui protège `GET /api/cron/rapports`, le déclencheur du job Vercel Cron de 06h00)
 - `ADMIN_EMAIL` / `ADMIN_PASSWORD` (création/rotation du compte SUPER_ADMIN via `npm --prefix backend run seed` ou `node backend/src/scripts/set-admin.js`)
 
+### Logs (débogage)
+
+Le backend utilise un mini-logger maison (`backend/src/lib/logger.js`, zéro dépendance) qui remplace toutes les sorties `console.*` des routes et du serveur.
+
+| Sortie | Où la lire | Condition |
+|---|---|---|
+| **stdout / stderr** | Dashboard Vercel → **Functions → Logs** (prod) ou le terminal local | Toujours |
+| **Fichier tournant** | `backend/logs/app-<AAAA-MM-JJ>.log` | Par défaut hors production (`LOG_FILE=true`). Désactiver avec `LOG_FILE=false`. |
+
+Chaque requête HTTP reçoit un **`requestId`** (UUID) renvoyé dans l'en-tête `X-Request-Id` ; les logs d'une même requête (middleware, erreurs, routes) partagent ce même identifiant.
+
+Variables :
+- `LOG_LEVEL` — `debug` | `info` (défaut) | `warn` | `error`
+- `LOG_FILE` — `true` / `false` (défaut : `true` hors prod, `false` sur Vercel)
+
 Comptes : création d'un SUPER_ADMIN idempotente (`set-admin.js`, upsert d'après
 `ADMIN_EMAIL`/`ADMIN_PASSWORD`), contrôle du hash avec `check-admin.mjs`.
 

@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
@@ -49,7 +50,7 @@ router.get("/", async (req, res) => {
 
     return res.json({ ok: true, total, page, limit, departements });
   } catch (err) {
-    console.error("[DEPARTEMENTS/LISTE]", err);
+    logger.error("[DEPARTEMENTS/LISTE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -77,7 +78,7 @@ router.get("/:id", async (req, res) => {
 
     return res.json({ ok: true, departement });
   } catch (err) {
-    console.error("[DEPARTEMENTS/DETAIL]", err);
+    logger.error("[DEPARTEMENTS/DETAIL]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -109,7 +110,7 @@ router.get("/:id/membres", async (req, res) => {
       membres: departement.membres,
     });
   } catch (err) {
-    console.error("[DEPARTEMENTS/MEMBRES]", err);
+    logger.error("[DEPARTEMENTS/MEMBRES]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -178,7 +179,7 @@ router.post("/", ECRITURE, async (req, res) => {
     if (err.code === "P2002") {
       return res.status(409).json({ ok: false, code: "DEPARTEMENT_EXISTANT", message: "Ce nom de département existe déjà" });
     }
-    console.error("[DEPARTEMENTS/CREATION]", err);
+    logger.error("[DEPARTEMENTS/CREATION]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -220,7 +221,7 @@ router.patch("/:id", ECRITURE, async (req, res) => {
     if (err.code === "P2002") {
       return res.status(409).json({ ok: false, code: "DEPARTEMENT_EXISTANT", message: "Ce nom de département existe déjà" });
     }
-    console.error("[DEPARTEMENTS/MAJ]", err);
+    logger.error("[DEPARTEMENTS/MAJ]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -237,7 +238,7 @@ router.delete("/:id", ECRITURE, async (req, res) => {
     if (err.code === "P2025") {
       return res.status(404).json({ ok: false, code: "DEPARTEMENT_INCONNU", message: "Département introuvable" });
     }
-    console.error("[DEPARTEMENTS/SUPPRESSION]", err);
+    logger.error("[DEPARTEMENTS/SUPPRESSION]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -312,7 +313,7 @@ router.post("/:id/membres", ECRITURE, async (req, res) => {
 
     return res.status(201).json({ ok: true, liaison });
   } catch (err) {
-    console.error("[DEPARTEMENTS/AJOUT_MEMBRE]", err);
+    logger.error("[DEPARTEMENTS/AJOUT_MEMBRE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -382,7 +383,7 @@ router.patch("/:id/membres/:ouvrierId", ECRITURE, async (req, res) => {
 
     return res.json({ ok: true, liaison });
   } catch (err) {
-    console.error("[DEPARTEMENTS/CHANGER_POSTE]", err);
+    logger.error("[DEPARTEMENTS/CHANGER_POSTE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -414,7 +415,7 @@ router.delete("/:id/membres/:ouvrierId", ECRITURE, async (req, res) => {
     await prisma.ouvrierDepartement.delete({ where: { id: liaisonExistante.id } });
     return res.json({ ok: true });
   } catch (err) {
-    console.error("[DEPARTEMENTS/SUPPRIMER_MEMBRE]", err);
+    logger.error("[DEPARTEMENTS/SUPPRIMER_MEMBRE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });

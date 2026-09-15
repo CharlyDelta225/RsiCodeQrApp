@@ -1,6 +1,9 @@
 .vercel
 .env*
 
+# Logs (créés par backend/src/lib/logger.js — rotation quotidienne)
+logs/
+
 # Copies d'assemblage générées par scripts/vercel-build.mjs (sources : frontend/)
 public/dashboard/
 public/terminal/

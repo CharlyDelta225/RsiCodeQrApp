@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import { Router } from "express";
 import { requireRole } from "../middleware/auth.middleware.js";
 import {
@@ -75,7 +76,7 @@ router.get("/journalier", async (req, res) => {
 
     return res.json({ ok: true, rapport: structure });
   } catch (err) {
-    console.error("[RAPPORTS/LECTURE]", err);
+    logger.error("[RAPPORTS/LECTURE]", err);
     return res.status(500).json({
       ok: false,
       code: "ERREUR_INTERNE",
@@ -184,7 +185,7 @@ router.post(
         email: { destinataires: dests, messageId },
       });
     } catch (err) {
-      console.error("[RAPPORTS] Échec d'envoi email", err);
+      logger.error("[RAPPORTS] Échec d'envoi email", err);
       return res.status(400).json({
         ok: false,
         code: "ENVOI_EMAIL_ECHOUE",
@@ -194,7 +195,7 @@ router.post(
       });
     }
   } catch (err) {
-    console.error("[RAPPORTS]", err);
+    logger.error("[RAPPORTS]", err);
     return res.status(500).json({
       ok: false,
       code: "ERREUR_INTERNE",

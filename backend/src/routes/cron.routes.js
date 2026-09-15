@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import { Router } from "express";
 import { declencherRapportsProgrammes } from "../lib/planificateur.js";
 
@@ -39,10 +40,10 @@ router.get("/rapports", async (req, res) => {
 
   try {
     const resultat = await declencherRapportsProgrammes();
-    console.log("[CRON/RAPPORTS]", resultat.ok ? "OK" : "Aucun envoi", resultat.raisons);
+    logger.info("[CRON/RAPPORTS]", resultat.ok ? "OK" : "Aucun envoi", resultat.raisons);
     return res.status(200).json({ ok: resultat.ok, raisons: resultat.raisons });
   } catch (err) {
-    console.error("[CRON/RAPPORTS] Erreur", err);
+    logger.error("[CRON/RAPPORTS] Erreur", err);
     return res.status(500).json({
       ok: false,
       code: "ERREUR_INTERNE",

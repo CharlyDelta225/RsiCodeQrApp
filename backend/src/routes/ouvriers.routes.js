@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import { Router } from "express";
 import archiver from "archiver";
 import prisma from "../lib/prisma.js";
@@ -76,7 +77,7 @@ router.get("/", async (req, res) => {
 
     return res.json({ ok: true, total, page, limit, ouvriers });
   } catch (err) {
-    console.error("[OUVRIERS/LISTE]", err);
+    logger.error("[OUVRIERS/LISTE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -123,7 +124,7 @@ router.get("/badges/zip", ECRITURE, async (req, res) => {
 
     const archive = archiver("zip", { zlib: { level: 9 } });
     archive.on("error", (err) => {
-      console.error("[OUVRIERS/BADGES_ZIP]", err);
+      logger.error("[OUVRIERS/BADGES_ZIP]", err);
       // Le flux a peut-être déjà commencé : on ne peut plus renvoyer de JSON,
       // on coupe juste la réponse proprement.
       res.end();
@@ -138,7 +139,7 @@ router.get("/badges/zip", ECRITURE, async (req, res) => {
 
     await archive.finalize();
   } catch (err) {
-    console.error("[OUVRIERS/BADGES_ZIP]", err);
+    logger.error("[OUVRIERS/BADGES_ZIP]", err);
     if (!res.headersSent) {
       return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
     }
@@ -165,7 +166,7 @@ router.get("/:id", async (req, res) => {
     }
     return res.json({ ok: true, ouvrier });
   } catch (err) {
-    console.error("[OUVRIERS/DETAIL]", err);
+    logger.error("[OUVRIERS/DETAIL]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -263,7 +264,7 @@ router.post("/", ECRITURE, async (req, res) => {
     if (err.code === "P2002") {
       return res.status(409).json({ ok: false, code: "MATRICULE_EXISTANT", message: "Ce matricule existe déjà" });
     }
-    console.error("[OUVRIERS/CREATION]", err);
+    logger.error("[OUVRIERS/CREATION]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -394,7 +395,7 @@ router.patch("/:id", ECRITURE, async (req, res) => {
     if (err.code === "P2002") {
       return res.status(409).json({ ok: false, code: "MATRICULE_EXISTANT", message: "Ce matricule existe déjà" });
     }
-    console.error("[OUVRIERS/MAJ]", err);
+    logger.error("[OUVRIERS/MAJ]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -416,7 +417,7 @@ router.patch("/:id/activer", ECRITURE, async (req, res) => {
     if (err.code === "P2025") {
       return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
     }
-    console.error("[OUVRIERS/ACTIVER]", err);
+    logger.error("[OUVRIERS/ACTIVER]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -438,7 +439,7 @@ router.patch("/:id/desactiver", ECRITURE, async (req, res) => {
     if (err.code === "P2025") {
       return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
     }
-    console.error("[OUVRIERS/DESACTIVER]", err);
+    logger.error("[OUVRIERS/DESACTIVER]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -460,7 +461,7 @@ router.get("/:id/badge", async (req, res) => {
     res.setHeader("Cache-Control", "public, max-age=86400");
     return res.send(png);
   } catch (err) {
-    console.error("[OUVRIERS/BADGE]", err);
+    logger.error("[OUVRIERS/BADGE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -477,7 +478,7 @@ router.delete("/:id", ECRITURE, async (req, res) => {
     if (err.code === "P2025") {
       return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
     }
-    console.error("[OUVRIERS/SUPPRESSION]", err);
+    logger.error("[OUVRIERS/SUPPRESSION]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
