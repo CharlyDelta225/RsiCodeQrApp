@@ -74,7 +74,7 @@ Il se teste indépendamment (aucun build requis en dev).
 |---|---|---|
 | `/login` · `/inscription` · `/oublie` · `/reinitialisation` | Auth publique | public |
 | `/` | Tableau de bord : KPIs, pointages récents | tous |
-| `/ouvriers` | CRUD ouvriers, **édition** (nom/prénom/matricule/département), import `.csv`/`.xlsx`, activer/désactiver le badge | lecture : tous · écriture : ADMIN/SUPER |
+| `/ouvriers` | CRUD ouvriers, **édition** (nom/prénom/matricule/téléphone, **départements multi-coches**), import `.csv`/`.xlsx`, activer/désactiver le badge | lecture : tous · écriture : ADMIN/SUPER |
 | `/badges` | Badges QR (aperçu, **filtre département**, ZIP) | tous · export : ADMIN/SUPER |
 | `/pointages` · `/historique` | Pointages du jour · historique filtrable | lecture : tous · export CSV : ADMIN/SUPER |
 | `/departements` | Membres et postes par département (**postes : voir ci-dessous**) | lecture : tous · écriture : ADMIN/SUPER |

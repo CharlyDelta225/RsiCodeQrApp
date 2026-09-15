@@ -26,6 +26,7 @@ export default function MigrationOuvrierPage() {
   const [succes, setSucces] = useState(null);
 
   const [recherche, setRecherche] = useState("");
+  const [filtreDepartement, setFiltreDepartement] = useState("tous"); // tous | sans | uuid
   const [enMise, setEnMise] = useState(false);
   const [migration, setMigration] = useState(null); // ouvrier en cours
   const [formMigration, setFormMigration] = useState({ departementId: "", roleDansDepartement: "MEMBRE" });
@@ -56,9 +57,11 @@ export default function MigrationOuvrierPage() {
 
   const ouvriersFiltres = ouvriers.filter((o) => {
     const q = recherche.trim().toLowerCase();
-    if (!q) return true;
-    const haystack = `${o.matricule} ${o.nom} ${o.prenom}`.toLowerCase();
-    return haystack.includes(q);
+    if (q && !`${o.matricule} ${o.nom} ${o.prenom}`.toLowerCase().includes(q)) return false;
+
+    if (filtreDepartement === "tous") return true;
+    if (filtreDepartement === "sans") return !o.departements || o.departements.length === 0;
+    return (o.departements || []).some((l) => l.departementId === filtreDepartement);
   });
 
   const pagination = usePagination(ouvriersFiltres);
@@ -178,15 +181,30 @@ export default function MigrationOuvrierPage() {
 
       {/* Liste des ouvriers */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5 space-y-4">
-        <Field label="Rechercher" hint="Par matricule, nom ou prénom.">
-          <Input
-            type="search"
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-            placeholder="Rechercher un ouvrier…"
-            className="md:max-w-md"
-          />
-        </Field>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Field label="Rechercher" hint="Par matricule, nom ou prénom." className="flex-1">
+            <Input
+              type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Rechercher un ouvrier…"
+            />
+          </Field>
+          <Field label="Département" hint="Filtre la liste affichée." className="sm:w-72">
+            <Select
+              value={filtreDepartement}
+              onChange={(e) => setFiltreDepartement(e.target.value)}
+            >
+              <option value="tous">Tous les départements</option>
+              <option value="sans">Sans département</option>
+              {departements.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nom}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
 
         <TableShell
           colonnes={["Matricule", "Nom", "Prénom", "Téléphone", "Département(s) actuel(s)", "Actions"]}

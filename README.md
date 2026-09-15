@@ -107,7 +107,7 @@ Pages du dashboard :
 | Route | Contenu | Accès |
 |---|---|---|
 | `/` | Tableau de bord : KPIs, pointages récents | tous |
-| `/ouvriers` | Gestion des ouvriers (CRUD, import `.csv`/`.xlsx`) | lecture : tous · écriture : ADMIN/SUPER |
+| `/ouvriers` | Gestion des ouvriers (CRUD, import `.csv`/`.xlsx`, choix multi-départements par cases à cocher) | lecture : tous · écriture : ADMIN/SUPER |
 | `/badges` | Badges QR (aperçu) | tous · export/impression : ADMIN/SUPER |
 | `/pointages` · `/historique` | Pointages du jour · historique filtrable | lecture : tous · export CSV : ADMIN/SUPER |
 | `/departements` | Membres et postes par département | lecture : tous · export CSV : ADMIN/SUPER |

@@ -8,7 +8,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import TableShell from "../ui/TableShell";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
-import { Field, Input } from "../ui/inputs";
+import { Field, Input, Select } from "../ui/inputs";
 import { C } from "../theme";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
@@ -90,7 +90,7 @@ export default function OuvriersPage() {
   const [envoi, setEnvoi] = useState(false);
 
   const [modification, setModification] = useState(null); // ouvrier en cours de modification
-  const [formModification, setFormModification] = useState({ nom: "", prenom: "", telephone: "", departement: "", matricule: "" });
+  const [formModification, setFormModification] = useState({ nom: "", prenom: "", telephone: "", departements: [], matricule: "" });
   const [envoiModification, setEnvoiModification] = useState(false);
 
   const [importEnCours, setImportEnCours] = useState(false);
@@ -117,7 +117,7 @@ export default function OuvriersPage() {
       ]);
       setOuvriers(data.ouvriers);
       setTotal(data.total);
-      setDepartements((dataDepts.departements || []).map((d) => d.nom));
+      setDepartements(dataDepts.departements || []);
     } catch (err) {
       setAlerte({ titre: "Une erreur est survenue", message: err instanceof ApiError ? err.message : "Erreur de chargement" });
     } finally {
@@ -160,11 +160,20 @@ export default function OuvriersPage() {
       nom: o.nom || "",
       prenom: o.prenom || "",
       telephone: o.telephone || "",
-      departement: o.departements?.[0]?.departement?.nom || "",
+      departements: (o.departements || []).map((l) => l.departement?.nom).filter(Boolean),
       matricule: o.matricule || "",
     });
     setModification(o);
     setAlerte(null);
+  }
+
+  function basculerDepartement(nom) {
+    setFormModification((prev) => ({
+      ...prev,
+      departements: prev.departements.includes(nom)
+        ? prev.departements.filter((n) => n !== nom)
+        : [...prev.departements, nom],
+    }));
   }
 
   async function handleModifier(e) {
@@ -178,8 +187,28 @@ export default function OuvriersPage() {
         prenom: formModification.prenom,
         telephone: formModification.telephone,
         matricule: formModification.matricule,
-        departementNom: formModification.departement,
       });
+
+      // Départements : on coche/décoche => on affecte (ajout) ou on retire la liaison.
+      const actuels = (modification.departements || []).map((l) => l.departement?.nom).filter(Boolean);
+      const cibles = formModification.departements;
+      const aAjouter = cibles.filter((n) => !actuels.includes(n));
+      const aRetirer = actuels.filter((n) => !cibles.includes(n));
+      const idParNom = new Map(departements.map((d) => [d.nom, d.id]));
+
+      for (const nom of aAjouter) {
+        const id = idParNom.get(nom);
+        if (id) await api.ajouterMembre(id, modification.id, "MEMBRE");
+      }
+      const liaisonsActuelles = modification.departements || [];
+      for (const nom of aRetirer) {
+        for (const l of liaisonsActuelles) {
+          if (l.departement?.nom === nom) {
+            await api.retirerMembre(l.departementId, modification.id);
+          }
+        }
+      }
+
       setSucces({
         titre: "Modification réussie",
         message: `L'ouvrier ${formModification.prenom} ${formModification.nom} (${formModification.matricule}) a bien été mis(e) à jour.`,
@@ -428,7 +457,7 @@ export default function OuvriersPage() {
             </Field>
             <datalist id="departements">
               {departements.map((d) => (
-                <option key={d} value={d} />
+                <option key={d.id} value={d.nom} />
               ))}
             </datalist>
             <div className="flex justify-end gap-2 pt-2">
@@ -483,19 +512,32 @@ export default function OuvriersPage() {
                 onChange={(e) => setFormModification({ ...formModification, telephone: e.target.value })}
               />
             </Field>
-            <Field label="Département">
-              <Input
-                list="departements"
-                placeholder="Département"
-                value={formModification.departement}
-                onChange={(e) => setFormModification({ ...formModification, departement: e.target.value })}
-              />
+            <Field label="Département(s)" hint="Cochez les départements auquels l'ouvrier appartient — appliqué lors de l'enregistrement.">
+              <div className="border border-slate-200 rounded-lg p-2 max-h-44 overflow-y-auto space-y-1 bg-white">
+                {departements.length === 0 && (
+                  <p className="text-xs text-slate-400">Aucun département configuré.</p>
+                )}
+                {departements.map((d) => {
+                  const coche = formModification.departements.includes(d.nom);
+                  return (
+                    <label
+                      key={d.id}
+                      className={`flex items-center gap-2 text-sm px-2 py-1 rounded-md cursor-pointer transition ${
+                        coche ? "bg-bordeaux-50 text-bordeaux-900 font-medium" : "hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={coche}
+                        onChange={() => basculerDepartement(d.nom)}
+                        className="accent-bordeaux-600 h-4 w-4"
+                      />
+                      {d.nom}
+                    </label>
+                  );
+                })}
+              </div>
             </Field>
-            <datalist id="departements">
-              {departements.map((d) => (
-                <option key={d} value={d} />
-              ))}
-            </datalist>
             <p className="text-[11px] text-slate-400 leading-relaxed">
               Un changement de matricule génère un nouveau QR code : pensez à ré-imprimer le badge.
             </p>

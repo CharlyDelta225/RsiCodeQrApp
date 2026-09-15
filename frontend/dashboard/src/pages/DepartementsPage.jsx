@@ -9,6 +9,7 @@ import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { Select, Input } from "../ui/inputs";
 import { C } from "../theme";
 
@@ -60,6 +61,7 @@ export default function DepartementsPage() {
   const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", actif: true, role: "MEMBRE" });
   const [formErreur, setFormErreur] = useState(null);
   const [enregistrement, setEnregistrement] = useState(false);
+  const [confirmation, setConfirmation] = useState(null); // { type: retirer|supprimer, liaison, titre, message, bouton }
 
   const chargerDepartements = useCallback(async () => {
     setChargement(true);
@@ -139,37 +141,60 @@ export default function DepartementsPage() {
     }
   }
 
-  async function handleRetirer(liaison) {
+  async function demanderRetirer(liaison) {
     const o = liaison.ouvrier;
-    if (!confirm(`Retirer ${o.prenom} ${o.nom} du département « ${selection?.nom} » ?`)) return;
-    setEnregistrement(true);
     setFormErreur(null);
-    try {
-      await api.retirerMembre(selectedId, o.id);
-      setEdition(null);
-      setSucces("Membre retiré du département.");
-      await chargerDetail();
-    } catch (err) {
-      setFormErreur(err instanceof ApiError ? err.message : "Erreur lors du retrait");
-    } finally {
-      setEnregistrement(false);
-    }
+    setSucces(null);
+    setConfirmation({
+      type: "retirer",
+      liaison,
+      titre: `Retirer « ${o.prenom} ${o.nom} » ?`,
+      message: `Il sera retiré du département « ${selection?.nom} » (conservé comme ouvrier).`,
+      bouton: "Retirer",
+    });
   }
 
-  async function handleSupprimer(liaison) {
+  function demanderSupprimer(liaison) {
     const o = liaison.ouvrier;
-    if (!confirm(`Supprimer définitivement ${o.prenom} ${o.nom} (badge et historique compris) ?`)) return;
+    setFormErreur(null);
+    setSucces(null);
+    setConfirmation({
+      type: "supprimer",
+      liaison,
+      titre: `Supprimer définitivement « ${o.prenom} ${o.nom} » ?`,
+      message:
+        "Le badge, l'historique de pointages et les liaisons aux départements seront aussi supprimés. Action irréversible.",
+      bouton: "Supprimer",
+    });
+  }
+
+  async function executerConfirmation() {
+    if (!confirmation) return;
+    const { type, liaison } = confirmation;
     setEnregistrement(true);
     setFormErreur(null);
     try {
-      await api.deleteOuvrier(o.id);
-      setEdition(null);
-      setSucces("Ouvrier supprimé.");
+      if (type === "retirer") {
+        await api.retirerMembre(selectedId, liaison.ouvrier.id);
+        setEdition(null);
+        setSucces("Membre retiré du département.");
+      } else {
+        await api.deleteOuvrier(liaison.ouvrier.id);
+        setEdition(null);
+        setSucces("Ouvrier supprimé.");
+      }
       await chargerDetail();
     } catch (err) {
-      setFormErreur(err instanceof ApiError ? err.message : "Erreur lors de la suppression");
+      setFormErreur(
+        err instanceof ApiError
+          ? err.message
+          : type === "retirer"
+          ? "Erreur lors du retrait"
+          : "Erreur lors de la suppression"
+      );
     } finally {
       setEnregistrement(false);
+      setConfirmation(null);
     }
   }
 
@@ -409,10 +434,10 @@ export default function DepartementsPage() {
                   Annuler
                 </Btn>
                 <div className="flex-1" />
-                <Btn variant="secondary" size="sm" onClick={() => handleRetirer(edition)} disabled={enregistrement}>
+                <Btn variant="secondary" size="sm" onClick={() => demanderRetirer(edition)} disabled={enregistrement}>
                   Retirer du département
                 </Btn>
-                <Btn variant="softDanger" size="sm" onClick={() => handleSupprimer(edition)} disabled={enregistrement}>
+                <Btn variant="softDanger" size="sm" onClick={() => demanderSupprimer(edition)} disabled={enregistrement}>
                   Supprimer
                 </Btn>
                 <Btn type="submit" loading={enregistrement}>
@@ -423,6 +448,17 @@ export default function DepartementsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirmation retirer / supprimer */}
+      <ConfirmDialog
+        ouvert={!!confirmation}
+        titre={confirmation?.titre ?? ""}
+        message={confirmation?.message ?? ""}
+        bouton={confirmation?.bouton ?? "Confirmer"}
+        enCours={enregistrement}
+        surAnnuler={() => setConfirmation(null)}
+        surConfirmer={executerConfirmation}
+      />
     </div>
   );
 }
