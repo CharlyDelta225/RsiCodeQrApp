@@ -21,6 +21,23 @@ run("npx prisma generate", path.join(RACINE, "backend"));
 // 2) Build du dashboard Vite (VITE_API_URL vide → mêmes-origine /api/...).
 run("npm run build", path.join(RACINE, "frontend/dashboard"));
 
+// 2bis) Preload du logo, image LCP : le nom est haché par Vite, on l'injecte
+// dans le index.html final pour une découverte précoce (perf / Lighthouse).
+function injecterPreloadLogo(distDir) {
+  const assets = path.join(distDir, "assets");
+  if (!fs.existsSync(assets)) return;
+  const webp = fs.readdirSync(assets).find((f) => /^rsi-logo-.+\.webp$/.test(f));
+  if (!webp) return;
+  const indexPath = path.join(distDir, "index.html");
+  const link = `<link rel="preload" as="image" type="image/webp" fetchpriority="high" href="/assets/${webp}" />`;
+  let html = fs.readFileSync(indexPath, "utf8");
+  if (html.includes(link)) return; // déjà injecté
+  html = html.replace("</head>", `    ${link}\n  </head>`);
+  fs.writeFileSync(indexPath, html);
+  console.log(`[vercel-build] Preload logo injecté -> /assets/${webp}`);
+}
+injecterPreloadLogo(path.join(RACINE, "frontend/dashboard/dist"));
+
 // 3) Assemble dashboard + terminal dans backend/public (servis par Express).
 const dist = path.join(RACINE, "frontend/dashboard/dist");
 const dashboardDest = path.join(RACINE, "backend/public/dashboard");

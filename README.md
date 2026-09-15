@@ -153,6 +153,13 @@ Pages publiques (hors authentification) :
 - **Page 404** dédiée (route catch-all `*`) au lieu d'une redirection muette.
 - **Contraste WCAG AA** sur l'ensemble (boutons or, sidebar, textes
   secondaires `slate`/`gray`) — lisibilité, notamment pour les membres âgés.
+- **Logo allégé** : servie en **WebP** (23 ko au lieu de 115 ko) via un
+  composant `<Logo>` (`<picture>` + fallback PNG), filigrane décoratif en
+  `loading=lazy`, logo carte en `fetchpriority=high`, et **preload** du logo
+  injecté automatiquement dans le `index.html` final par
+  `scripts/vercel-build.mjs` (le hash Vite le rend instable à la main).
+- **Aucun outil de mesure d'audience** : pas de cookies analytics ; le
+  traitement des données est documenté dans `/confidentialite` (RGPD).
 
 ### Terminal kiosque
 

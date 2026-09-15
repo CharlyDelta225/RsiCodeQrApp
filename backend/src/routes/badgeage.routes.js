@@ -76,7 +76,7 @@ router.post("/", limiterBadgeage, async (req, res) => {
       return res.status(409).json({
         ok: false,
         code: "DEJA_BADGE_AUJOURDHUI",
-        message: "Vous avez déjà badgé",
+        message: "Vous avez déjà badger",
       });
     }
 
@@ -96,7 +96,7 @@ router.post("/", limiterBadgeage, async (req, res) => {
         return res.status(409).json({
           ok: false,
           code: "DEJA_BADGE_AUJOURDHUI",
-          message: "Vous avez déjà badgé",
+          message: "Vous avez déjà badger",
         });
       }
       throw err;

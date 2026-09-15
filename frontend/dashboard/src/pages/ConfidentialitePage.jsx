@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { C } from "../theme";
 import { usePageMeta } from "../hooks/usePageMeta";
-import rsiLogo from "../assets/rsi-logo.png";
+import Logo from "../components/Logo";
 
 const SECTIONS = [
   {
@@ -58,7 +58,7 @@ const SECTIONS = [
   {
     titre: "8. Stockage local sur votre appareil",
     corps: [
-      "L'application n'utilise pas de cookies publicitaires ou tiers. Elle conserve uniquement, dans le stockage local de votre navigateur : votre jeton de session (pour rester connecté) et, sur le terminal de badgeage, la préférence son. Ces informations restent sur votre appareil.",
+      "L'application n'utilise pas de cookies publicitaires ou tiers, ni d'outil de mesure d'audience (analytics). Elle conserve uniquement, dans le stockage local de votre navigateur : votre jeton de session (pour rester connecté) et, sur le terminal de badgeage, la préférence son. Ces informations restent sur votre appareil.",
     ],
   },
   {
@@ -85,7 +85,7 @@ export default function ConfidentialitePage() {
     <div className="min-h-screen overflow-y-auto" style={{ background: C.header }}>
       <div className="max-w-3xl mx-auto px-4 py-10">
         <div className="flex flex-col items-center text-center gap-3 mb-6">
-          <img src={rsiLogo} alt="" aria-hidden="true" className="w-16 h-16 object-contain drop-shadow-md" />
+          <Logo decoratif className="w-16 h-16 object-contain drop-shadow-md" />
           <div>
             <h1
               className="text-xl font-bold text-white"

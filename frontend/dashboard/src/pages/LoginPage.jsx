@@ -6,7 +6,7 @@ import { C } from "../theme";
 import { usePageMeta } from "../hooks/usePageMeta";
 import Btn from "../ui/Btn";
 import { Input } from "../ui/inputs";
-import rsiLogo from "../assets/rsi-logo.png";
+import Logo from "../components/Logo";
 
 export default function LoginPage() {
   usePageMeta(
@@ -57,10 +57,8 @@ export default function LoginPage() {
       style={{ background: C.header }}
     >
       {/* Logo en grand filigrane derrière la carte — purement décoratif */}
-      <img
-        src={rsiLogo}
-        alt=""
-        aria-hidden="true"
+      <Logo
+        decoratif
         className="absolute pointer-events-none select-none"
         style={{
           width: "min(120vw, 900px)",
@@ -74,7 +72,7 @@ export default function LoginPage() {
         className="w-full max-w-sm bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/20 p-7 space-y-5 relative z-10"
       >
         <div className="flex flex-col items-center text-center gap-3 pb-1">
-          <img src={rsiLogo} alt="RSI" className="w-20 h-20 object-contain drop-shadow-md" />
+          <Logo hautePriorite className="w-20 h-20 object-contain drop-shadow-md" />
           <div>
             <h1
               className="text-lg font-bold text-slate-900"

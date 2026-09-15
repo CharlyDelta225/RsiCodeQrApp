@@ -1,7 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import { C, navItems } from "../theme";
 import { roleAdmin, libelleRole } from "../lib/auth";
-import rsiLogo from "../assets/rsi-logo.png";
+import Logo from "./Logo";
 
 // Tolérance des menus par rôle (hiérarchie) : SUPER_ADMIN voit tout, ADMIN
 // voit les pages ADMIN+, LECTEUR ne voit que les pages de lecture.
@@ -59,7 +59,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
     <>
       <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-4 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <img src={rsiLogo} alt="RSI" className="w-9 h-9 object-contain rounded-full flex-shrink-0" />
+          <Logo className="w-9 h-9 object-contain rounded-full flex-shrink-0" />
           <div className="min-w-0">
             <p className="text-white font-bold text-sm leading-tight">RSI</p>
             <p className="text-white/80 text-[10px] leading-tight truncate">Présence — Badgeage QR</p>
@@ -117,7 +117,7 @@ export function Sidebar({ admin, onDeconnexion }) {
     <>
       <aside className="hidden md:flex lg:hidden flex-col h-full w-14 flex-shrink-0" style={{ background: C.sidebar }}>
         <div className="flex items-center justify-center pt-4 pb-3 border-b border-white/10 flex-shrink-0">
-          <img src={rsiLogo} alt="RSI" className="w-8 h-8 object-contain rounded-full" />
+          <Logo className="w-8 h-8 object-contain rounded-full" />
         </div>
         <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto px-1.5 min-h-0 mt-2">
           {navAutorises().map((item) => (
