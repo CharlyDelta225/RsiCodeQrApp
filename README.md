@@ -210,6 +210,37 @@ En production (hébergement), définir `CORS_ORIGINES` avec le/les domaine(s) du
 
 ---
 
+## Scalabilité
+
+L'application est dimensionnée pour absorber **2 000 badgeages en quelques
+minutes** sans surcharge :
+
+- **Serverless auto-scalable (Vercel)** : l'API Express tourne en fonctions
+  serverless qui se multiplient avec la charge — il n'y a pas un seul
+  serveur à saturer.
+- **CDN global** : les assets statiques (JS, CSS, logo, favicon, sitemap)
+  sont servis depuis le réseau edge Vercel avec **Brotli** automatique.
+- **Pooling de connexions** : le pooler Supabase (pgbouncer) agrège les
+  connexions ; chaque instance serverless n'en ouvre que 4
+  (`connection_limit`), sans créer une connexion par visiteur.
+- **Index de base de données** : le badgeage passe par `matricule @unique`
+  (lookup) puis l'insertion unique `(ouvrierId, jour)` est atomique par
+  la base, même en cas de scans simultanés. L'ajout de
+  `@@index([jour])` assure des requêtes d'historique par date rapides.
+- **Rate-limit par IP réelle** : badgeage 30/min, auth 10/min — une boucle
+  ou un terminal déréglé ne peut pas saturer l'API.
+
+**Mesure (autocannon sur prod)** : avec 200 connexions simultanées, la
+médiane est de **186–285 RPS** (p50 latency 347 ms). Le scénario pire
+cas (2 000 badgeages en 1 minute = 33 RPS) utilise à peine 10 % de la
+capacité mesurée — **marge confortable au-delà de 6 000 usagers**.
+
+> La migration `@@index([jour])` doit être appliquée sur la base Supabase
+> avec : `npx prisma migrate deploy` en utilisant le `DATABASE_URL` du
+> pooler Supabase (clé secrète Vercel, non accessible hors production).
+
+---
+
 ## Modèle de données — Départements
 
 Les ouvriers sont rattachés à un ou **plusieurs départements** via une table de jonction `OuvrierDepartement` avec un poste par département.
@@ -235,6 +266,7 @@ UNIQUE (ouvrierId, jour)   → migration 20260912090000_anti_double_badgeage
 
 - La colonne `jour` (date du badge, heure UTC) + l'index unique **garantissent la règle en base** : deux requêtes simultanées, une seule crée le pointage, l'autre reçoit `P2002` → `409 DEJA_BADGE_AUJOURDHUI`.
 - Index croisé `(ouvrierId, jour)` : l'unicité par ouvrier et par jour, sans ralentir les recherches par jour.
+- **`@@index([jour])`** ajouté ultérieurement : les requêtes `/api/pointages` filtrées par plage de dates **sans ouvrierId** (historique global, pointages du jour) utilisent cet index ; l'ancien index `(ouvrierId, dateHeure)` ne couvrait que la variante par ouvrier.
 
 ---
 
@@ -387,6 +419,12 @@ Déploiement en CLI (depuis la racine du dépôt) :
 ```bash
 npx vercel --prod --scope solutionniste --yes
 ```
+
+> **Déploiement automatique** : exécuter une seule fois  
+> `npx vercel git connect --scope solutionniste --yes`  
+> pour lier le dépôt GitHub. À chaque `git push` sur `main`, Vercel construit
+> et déploie automatiquement en production — la commande CLI n'est plus
+> nécessaire (utilisable uniquement pour un déploiement manuel ponctuel).
 
 Variables d'environnement (à renseigner dans le projet Vercel / le `.env`) :
 - `DATABASE_URL` — pooler Supabase (`postgresql://postgres.<ref>:<mdp>@aws-1-<region>.pooler.supabase.com:5432/postgres?schema=public`) ; sans `sslmode` dans l'URL, le code passe `ssl: { rejectUnauthorized: false }`

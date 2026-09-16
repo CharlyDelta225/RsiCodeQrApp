@@ -94,6 +94,7 @@ model Pointage {
 
   @@unique([ouvrierId, jour])
   @@index([ouvrierId, dateHeure])
+  @@index([jour])
   @@map("Pointage")
 }
 
