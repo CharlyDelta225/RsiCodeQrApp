@@ -3,7 +3,7 @@ import rsiLogoPng from "../assets/rsi-logo.png";
 
 export default function Logo({ className, style, decoratif = false, hautePriorite = false }) {
   return (
-    <picture>
+    <picture className="contents">
       <source srcSet={rsiLogoWebp} type="image/webp" />
       <img
         src={rsiLogoPng}

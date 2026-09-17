@@ -62,7 +62,7 @@ export default function ReinitialisationPage() {
     >
       <Logo
         decoratif
-        className="absolute pointer-events-none select-none"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none"
         style={{ width: "min(120vw, 900px)", opacity: 0.08, filter: "grayscale(1) brightness(2)" }}
       />
 
