@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://rsi-app-phi.vercel.app/</loc>
+    <loc>%SITE_URL%/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://rsi-app-phi.vercel.app/login</loc>
+    <loc>%SITE_URL%/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://rsi-app-phi.vercel.app/inscription</loc>
+    <loc>%SITE_URL%/inscription</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://rsi-app-phi.vercel.app/confidentialite</loc>
+    <loc>%SITE_URL%/confidentialite</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://rsi-app-phi.vercel.app/cgv-cgu</loc>
+    <loc>%SITE_URL%/cgv-cgu</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://rsi-app-phi.vercel.app/terminal</loc>
+    <loc>%SITE_URL%/terminal</loc>
     <changefreq>never</changefreq>
     <priority>0.2</priority>
   </url>

@@ -395,7 +395,7 @@ node --test "tests/*.test.js"
 ## Déploiement (Vercel — serverless)
 
 L'API Express **et** le dashboard **et** le terminal sont servis sous une seule
-URL Vercel (ex. `https://rsi-app-phi.vercel.app`).
+URL Vercel (ex. `https://rsicodeqrapp.vercel.app`).
 
 - **Entrée** : `api/index.js` → réexporte l'app Express (`backend/src/app.js`).
 - **Config** : `vercel.json` — `functions.api/index.js.maxDuration=60`,
@@ -430,8 +430,9 @@ Variables d'environnement (à renseigner dans le projet Vercel / le `.env`) :
 - `DATABASE_URL` — pooler Supabase (`postgresql://postgres.<ref>:<mdp>@aws-1-<region>.pooler.supabase.com:5432/postgres?schema=public`) ; sans `sslmode` dans l'URL, le code passe `ssl: { rejectUnauthorized: false }`
 - `JWT_SECRET` (secret aléatoire)
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_EXPEDITEUR` (rapports + création de comptes + liens de réinitialisation)
-- `APP_URL` (URL du dashboard, ex. `https://rsi-app-phi.vercel.app` — liens de réinitialisation)
-- `CORS_ORIGINES` (origines du dashboard, ex. `https://rsi-app-phi.vercel.app`)
+- `APP_URL` (URL du dashboard, ex. `https://rsicodeqrapp.vercel.app` — liens de réinitialisation)
+- `CORS_ORIGINES` (origines du dashboard, ex. `https://rsicodeqrapp.vercel.app`)
+- `VITE_SITE_URL` (optionnel, lu au build du dashboard ; défaut `https://rsicodeqrapp.vercel.app`) — URL publique unique injectée dans les balises canonical/OG/Twitter de `index.html` et dans `robots.txt` / `sitemap.xml` (modèles dans `frontend/dashboard/seo/`, placeholder `%SITE_URL%`)
 - `AUTH_RATE_LIMIT_MAX` (optionnel, défaut 10/min par IP sur l'authentification)
 - `RAPPORT_EMAIL_DESTINATAIRES` (destinataires par défaut des rapports, séparés par des virgules) — liste de base : `menzancharle@gmail.com,broujeanmarie697@gmail.com`
 - `CRON_SECRET` (secret partagé qui protège `GET /api/cron/rapports`, le déclencheur du job Vercel Cron de 06h00)

@@ -5,7 +5,7 @@ Toute modification d'endpoint ou de format de réponse est annoncée ici, en
 versionnant la date de changement.
 
 - Base URL (dev local) : `http://localhost:3000`
-- Base URL (production) : `https://rsi-app-phi.vercel.app`
+- Base URL (production) : `https://rsicodeqrapp.vercel.app`
 - Format des corps : JSON (`Content-Type: application/json`)
 - CORS : activé (autorise le terminal et le dashboard)
 - Rate-limits : par **IP réelle** du client (derrière le proxy) — voir le journal 2026-09-12
