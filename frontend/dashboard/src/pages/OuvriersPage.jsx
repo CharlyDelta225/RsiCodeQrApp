@@ -1,15 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
+import { Pencil, Plus, QrCode } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { libelleDepartement } from "../lib/departement";
 import { getAdmin } from "../lib/auth";
 import { usePagination } from "../lib/pagination";
 import PaginationBar from "../components/PaginationBar";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useToast } from "../components/Toast.jsx";
 import TableShell from "../ui/TableShell";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
 import { Field, Input, Select } from "../ui/inputs";
-import { C } from "../theme";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -44,40 +45,8 @@ function raisonEchec(err, fallback) {
   return fallback;
 }
 
-/** Popup résultat (alerte ou succès) — reskiné dans les tons de la maison. */
-function PopupResultat({ titre, message, action, surFermer }) {
-  const danger = action === "alerte";
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
-        <div
-          className="w-14 h-14 mx-auto rounded-full flex items-center justify-center text-2xl text-white"
-          style={{
-            background: danger ? C.btn : "linear-gradient(135deg,#10b981,#059669)",
-            boxShadow: danger ? "0 8px 20px rgba(178,58,43,.3)" : "0 8px 20px rgba(5,150,105,.3)",
-          }}
-        >
-          {danger ? "!" : "✓"}
-        </div>
-        <div>
-          <h2 className="font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
-            {titre}
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">{message}</p>
-        </div>
-        <button
-          onClick={surFermer}
-          className="w-full text-sm font-medium text-white px-4 py-2 rounded-xl shadow-sm transition hover:opacity-90"
-          style={{ background: danger ? C.btn : "linear-gradient(135deg,#10b981,#059669)" }}
-        >
-          Fermer
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function OuvriersPage() {
+  const toast = useToast();
   const [ouvriers, setOuvriers] = useState([]);
   const [total, setTotal] = useState(0);
   const [recherche, setRecherche] = useState("");
@@ -86,11 +55,11 @@ export default function OuvriersPage() {
   const [succes, setSucces] = useState(null);
 
   const [modalOuvert, setModalOuvert] = useState(false);
-  const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", departement: "" });
+  const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", departement: "", photoUrl: "" });
   const [envoi, setEnvoi] = useState(false);
 
   const [modification, setModification] = useState(null); // ouvrier en cours de modification
-  const [formModification, setFormModification] = useState({ nom: "", prenom: "", telephone: "", departements: [], matricule: "" });
+  const [formModification, setFormModification] = useState({ nom: "", prenom: "", telephone: "", departements: [], matricule: "", photoUrl: "" });
   const [envoiModification, setEnvoiModification] = useState(false);
 
   const [importEnCours, setImportEnCours] = useState(false);
@@ -104,6 +73,18 @@ export default function OuvriersPage() {
   const [departements, setDepartements] = useState([]);
 
   const pagination = usePagination(ouvriers);
+
+  useEffect(() => {
+    if (!succes) return;
+    toast.success(succes.titre, succes.message);
+    setSucces(null);
+  }, [succes, toast]);
+
+  useEffect(() => {
+    if (!alerte) return;
+    toast.error(alerte.titre, alerte.message);
+    setAlerte(null);
+  }, [alerte, toast]);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -143,9 +124,10 @@ export default function OuvriersPage() {
         prenom: form.prenom,
         telephone: form.telephone,
         departementNom: form.departement,
+        photoUrl: form.photoUrl?.trim() || undefined,
       });
       setModalOuvert(false);
-      setForm({ nom: "", prenom: "", telephone: "", departement: "" });
+      setForm({ nom: "", prenom: "", telephone: "", departement: "", photoUrl: "" });
       setSucces({ titre: "Ajout réussi", message: `L'ouvrier ${form.prenom} ${form.nom} a bien été ajouté(e).` });
       charger();
     } catch (err) {
@@ -162,6 +144,7 @@ export default function OuvriersPage() {
       telephone: o.telephone || "",
       departements: (o.departements || []).map((l) => l.departement?.nom).filter(Boolean),
       matricule: o.matricule || "",
+      photoUrl: o.photoUrl || "",
     });
     setModification(o);
     setAlerte(null);
@@ -187,6 +170,7 @@ export default function OuvriersPage() {
         prenom: formModification.prenom,
         telephone: formModification.telephone,
         matricule: formModification.matricule,
+        photoUrl: formModification.photoUrl?.trim() || null,
       });
 
       // Départements : on coche/décoche => on affecte (ajout) ou on retire la liaison.
@@ -322,30 +306,12 @@ export default function OuvriersPage() {
             </label>
           )}
           {peutEcrire() && (
-            <Btn onClick={() => setModalOuvert(true)} icon="+">
+            <Btn onClick={() => setModalOuvert(true)} icon={<Plus size={16} />}>
               Ajouter un ouvrier
             </Btn>
           )}
         </div>
       </div>
-
-      {alerte && (
-        <PopupResultat
-          action="alerte"
-          titre={alerte.titre}
-          message={alerte.message}
-          surFermer={() => setAlerte(null)}
-        />
-      )}
-
-      {succes && (
-        <PopupResultat
-          action="succes"
-          titre={succes.titre}
-          message={succes.message}
-          surFermer={() => setSucces(null)}
-        />
-      )}
 
       {confirmation && (
         <ConfirmDialog
@@ -400,11 +366,11 @@ export default function OuvriersPage() {
             </td>
             <td className="px-3 py-2 text-right whitespace-nowrap space-x-1.5">
               {peutEcrire() && (
-                <Btn variant="secondary" size="xs" onClick={() => ouvrirModification(o)} icon="✎">
+                <Btn variant="secondary" size="xs" onClick={() => ouvrirModification(o)} icon={<Pencil size={12} />}>
                   Modifier
                 </Btn>
               )}
-              <Btn variant="secondary" size="xs" onClick={() => handleVoirBadge(o)} icon="⊛">
+              <Btn variant="secondary" size="xs" onClick={() => handleVoirBadge(o)} icon={<QrCode size={12} />}>
                 Badge
               </Btn>
               {peutEcrire() && (
@@ -453,6 +419,13 @@ export default function OuvriersPage() {
                 placeholder="Département"
                 value={form.departement}
                 onChange={(e) => setForm({ ...form, departement: e.target.value })}
+              />
+            </Field>
+            <Field label="Photo / Annexe (URL)" hint="Optionnel. Lien vers la photo de l'ouvrier.">
+              <Input
+                placeholder="https://..."
+                value={form.photoUrl}
+                onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
               />
             </Field>
             <datalist id="departements">
@@ -510,6 +483,13 @@ export default function OuvriersPage() {
                 placeholder="Téléphone"
                 value={formModification.telephone}
                 onChange={(e) => setFormModification({ ...formModification, telephone: e.target.value })}
+              />
+            </Field>
+            <Field label="Photo / Annexe (URL)" hint="Optionnel. Vide pour retirer la photo.">
+              <Input
+                placeholder="https://..."
+                value={formModification.photoUrl}
+                onChange={(e) => setFormModification({ ...formModification, photoUrl: e.target.value })}
               />
             </Field>
             <Field label="Département(s)" hint="Cochez les départements auquels l'ouvrier appartient — appliqué lors de l'enregistrement.">

@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { C } from "../theme";
 import { usePageMeta } from "../hooks/usePageMeta";
 import Btn from "../ui/Btn";
-import { Input } from "../ui/inputs";
+import { Field, Input } from "../ui/inputs";
 import Logo from "../components/Logo";
 
 /**
@@ -49,7 +49,7 @@ export default function ReinitialisationPage() {
       await api.effectuerReset(token, motDePasse);
       setSucces(true);
     } catch (err) {
-      setErreur(err.message || "Impossible de contacter le serveur.");
+      setErreur(err.message || "Impossible d'enregistrer.");
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export default function ReinitialisationPage() {
         <div className="flex flex-col items-center text-center gap-3 pb-1">
           <Logo className="w-16 h-16 object-contain drop-shadow-md" />
           <div>
-            <h1 className="text-lg font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
+            <h1 id="reinit-titre" className="text-lg font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
               Nouveau mot de passe
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -93,7 +93,7 @@ export default function ReinitialisationPage() {
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" aria-labelledby="reinit-titre">
             {erreur && (
               <div className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
                 {erreur}
@@ -103,28 +103,30 @@ export default function ReinitialisationPage() {
             {token && !succes && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Nouveau mot de passe</label>
-                  <Input
-                    type="password"
-                    required
-                    autoComplete="new-password"
-                    minLength={8}
-                    value={motDePasse}
-                    onChange={(e) => setMotDePasse(e.target.value)}
-                    placeholder="8 caractères minimum"
-                  />
+                  <Field label="Nouveau mot de passe">
+                    <Input
+                      type="password"
+                      required
+                      autoComplete="new-password"
+                      minLength={8}
+                      value={motDePasse}
+                      onChange={(e) => setMotDePasse(e.target.value)}
+                      placeholder="8 caractères minimum"
+                    />
+                  </Field>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Confirmation</label>
-                  <Input
-                    type="password"
-                    required
-                    autoComplete="new-password"
-                    value={confirmation}
-                    onChange={(e) => setConfirmation(e.target.value)}
-                    placeholder="Répétez le mot de passe"
-                  />
+                  <Field label="Confirmation">
+                    <Input
+                      type="password"
+                      required
+                      autoComplete="new-password"
+                      value={confirmation}
+                      onChange={(e) => setConfirmation(e.target.value)}
+                      placeholder="Répétez le mot de passe"
+                    />
+                  </Field>
                 </div>
 
                 <Btn type="submit" disabled={loading || !token} loading={loading} className="w-full" size="lg">

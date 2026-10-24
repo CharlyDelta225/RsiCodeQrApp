@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { C } from "../theme";
 
 const BTN_NAV =
@@ -22,8 +23,8 @@ export default function PaginationBar({ page, totalPages, onPage, total, label =
           {total} {label}
         </span>
       )}
-      <button onClick={() => onPage(page - 1)} disabled={page <= 1} className={BTN_NAV}>
-        ←
+      <button onClick={() => onPage(page - 1)} disabled={page <= 1} className={BTN_NAV} aria-label="Page précédente">
+        <ChevronLeft size={14} aria-hidden="true" />
       </button>
       {pages.map((p) =>
         p === page ? (
@@ -36,8 +37,8 @@ export default function PaginationBar({ page, totalPages, onPage, total, label =
           </button>
         )
       )}
-      <button onClick={() => onPage(page + 1)} disabled={page >= totalPages} className={BTN_NAV}>
-        →
+      <button onClick={() => onPage(page + 1)} disabled={page >= totalPages} className={BTN_NAV} aria-label="Page suivante">
+        <ChevronRight size={14} aria-hidden="true" />
       </button>
     </div>
   );

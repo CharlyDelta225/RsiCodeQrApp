@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { RefreshCw } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { libelleDepartement } from "../lib/departement";
 import { usePagination } from "../lib/pagination";
@@ -89,7 +90,7 @@ export default function PointagesJourPage() {
             </p>
           )}
         </div>
-        <Btn variant="secondary" onClick={charger} icon="↻">
+        <Btn variant="secondary" onClick={charger} icon={<RefreshCw size={16} />}>
           Actualiser
         </Btn>
       </div>

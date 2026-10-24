@@ -19,6 +19,19 @@ export default function DashboardLayout() {
     `${subtitle || "Application de présence par badgeage QR"}. RSI — Présence.`
   );
 
+  // Fermeture du drawer mobile avec Échap
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        setDrawerOpen(false);
+      }
+    }
+    if (drawerOpen) {
+      window.addEventListener("keydown", onKeyDown);
+    }
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [drawerOpen]);
+
   // Déconnexion auto après 10 min d'inactivité
   useEffect(() => {
     startInactivityWatcher();
@@ -45,7 +58,9 @@ export default function DashboardLayout() {
           onDeconnexion={() => setConfirmerDeconnexion(true)}
         />
         <main className="flex-1 overflow-y-auto min-h-0">
-          <Outlet />
+          <div key={location.pathname} className="page-enter min-h-full">
+            <Outlet />
+          </div>
         </main>
       </div>
       <ConfirmDialog

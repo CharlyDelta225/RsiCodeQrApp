@@ -12,18 +12,35 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import {
+  AlertCircle,
+  BadgeCheck,
+  Building2,
+  CalendarClock,
+  Clock,
+  LayoutDashboard,
+  RefreshCw,
+  UserCheck,
+  UserRoundX,
+  Users,
+  X,
+} from "lucide-react";
 import { api } from "../lib/api";
 import KpiCard from "../components/KpiCard";
 import Btn from "../ui/Btn";
 import Spinner from "../ui/Spinner";
 
 const JOURS_COURTS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-// Palette harmonisée sur l'identité RSI (bordeaux → or → teintes chaudes),
-// répétée si plus de 18 départements.
+// Palette harmonisée sur l'identité RSI (bordeaux → or → ambre, neutres chauds)
 const COULEURS_PIE = [
-  "#8B1A1A", "#C0392B", "#A23A1F", "#B45309", "#D97706", "#D4A017",
-  "#0F766E", "#0369A1", "#3B5BDB", "#6D28D9", "#A21CAF", "#BE185D",
-  "#15803D", "#4D7C0F", "#7C4A1E", "#92400E", "#831843", "#475569",
+  "#7B1515",
+  "#8B1A1A",
+  "#B23A2B",
+  "#C0392B",
+  "#D97706",
+  "#D4A017",
+  "#B45309",
+  "#92400E",
 ];
 
 const INTERVALLE_ACTUALISATION_MS = 60000;
@@ -245,75 +262,114 @@ export default function DashboardPage() {
   const centreValeur = deptSelectionne ? membresDept.length : stats?.presentsAuj;
   const centreLibelle = deptSelectionne ? "présents ici" : "présents";
 
-  const tooltipStyle = { fontSize: 12, borderRadius: 8, border: "1px solid #f1f5f9" };
+  const admin = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("rsi_admin") || "null") : null;
+  const nomAffiche = admin?.nom || admin?.prenom || admin?.email?.split("@")[0] || "Administrateur";
+  const dateJour = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+
+  const tooltipStyle = { fontSize: 12, borderRadius: 10, border: "1px solid #f1f5f9", boxShadow: "0 10px 30px -20px rgba(123,21,21,0.9)" };
+
+  const dataParDeptAffiche = useMemo(() => {
+    if (dataParDept.length <= 8) return dataParDept;
+    const top = dataParDept.slice(0, 8);
+    const autres = dataParDept.slice(8).reduce((acc, cur) => acc + cur.value, 0);
+    if (autres > 0) {
+      top.push({ name: "Autres", value: autres });
+    }
+    return top;
+  }, [dataParDept]);
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      {/* Bandeau : dernière actualisation + bouton rafraîchir */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-bordeaux-900">Vue d'ensemble</h2>
-          <p className="text-xs text-slate-500">
-            {derniereMaj
-              ? `Actualisé à ${derniereMaj.toLocaleTimeString("fr-FR")} · auto toutes les 45 s`
-              : "Chargement des indicateurs…"}
-          </p>
+    <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-full flex items-center justify-center text-white shadow-sm" style={{ background: "linear-gradient(135deg,#B23A2B,#7B1515)" }}>
+            <LayoutDashboard size={18} aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">Bonjour,</p>
+            <h1 className="text-lg md:text-xl font-semibold text-slate-900 capitalize" style={{ fontFamily: "Poppins,sans-serif" }}>
+              {nomAffiche}
+            </h1>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+              <span className="inline-flex items-center gap-1 capitalize">
+                <CalendarClock size={12} aria-hidden="true" />
+                {dateJour}
+              </span>
+              {derniereMaj && (
+                <span className="inline-flex items-center gap-1">
+                  <Clock size={12} aria-hidden="true" />
+                  Dernière actualisation à {derniereMaj.toLocaleTimeString("fr-FR")}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <Btn variant="secondary" size="sm" onClick={() => charger(true)} icon="↻">
+        <Btn variant="secondary" size="sm" onClick={() => charger(true)} icon={<RefreshCw size={14} />}>
           Actualiser
         </Btn>
       </div>
 
       {erreur && (
-        <p className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
-          {erreur}
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-4 py-3" role="alert">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={16} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <span>{erreur}</span>
+          </div>
+          <Btn variant="ghost" size="sm" onClick={() => charger(true)} icon={<RefreshCw size={14} />}>
+            Réessayer
+          </Btn>
+        </div>
       )}
 
       {/* KPI cliquables */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiCard
-          icon="👥"
+          icon={<Users size={18} />}
           label="Ouvriers enregistrés"
-          value={stats ? stats.total : "…"}
+          value={chargement && !stats ? "—" : stats ? stats.total : "—"}
           accent="bordeaux"
           onClick={() => navigate("/ouvriers")}
         />
         <KpiCard
-          icon="✅"
+          icon={<BadgeCheck size={18} />}
           label="Badges actifs"
-          value={stats ? stats.actifs : "…"}
-          sub={stats ? "prêts à badger" : undefined}
+          value={chargement && !stats ? "—" : stats ? stats.actifs : "—"}
+          sub={stats ? "Prêts à badger" : undefined}
           accent="gold"
           onClick={() => navigate("/badges")}
         />
         <KpiCard
-          icon="🟢"
+          icon={<UserCheck size={18} />}
           label="Présents aujourd'hui"
-          value={stats ? stats.presentsAuj : "…"}
+          value={chargement && !stats ? "—" : stats ? stats.presentsAuj : "—"}
           accent="vert"
           onClick={() => navigate("/pointages")}
         />
         <KpiCard
-          icon="⚪"
+          icon={<UserRoundX size={18} />}
           label="Absents aujourd'hui"
-          value={stats ? absentsAuj : "…"}
+          value={chargement && !stats ? "—" : stats ? absentsAuj : "—"}
           accent="gris"
           onClick={() => navigate("/historique")}
         />
         <KpiCard
-          icon="🏛"
+          icon={<Building2 size={18} />}
           label="Départements"
-          value={stats ? stats.departements : "…"}
+          value={chargement && !stats ? "—" : stats ? stats.departements : "—"}
           accent="bleu"
           onClick={() => navigate("/departements")}
         />
       </div>
 
       {chargement && (
-        <div className="flex items-center justify-center gap-2 text-slate-500 py-8">
-          <Spinner size="sm" />
-          <span className="text-sm">Chargement des graphiques…</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className={`bg-white border border-slate-200 rounded-xl p-4 ${i === 2 ? "lg:col-span-2" : ""}`}>
+              <div className="h-4 w-40 bg-slate-100 rounded animate-pulse mb-2" />
+              <div className="h-3 w-56 bg-slate-100 rounded animate-pulse mb-4" />
+              <div className="h-56 bg-slate-50 rounded-lg animate-pulse" />
+            </div>
+          ))}
         </div>
       )}
 
@@ -333,18 +389,21 @@ export default function DashboardPage() {
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dataParJour} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <CartesianGrid strokeDasharray="2 6" stroke="#f1f5f9" vertical={false} />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: echelle === "30" ? 9 : 11 }}
+                    tick={{ fontSize: echelle === "30" ? 9 : 11, fill: "#475569" }}
                     interval={echelle === "30" ? 5 : 0}
+                    axisLine={{ stroke: "#e2e8f0" }}
+                    tickLine={false}
                   />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#475569" }} axisLine={false} tickLine={false} />
                   <Tooltip
                     formatter={(v) => [`${v} présent(s)`, "Badgeages"]}
+                    labelStyle={{ color: "#7B1515", fontWeight: 600 }}
                     contentStyle={tooltipStyle}
                   />
-                  <Bar dataKey="presents" fill="#B23A2B" radius={[4, 4, 0, 0]} maxBarSize={34} />
+                  <Bar dataKey="presents" fill="#8B1A1A" radius={[6, 6, 0, 0]} maxBarSize={36} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -359,14 +418,15 @@ export default function DashboardPage() {
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dataParHeure} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="heure" tick={{ fontSize: 10 }} interval={1} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="2 6" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="heure" tick={{ fontSize: 10, fill: "#475569" }} interval={1} axisLine={{ stroke: "#e2e8f0" }} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#475569" }} axisLine={false} tickLine={false} />
                   <Tooltip
                     formatter={(v) => [`${v} badgeage(s)`, "Volume"]}
+                    labelStyle={{ color: "#8B6914", fontWeight: 600 }}
                     contentStyle={tooltipStyle}
                   />
-                  <Bar dataKey="badgeages" fill="#8B6914" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  <Bar dataKey="badgeages" fill="#B45309" radius={[6, 6, 0, 0]} maxBarSize={28} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -383,9 +443,13 @@ export default function DashboardPage() {
                 : `${pointagesAuj.length} badgeage(s) enregistré(s) — cliquez sur un segment pour les détails`}
             </p>
             {dataParDept.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-10">
-                Les données apparaîtront dès les premiers scans de la journée
-              </p>
+              <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-50 text-slate-400">
+                  <Clock size={18} aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium text-slate-700">Aucun pointage aujourd'hui</p>
+                <p className="text-xs text-slate-500">Les données apparaîtront dès les premiers scans de la journée</p>
+              </div>
             ) : (
               <>
                 <div className="flex flex-col md:flex-row items-center md:items-stretch gap-4">
@@ -411,18 +475,19 @@ export default function DashboardPage() {
                             setDeptSelectionne(entry.name === deptSelectionne ? null : entry.name)
                           }
                         >
-                          {dataParDept.map((d, i) => (
+                          {dataParDeptAffiche.map((d, i) => (
                             <Cell
                               key={d.name}
-                              fill={COULEURS_PIE[i % COULEURS_PIE.length]}
+                              fill={d.name === "Autres" ? "#94a3b8" : COULEURS_PIE[i % COULEURS_PIE.length]}
                               opacity={
-                                deptSelectionne && deptSelectionne !== d.name ? 0.3 : 1
+                                deptSelectionne && deptSelectionne !== d.name ? 0.25 : 1
                               }
                             />
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(v) => [`${v} présent(s)`, "Effectif"]}
+                          formatter={(v, name) => [`${v} présent(s)`, name]}
+                          labelStyle={{ color: "#7B1515", fontWeight: 600 }}
                           contentStyle={tooltipStyle}
                         />
                       </PieChart>
@@ -440,29 +505,31 @@ export default function DashboardPage() {
 
                   {/* Légende classée (cliquable) */}
                   <div className="flex-1 w-full min-w-0 md:overflow-y-auto md:max-h-56 pr-1 space-y-1">
-                    {dataParDept.map((d, i) => {
-                      const pct = pointagesAuj.length > 0 ? (d.value / pointagesAuj.length) * 100 : 0;
+                    {dataParDeptAffiche.map((d, i) => {
+                      const totalRef = dataParDept.reduce((acc, cur) => acc + cur.value, 0);
+                      const pct = totalRef > 0 ? (d.value / totalRef) * 100 : 0;
                       const actif = deptSelectionne === d.name;
+                      const couleur = d.name === "Autres" ? "#94a3b8" : COULEURS_PIE[i % COULEURS_PIE.length];
                       return (
                         <button
                           key={d.name}
                           type="button"
-                          onClick={() => setDeptSelectionne(actif ? null : d.name)}
-                          className={`w-full flex items-center gap-2 py-1 px-1.5 rounded-lg transition-colors text-left ${
+                          onClick={() => setDeptSelectionne(d.name === "Autres" ? null : actif ? null : d.name)}
+                          className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-left ${
                             actif ? "bg-bordeaux-50 ring-1 ring-bordeaux-200" : "hover:bg-slate-50"
                           }`}
                         >
                           <span
                             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                             style={{
-                              background: COULEURS_PIE[i % COULEURS_PIE.length],
-                              opacity: deptSelectionne && !actif ? 0.35 : 1,
+                              background: couleur,
+                              opacity: deptSelectionne && !actif ? 0.3 : 1,
                             }}
                           />
                           <span className="text-xs text-slate-700 font-medium truncate flex-1 min-w-0">
                             {d.name}
                           </span>
-                          <span className="text-[11px] font-semibold text-gray-800 tabular-nums flex-shrink-0">
+                          <span className="text-[11px] font-semibold text-slate-800 tabular-nums flex-shrink-0">
                             {d.value}
                           </span>
                           <span className="w-11 text-right text-[11px] text-slate-500 tabular-nums flex-shrink-0">
@@ -476,7 +543,7 @@ export default function DashboardPage() {
 
                 {/* Détail du département sélectionné */}
                 {deptSelectionne && (
-                  <div className="border-t border-slate-100 pt-3 mt-3">
+                  <div className="border-t border-slate-100 pt-4 mt-4">
                     <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                       <h4 className="text-xs font-semibold text-bordeaux-900">
                         {deptSelectionne} — {membresDept.length} présent(s)
@@ -484,17 +551,25 @@ export default function DashboardPage() {
                       <button
                         type="button"
                         onClick={() => setDeptSelectionne(null)}
-                        className="text-[11px] font-medium text-slate-500 hover:text-bordeaux-700 transition-colors"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-bordeaux-700 transition-colors"
                       >
-                        ✕ Fermer
+                        <X size={12} aria-hidden="true" /> Fermer
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto pr-1">
                       {membresDept.map((m, i) => (
                         <div
                           key={i}
                           className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50"
                         >
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold text-bordeaux-700 bg-bordeaux-50 ring-1 ring-bordeaux-100 flex-shrink-0">
+                            {(m.nom || "?")
+                              .split(" ")
+                              .slice(0, 2)
+                              .map((x) => x[0])
+                              .join("")
+                              .toUpperCase()}
+                          </div>
                           <span className="text-xs text-slate-700 truncate flex-1 min-w-0">
                             {m.nom}
                           </span>

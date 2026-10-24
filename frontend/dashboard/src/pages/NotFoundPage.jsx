@@ -13,7 +13,7 @@ export default function NotFoundPage() {
       className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
       style={{ background: C.header }}
     >
-      <div className="w-full max-w-sm bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/20 p-7 text-center space-y-4 relative z-10">
+      <div className="w-full max-w-sm bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/20 p-7 text-center space-y-4 relative z-10" role="main" aria-labelledby="notfound-titre">
         <p
           className="text-6xl font-bold"
           style={{ fontFamily: "Poppins,sans-serif", color: C.btn }}
@@ -21,7 +21,7 @@ export default function NotFoundPage() {
           404
         </p>
         <div>
-          <h1 className="text-lg font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
+          <h1 id="notfound-titre" className="text-lg font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
             Page introuvable
           </h1>
           <p className="text-sm text-slate-600 mt-1 leading-relaxed">

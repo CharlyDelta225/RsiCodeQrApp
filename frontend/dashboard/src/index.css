@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
 @import "tailwindcss";
 
 /* ─── Tokens d'IDENTITÉ RSI — toute l'UI tourne autour de ces deux familles ── */
@@ -63,3 +62,176 @@ h1, h2, h3, h4, h5 {
 .overflow-x-auto::-webkit-scrollbar-track { background: transparent; }
 .overflow-y-auto::-webkit-scrollbar-thumb,
 .overflow-x-auto::-webkit-scrollbar-thumb { background: #C0392B44; border-radius: 4px; }
+
+/* ─── Impression des badges sélectionnés (BadgesPage) ─────────────────────── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  aside,
+  .app-topbar {
+    display: none !important;
+  }
+
+  html,
+  body,
+  #root,
+  #root > div,
+  main {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    max-width: none !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  .badges-page--selection {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .badges-page--selection > :not(.badges-print-zone) {
+    display: none !important;
+  }
+
+  .badges-print-zone {
+    display: grid !important;
+    grid-template-columns: repeat(2, 85.6mm);
+    gap: 5mm;
+    justify-content: center;
+  }
+
+  .badge-print-carte {
+    width: 85.6mm;
+    height: 54mm;
+    border: 1px solid #7B1515;
+    border-radius: 3mm;
+    overflow: hidden;
+    break-inside: avoid;
+    background: #fff;
+    color: #1A1A2E;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .badge-print-bande {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2mm 3mm;
+    background: linear-gradient(135deg, #B23A2B, #7B1515);
+    color: #fff;
+    font-family: 'Poppins', sans-serif;
+    font-size: 8pt;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .badge-print-corps {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 3mm;
+    padding: 3.5mm 4mm;
+  }
+
+  .badge-print-infos {
+    min-width: 0;
+  }
+
+  .badge-print-nom {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13pt;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  .badge-print-matricule {
+    margin: 1.5mm 0 0;
+    font-family: monospace;
+    font-size: 9pt;
+    color: #932A1F;
+  }
+
+  .badge-print-dept {
+    margin: 1.5mm 0 0;
+    font-size: 8pt;
+    color: #64748b;
+  }
+}
+
+/* Rapport imprimable en PDF via le navigateur */
+@media print {
+  .rapport-page .no-print {
+    display: none !important;
+  }
+
+  .rapport-page table {
+    width: 100% !important;
+    font-size: 9pt;
+  }
+
+  .rapport-page thead {
+    display: table-header-group;
+  }
+
+  .rapport-page tr {
+    break-inside: avoid;
+  }
+}
+
+/* ─── Mouvements et focus communs ─────────────────────────────────────────── */
+a,
+button,
+input,
+select,
+textarea,
+summary,
+[role="button"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid #B23A2B !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(212, 160, 23, 0.28);
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: page-enter 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .page-enter {
+    animation: none;
+  }
+}
+

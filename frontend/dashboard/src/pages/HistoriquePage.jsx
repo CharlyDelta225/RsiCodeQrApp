@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { Download } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { libelleDepartement } from "../lib/departement";
@@ -122,7 +123,7 @@ export default function HistoriquePage() {
             variant="secondary"
             onClick={handleExporterCsv}
             disabled={pointages.length === 0}
-            icon="⬇"
+            icon={<Download size={16} />}
           >
             Exporter cette page en CSV
           </Btn>

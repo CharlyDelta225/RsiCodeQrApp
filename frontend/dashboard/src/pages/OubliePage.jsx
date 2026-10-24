@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../lib/api";
 import { C } from "../theme";
 import { usePageMeta } from "../hooks/usePageMeta";
 import Btn from "../ui/Btn";
-import { Input } from "../ui/inputs";
+import { Field, Input } from "../ui/inputs";
 import Logo from "../components/Logo";
 
 /**
@@ -31,7 +32,7 @@ export default function OubliePage() {
       await api.demanderResetEmail(email.trim());
       setEnvoye(true);
     } catch (err) {
-      setErreur(err.message || "Impossible de contacter le serveur.");
+      setErreur(err.message || "Impossible d'envoyer la demande.");
     } finally {
       setLoading(false);
     }
@@ -58,7 +59,7 @@ export default function OubliePage() {
             <p className="text-xs text-slate-500 mt-0.5">
               {envoye
                 ? "Vérifiez votre boîte mail"
-                : "Un lien de réinitialisation sera envoyé par email"}
+                : "Un lien de réinitialisation sera envoyé"}
             </p>
           </div>
         </div>
@@ -69,7 +70,7 @@ export default function OubliePage() {
             d'être envoyé. Consultez votre boîte mail (pensez au dossier spam).
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" aria-labelledby="oublie-titre">
             {erreur && (
               <div className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
                 {erreur}
@@ -77,15 +78,16 @@ export default function OubliePage() {
             )}
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Email du compte</label>
-              <Input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
-              />
+              <Field label="Email du compte">
+                <Input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                />
+              </Field>
             </div>
 
             <Btn type="submit" disabled={loading} loading={loading} className="w-full" size="lg">
@@ -95,8 +97,8 @@ export default function OubliePage() {
         )}
 
         <p className="text-center">
-          <Link to="/login" className="text-xs text-slate-500 hover:text-red-700 transition-colors">
-            ← Retour à la connexion
+          <Link to="/login" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-700 transition-colors">
+            <ArrowLeft size={12} aria-hidden="true" /> Retour à la connexion
           </Link>
         </p>
       </div>

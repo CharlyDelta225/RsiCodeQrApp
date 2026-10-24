@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { ArrowRight, ChevronRight, Download, Settings2, X } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
+import { useToast } from "../components/Toast.jsx";
 
 import { usePagination } from "../lib/pagination";
 import PaginationBar from "../components/PaginationBar";
@@ -26,6 +28,15 @@ const ROLES = [
   { valeur: "MEMBRE", libelle: "Membre" },
 ];
 
+const ACCENTS = [
+  "linear-gradient(90deg,#7B1515,#B23A2B)",
+  "linear-gradient(90deg,#B08612,#DCB23F)",
+  "linear-gradient(90deg,#932A1F,#D06E5F)",
+  "linear-gradient(90deg,#8B6914,#E4C468)",
+  "linear-gradient(90deg,#5A0A0A,#B23A2B)",
+  "linear-gradient(90deg,#6B5110,#D4A017)",
+];
+
 function libelleRole(role) {
   return ROLES.find((r) => r.valeur === role)?.libelle || role;
 }
@@ -35,7 +46,7 @@ function styleRole(role) {
     {
       RESPONSABLE: "text-gold-800 bg-gold-50 ring-1 ring-gold-200",
       ADJOINT: "text-bordeaux-700 bg-bordeaux-50 ring-1 ring-bordeaux-200",
-      SECRETAIRE: "text-sky-700 bg-sky-50 ring-1 ring-sky-200",
+      SECRETAIRE: "text-amber-800 bg-amber-50 ring-1 ring-amber-200",
       MEMBRE: "text-slate-600 bg-slate-100 ring-1 ring-slate-200",
     }[role] || "text-slate-600 bg-slate-100"
   );
@@ -47,6 +58,7 @@ function csvValeur(v) {
 }
 
 export default function DepartementsPage() {
+  const toast = useToast();
   const [departements, setDepartements] = useState([]);
   const [total, setTotal] = useState(0);
   const [selectedId, setSelectedId] = useState("");
@@ -55,6 +67,18 @@ export default function DepartementsPage() {
   const [chargementDetail, setChargementDetail] = useState(false);
   const [erreur, setErreur] = useState(null);
   const [succes, setSucces] = useState(null);
+
+  useEffect(() => {
+    if (!succes) return;
+    toast.success("Membres", succes);
+    setSucces(null);
+  }, [succes, toast]);
+
+  useEffect(() => {
+    if (!erreur) return;
+    toast.error("Erreur", erreur);
+    setErreur(null);
+  }, [erreur, toast]);
 
   // Popup d'édition d'un membre
   const [edition, setEdition] = useState(null);
@@ -214,6 +238,11 @@ export default function DepartementsPage() {
 
   const nbMembres = selection?.membres?.length ?? 0;
 
+  const repartitionRoles = ROLES.map((role) => ({
+    ...role,
+    nombre: (selection?.membres ?? []).filter((m) => m.roleDansDepartement === role.valeur).length,
+  })).filter((role) => role.nombre > 0);
+
   const pagination = usePagination(selection?.membres ?? []);
 
   return (
@@ -238,7 +267,7 @@ export default function DepartementsPage() {
               className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-bordeaux-700 bg-white ring-1 ring-bordeaux-200 hover:bg-bordeaux-50 rounded-full px-4 py-2 transition"
             >
               Créer / renommer / exporter les départements
-              <span className="text-xs">→</span>
+              <ArrowRight size={12} aria-hidden="true" />
             </Link>
           )}
           </div>
@@ -246,9 +275,9 @@ export default function DepartementsPage() {
             <button
               onClick={handleExporterCsv}
               disabled={!selection || nbMembres === 0}
-              className="text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 disabled:opacity-50 rounded-xl px-4 py-2 shadow-sm transition"
+              className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 disabled:opacity-50 rounded-xl px-4 py-2 shadow-sm transition"
             >
-              ⬇ Exporter en CSV
+              <Download size={16} aria-hidden="true" /> Exporter en CSV
             </button>
           )}
         </div>
@@ -266,29 +295,86 @@ export default function DepartementsPage() {
         </div>
       )}
 
-      {/* Sélecteur de département */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5">
-        <label htmlFor="select-departement" className="block text-xs font-medium text-slate-500 mb-1.5">
-          Département
-        </label>
+      {/* Cartes de départements */}
+      <div>
+        <div className="flex items-end justify-between flex-wrap gap-2 mb-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
+              Départements
+            </h2>
+            <p className="text-xs text-slate-500">Cliquez sur une carte pour afficher ses membres.</p>
+          </div>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-500">
+            {departements.length} département{departements.length > 1 ? "s" : ""}
+          </span>
+        </div>
+
         {chargement ? (
-          <div className="text-sm text-slate-500 py-1.5">Chargement…</div>
-        ) : (
-          <Select
-            id="select-departement"
-            value={selectedId}
-            onChange={(e) => {
-              setSelectedId(e.target.value);
-              setSucces(null);
-            }}
-            className="w-full md:max-w-md"
-          >
-            {departements.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nom} — {d._count?.membres ?? 0} membre(s)
-              </option>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 rounded-2xl bg-slate-100 animate-pulse" />
             ))}
-          </Select>
+          </div>
+        ) : departements.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-500">
+            Aucun département disponible.
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {departements.map((d, index) => {
+              const actif = selectedId === d.id;
+              const nb = d._count?.membres ?? 0;
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedId(d.id);
+                    setSucces(null);
+                  }}
+                  aria-pressed={actif}
+                  className={`text-left rounded-2xl border bg-white p-4 transition-all ${
+                    actif
+                      ? "border-bordeaux-300 ring-2 ring-bordeaux-200 shadow-md"
+                      : "border-slate-200 hover:border-bordeaux-200 hover:shadow-sm"
+                  }`}
+                >
+                  <div
+                    className="h-1.5 w-14 rounded-full mb-3"
+                    style={{ background: ACCENTS[index % ACCENTS.length] }}
+                  />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{d.nom}</p>
+                      {d.description && (
+                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{d.description}</p>
+                      )}
+                    </div>
+                    <span
+                      className={`flex-shrink-0 inline-flex items-center justify-center min-w-9 h-9 rounded-xl text-sm font-semibold ${
+                        actif ? "bg-bordeaux-700 text-white" : "bg-slate-100 text-slate-700"
+                      }`}
+                      title={`${nb} membre(s)`}
+                    >
+                      {nb}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-3">
+                    {nb} membre{nb > 1 ? "s" : ""}
+                  </p>
+                  {actif && repartitionRoles.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {repartitionRoles.map((role) => (
+                        <Pill key={role.valeur} className={styleRole(role.valeur)}>
+                          {role.nombre} {role.libelle}
+                        </Pill>
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -338,7 +424,7 @@ export default function DepartementsPage() {
                       onMouseEnter={(e) => (e.currentTarget.style.background = C.btn)}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                     >
-                      ⚙
+                      <Settings2 size={16} aria-hidden="true" />
                     </button>
                   ) : (
                     <span className="inline-block" />
@@ -377,7 +463,7 @@ export default function DepartementsPage() {
                 onClick={() => setEdition(null)}
                 className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
               >
-                ✕
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
 

@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
+import { ArrowRightLeft, X } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useToast } from "../components/Toast.jsx";
 import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Btn from "../ui/Btn";
@@ -19,6 +21,7 @@ function libellePoste(valeur) {
 }
 
 export default function MigrationOuvrierPage() {
+  const toast = useToast();
   const [ouvriers, setOuvriers] = useState([]);
   const [departements, setDepartements] = useState([]);
   const [chargement, setChargement] = useState(true);
@@ -65,6 +68,18 @@ export default function MigrationOuvrierPage() {
   });
 
   const pagination = usePagination(ouvriersFiltres);
+
+  useEffect(() => {
+    if (!succes) return;
+    toast.success("Migration", succes);
+    setSucces(null);
+  }, [succes, toast]);
+
+  useEffect(() => {
+    if (!erreur) return;
+    toast.error("Erreur", erreur);
+    setErreur(null);
+  }, [erreur, toast]);
 
   function afficherMigration(o) {
     setMigrationErreur(null);
@@ -167,17 +182,7 @@ export default function MigrationOuvrierPage() {
         </div>
       </div>
 
-      {(erreur || succes) && (
-        <div
-          className={`text-sm rounded-xl px-4 py-3 border ${
-            erreur
-              ? "text-bordeaux-700 bg-bordeaux-50 border-bordeaux-200"
-              : "text-emerald-700 bg-emerald-50 border-emerald-200"
-          }`}
-        >
-          {erreur || succes}
-        </div>
-      )}
+      {(erreur || succes) && null}
 
       {/* Liste des ouvriers */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5 space-y-4">
@@ -232,9 +237,9 @@ export default function MigrationOuvrierPage() {
                           onClick={() => demanderRetrait(o, l)}
                           disabled={enMise}
                           title={`Retirer ${o.nom} ${o.prenom} du département ${l.departement?.nom ?? ""}`}
-                          className="w-4 h-4 rounded-full text-slate-500 hover:bg-bordeaux-600 hover:text-white transition disabled:opacity-40"
+                          className="w-4 h-4 flex items-center justify-center rounded-full text-slate-500 hover:bg-bordeaux-600 hover:text-white transition disabled:opacity-40"
                         >
-                          ✕
+                          <X size={10} aria-hidden="true" />
                         </button>
                       </span>
                     ))}
@@ -244,7 +249,7 @@ export default function MigrationOuvrierPage() {
                 )}
               </td>
               <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                <Btn size="sm" icon="⇄" onClick={() => afficherMigration(o)}>
+                <Btn size="sm" icon={<ArrowRightLeft size={14} />} onClick={() => afficherMigration(o)}>
                   Migrer
                 </Btn>
               </td>
@@ -280,7 +285,7 @@ export default function MigrationOuvrierPage() {
                 onClick={fermerMigration}
                 className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
               >
-                ✕
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
             <form onSubmit={affecterDepartement} className="p-6 space-y-4">
@@ -319,7 +324,7 @@ export default function MigrationOuvrierPage() {
                 <Btn variant="ghost" size="sm" onClick={fermerMigration}>
                   Annuler
                 </Btn>
-                <Btn type="submit" loading={enMise} icon="⇄">
+                <Btn type="submit" loading={enMise} icon={<ArrowRightLeft size={14} />}>
                   {enMise ? "Affectation…" : "Affecter"}
                 </Btn>
               </div>

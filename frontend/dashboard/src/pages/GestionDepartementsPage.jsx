@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { ArrowRight, ChevronRight, Download, Plus, X } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useToast } from "../components/Toast.jsx";
 import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Btn from "../ui/Btn";
@@ -22,6 +24,7 @@ function csvValeur(v) {
 }
 
 export default function GestionDepartementsPage() {
+  const toast = useToast();
   const [departements, setDepartements] = useState([]);
   const [total, setTotal] = useState(0);
   const [chargement, setChargement] = useState(true);
@@ -64,6 +67,18 @@ export default function GestionDepartementsPage() {
   const nbMembresTotal = departements.reduce((s, d) => s + (d._count?.membres ?? 0), 0);
 
   const pagination = usePagination(departementsFiltres);
+
+  useEffect(() => {
+    if (!succes) return;
+    toast.success("Départements", succes);
+    setSucces(null);
+  }, [succes, toast]);
+
+  useEffect(() => {
+    if (!erreur) return;
+    toast.error("Erreur de chargement", erreur);
+    setErreur(null);
+  }, [erreur, toast]);
 
   async function handleCreer(e) {
     e.preventDefault();
@@ -156,7 +171,7 @@ export default function GestionDepartementsPage() {
               className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-bordeaux-700 bg-white ring-1 ring-bordeaux-200 hover:bg-bordeaux-50 rounded-full px-4 py-2 transition"
             >
               Gérer les membres et postes
-              <span className="text-xs">→</span>
+              <ArrowRight size={12} aria-hidden="true" />
             </Link>
           </div>
           <div className="flex items-center gap-2">
@@ -167,34 +182,24 @@ export default function GestionDepartementsPage() {
                   setCreationErreur(null);
                   setCreationOuvert(true);
                 }}
-                icon="+"
+                icon={<Plus size={16} />}
               >
                 Créer un département
               </Btn>
             )}
-            <Btn
-              variant="secondary"
-              onClick={handleExporterListe}
-              disabled={departementsFiltres.length === 0}
-              icon="⬇"
-            >
+              <Btn
+                variant="secondary"
+                onClick={handleExporterListe}
+                disabled={departementsFiltres.length === 0}
+                icon={<Download size={16} />}
+              >
               Exporter la liste
             </Btn>
           </div>
         </div>
       </div>
 
-      {(erreur || succes) && (
-        <div
-          className={`text-sm rounded-xl px-4 py-3 border ${
-            erreur
-              ? "text-bordeaux-700 bg-bordeaux-50 border-bordeaux-200"
-              : "text-emerald-700 bg-emerald-50 border-emerald-200"
-          }`}
-        >
-          {erreur || succes}
-        </div>
-      )}
+      {(erreur || succes) && null}
 
       {/* Liste des départements */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5 space-y-4">
@@ -278,7 +283,7 @@ export default function GestionDepartementsPage() {
                 onClick={() => setCreationOuvert(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
               >
-                ✕
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
             <form onSubmit={handleCreer} className="p-6 space-y-4">
@@ -326,7 +331,7 @@ export default function GestionDepartementsPage() {
                 onClick={() => setRenommage(null)}
                 className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
               >
-                ✕
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
             <form onSubmit={handleRenommer} className="p-6 space-y-4">

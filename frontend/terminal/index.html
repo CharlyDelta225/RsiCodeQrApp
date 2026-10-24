@@ -10,69 +10,720 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <script src="/terminal/html5-qrcode.min.js"></script>
 <style>
+  :root {
+    --bordeaux-700: #7B1515;
+    --bordeaux-800: #5A0A0A;
+    --bordeaux-900: #3a0606;
+    --gold-300: #F3E3B3;
+    --gold-500: #D4A017;
+    --vert: #34d399;
+    --rouge: #f87171;
+    --ombre: 0 24px 70px rgba(0, 0, 0, 0.45);
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
   body {
     margin: 0;
-    background: linear-gradient(160deg, #5A0A0A 0%, #7B1515 55%, #3a0606 100%);
-    color: white;
-    font-family: system-ui, sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+    color: #ffffff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(212, 160, 23, 0.16), transparent 42%),
+      radial-gradient(circle at 85% 80%, rgba(212, 160, 23, 0.08), transparent 35%),
+      linear-gradient(160deg, #5A0A0A 0%, #7B1515 55%, #3a0606 100%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 1120px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding: clamp(14px, 2.2vw, 28px) clamp(14px, 3vw, 32px) clamp(18px, 3vh, 36px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .barreHaut {
+    width: 100%;
+    min-height: 56px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding-right: 58px;
+  }
+
+  .horlogeBloc {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .horloge {
+    display: block;
+    font-size: clamp(1.9rem, 4.6vw, 3rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.03em;
+    font-variant-numeric: tabular-nums;
+    color: #ffffff;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.25);
+  }
+
+  .dateJour {
+    font-size: clamp(0.82rem, 1.6vw, 1rem);
+    font-weight: 500;
+    color: var(--gold-300);
+    opacity: 0.82;
+  }
+
+  #sonBtn {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+    z-index: 150;
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(212, 160, 23, 0.6);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--gold-300);
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  #sonBtn:hover { background: rgba(255, 255, 255, 0.16); }
+  #sonBtn:active { transform: scale(0.96); }
+  #sonBtn:focus-visible { outline: 3px solid var(--gold-300); outline-offset: 3px; }
+  #sonBtn .icoSon { width: 24px; height: 24px; display: block; }
+  #sonBtn .icoSonOff { display: none; }
+  #sonBtn[data-mute="1"] { opacity: 0.7; }
+  #sonBtn[data-mute="1"] .icoSonOn { display: none; }
+  #sonBtn[data-mute="1"] .icoSonOff { display: block; }
+
+  .contenu {
+    flex: 1;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: 100vh;
-    padding: 16px;
-    box-sizing: border-box;
+    justify-content: center;
+    padding-top: clamp(8px, 2vh, 24px);
   }
-  #logo { width: 88px; height: 88px; object-fit: contain; margin-bottom: 6px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
-  h1 { font-size: 18px; font-weight: 500; margin: 8px 0 16px; color: #F3E3B3; text-align: center; }
-  #reader { width: 100%; max-width: 400px; border-radius: 12px; overflow: hidden; border: 2px solid #D4A017; }
-  #resultat {
-    margin-top: 20px;
+
+  .entete { text-align: center; }
+
+  #logo {
+    display: block;
+    width: clamp(64px, 8vw, 92px);
+    height: auto;
+    margin: 0 auto;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.35));
+  }
+
+  h1 {
+    margin: clamp(8px, 1.6vh, 16px) 0 0;
+    font-size: clamp(1.55rem, 3.6vw, 2.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    color: var(--gold-300);
+  }
+
+  .sousTitre {
+    margin: 8px 0 0;
+    font-size: clamp(0.9rem, 1.7vw, 1.1rem);
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .cadreScan {
+    position: relative;
+    width: min(92vw, 560px);
+    aspect-ratio: 4 / 3;
+    margin: clamp(14px, 2.5vh, 24px) auto 0;
+    border-radius: 24px;
+    background: #170404;
+    border: 1px solid rgba(212, 160, 23, 0.35);
+    box-shadow: var(--ombre), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .cadreScan::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.22) 100%);
+  }
+
+  #reader {
+    position: absolute;
+    inset: 0;
     width: 100%;
-    max-width: 400px;
-    padding: 16px;
-    border-radius: 12px;
+    height: 100%;
+    border: 0 !important;
+    overflow: hidden;
+  }
+
+  #reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+    display: block;
+  }
+
+  #reader__dashboard,
+  #reader__header_message {
+    display: none !important;
+  }
+
+  #reader__scan_region {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: transparent !important;
+  }
+
+  .coin {
+    position: absolute;
+    z-index: 4;
+    width: 42px;
+    height: 42px;
+    border: 0 solid var(--gold-500);
+    pointer-events: none;
+    filter: drop-shadow(0 0 10px rgba(212, 160, 23, 0.35));
+  }
+
+  .coinHautGauche {
+    top: 10px;
+    left: 10px;
+    border-top-width: 4px;
+    border-left-width: 4px;
+    border-top-left-radius: 16px;
+  }
+
+  .coinHautDroit {
+    top: 10px;
+    right: 10px;
+    border-top-width: 4px;
+    border-right-width: 4px;
+    border-top-right-radius: 16px;
+  }
+
+  .coinBasGauche {
+    bottom: 10px;
+    left: 10px;
+    border-bottom-width: 4px;
+    border-left-width: 4px;
+    border-bottom-left-radius: 16px;
+  }
+
+  .coinBasDroit {
+    bottom: 10px;
+    right: 10px;
+    border-bottom-width: 4px;
+    border-right-width: 4px;
+    border-bottom-right-radius: 16px;
+  }
+
+  .ligneBalayage {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    top: 50%;
+    z-index: 3;
+    height: 2px;
+    opacity: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(243, 227, 179, 0.9), transparent);
+    box-shadow: 0 0 16px rgba(212, 160, 23, 0.75);
+    animation: balayage 3.4s ease-in-out infinite;
+  }
+
+  @keyframes balayage {
+    0%, 100% { top: 12%; opacity: 0; }
+    12% { opacity: 0.85; }
+    50% { top: 88%; opacity: 0.85; }
+    88% { opacity: 0.2; }
+  }
+
+  .statutBarre {
+    display: flex;
+    justify-content: center;
+    margin-top: clamp(12px, 2vh, 18px);
+  }
+
+  #statut {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(243, 227, 179, 0.18);
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--gold-300);
+    font-size: clamp(0.92rem, 1.6vw, 1.12rem);
+    font-weight: 600;
+    line-height: 1.3;
     text-align: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  #statut::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--gold-500);
+    box-shadow: 0 0 0 4px rgba(212, 160, 23, 0.18);
+  }
+
+  #statut[data-etat="pret"]::before {
+    background: var(--vert);
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.18);
+  }
+
+  #statut[data-etat="erreur"]::before {
+    background: var(--rouge);
+    box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.2);
+  }
+
+  .aide {
+    margin: clamp(10px, 2vh, 16px) 0 0;
+    font-size: clamp(0.78rem, 1.4vw, 0.92rem);
+    line-height: 1.4;
+    color: rgba(243, 227, 179, 0.6);
+    text-align: center;
+  }
+
+  .erreurCamera {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(18px, 4vw, 34px);
+    text-align: center;
+    background: radial-gradient(circle at 50% 25%, rgba(123, 21, 21, 0.94), rgba(34, 4, 4, 0.99));
+  }
+
+  .erreurCamera[hidden] { display: none; }
+
+  .erreurCamera svg {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 10px;
+    color: var(--gold-300);
+  }
+
+  .erreurCamera h2 {
+    margin: 0 0 6px;
+    font-size: clamp(1.15rem, 2.8vw, 1.55rem);
+    font-weight: 800;
+    color: #ffffff;
+  }
+
+  .erreurCamera p {
+    max-width: 44ch;
+    margin: 3px 0;
+    font-size: clamp(0.86rem, 1.7vw, 0.98rem);
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  .boutonReessayer {
+    margin-top: 16px;
+    padding: 12px 26px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--gold-500);
+    color: var(--bordeaux-900);
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+
+  .boutonReessayer:hover { background: #e3b433; }
+  .boutonReessayer:active { transform: scale(0.97); }
+  .boutonReessayer:focus-visible { outline: 3px solid #ffffff; outline-offset: 3px; }
+
+  .cadreScan.enErreur #reader,
+  .cadreScan.enErreur .ligneBalayage {
     display: none;
   }
-  .succes { background: #eaf3de; color: #27500a; }
-  .erreur { background: #fde2e2; color: #7a1a1a; }
-  #statut { font-size: 12px; color: #D4A017; margin-top: 12px; }
-  #sonBtn {
-    position: fixed; top: 10px; right: 10px;
-    background: rgba(255,255,255,0.14); color: #F3E3B3;
-    border: 1px solid #D4A017; border-radius: 999px;
-    font-size: 18px; padding: 4px 12px; cursor: pointer;
-    z-index: 10;
+
+  .bandeauSon {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    z-index: 140;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 24px);
+    padding: 12px 14px 12px 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(212, 160, 23, 0.65);
+    background: rgba(12, 12, 12, 0.9);
+    color: var(--gold-300);
+    font-size: 15px;
+    line-height: 1.3;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+    transform: translateX(-50%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
-  #sonBtn[data-mute="1"] { opacity: 0.55; }
-  #sonBandeau {
-    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
-    background: rgba(12,12,12,0.88); color: #F3E3B3;
-    border: 1px solid #D4A017; border-radius: 999px;
-    padding: 12px 20px; font-size: 15px; white-space: nowrap;
-    display: none; align-items: center; gap: 8px;
-    z-index: 20; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+
+  .icoBandeau {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
   }
+
   #sonBandeau .boutAction {
-    background: #D4A017; color: #3a0606; border: none;
-    border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600;
-    cursor: pointer; margin-left: 6px;
+    flex: 0 0 auto;
+    margin-left: 4px;
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--gold-500);
+    color: var(--bordeaux-900);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  #sonBandeau .boutAction:hover { background: #e3b433; }
+  #sonBandeau .boutAction:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+
+  .resultat {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(20px, 5vw, 64px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 200ms ease, visibility 0s linear 200ms;
+  }
+
+  .resultat.visible {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 200ms ease;
+  }
+
+  .resultat.succes {
+    color: #ffffff;
+    background: radial-gradient(circle at 50% 32%, #1f7a4d 0%, #0e4a2f 42%, #06251a 100%);
+  }
+
+  .resultat.deja {
+    color: #2a1a02;
+    background: radial-gradient(circle at 50% 32%, #d9a326 0%, #a86f10 45%, #6b4306 100%);
+  }
+
+  .resultat.erreur {
+    color: #ffffff;
+    background: radial-gradient(circle at 50% 32%, #7B1515 0%, #5A0A0A 45%, #2a0404 100%);
+  }
+
+  .resultatContenu {
+    width: min(1100px, 100%);
+    text-align: center;
+    opacity: 0;
+    transform: scale(0.94);
+    transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 200ms ease;
+  }
+
+  .resultat.visible .resultatContenu {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .resultatIcone {
+    display: flex;
+    justify-content: center;
+    margin-bottom: clamp(8px, 2vh, 20px);
+  }
+
+  .iconeResultat {
+    width: clamp(76px, 13vw, 132px);
+    height: auto;
+  }
+
+  .resultatTitre {
+    font-size: clamp(2rem, 8vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  .resultat.deja .resultatTitre,
+  .resultat.erreur .resultatTitre {
+    font-size: clamp(1.45rem, 4.6vw, 2.9rem);
+  }
+
+  .resultatSousTitre {
+    margin-top: clamp(8px, 1.6vh, 16px);
+    font-size: clamp(1.05rem, 2.6vw, 1.7rem);
+    font-weight: 600;
+    line-height: 1.3;
+    opacity: 0.94;
+    text-wrap: balance;
+  }
+
+  .resultatDetail {
+    display: inline-block;
+    margin-top: clamp(14px, 2.4vh, 24px);
+    padding: 10px 20px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: clamp(0.9rem, 1.8vw, 1.15rem);
+    font-weight: 600;
+    opacity: 0.82;
+  }
+
+  .cercleAnime { stroke-dasharray: 315; stroke-dashoffset: 315; }
+  .cocheAnimee { stroke-dasharray: 92; stroke-dashoffset: 92; }
+  .croixAnimee { stroke-dasharray: 120; stroke-dashoffset: 120; }
+
+  .resultat.succes.visible .cercleAnime { animation: tracerTrait 0.55s ease-out forwards; }
+  .resultat.succes.visible .cocheAnimee { animation: tracerTrait 0.4s 0.4s ease-out forwards; }
+  .resultat.erreur.visible .croixAnimee { animation: tracerTrait 0.38s 0.08s ease-out forwards; }
+  .resultat.deja.visible .iconeResultat { animation: pulseIcone 1.4s ease-out; }
+
+  @keyframes tracerTrait {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes pulseIcone {
+    0% { transform: scale(0.92); }
+    45% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+
+  @media (max-width: 520px) {
+    .contenu { justify-content: flex-start; }
+    .entete { margin-top: 6px; }
+    .cadreScan { width: min(92vw, 430px); border-radius: 20px; }
+    .coin { width: 32px; height: 32px; }
+    .aide { display: none; }
+    #sonBandeau {
+      font-size: 13px;
+      padding: 10px 12px 10px 14px;
+      border-radius: 18px;
+    }
+  }
+
+  @media (orientation: landscape) and (max-height: 720px) {
+    .app { padding-top: 8px; padding-bottom: 10px; }
+    .barreHaut { min-height: 0; }
+    .horloge { font-size: clamp(1.3rem, 2.4vw, 1.8rem); }
+    .dateJour { font-size: 0.78rem; }
+    .entete {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 2px;
+      text-align: left;
+    }
+    #logo { width: 48px; }
+    .entete h1 { margin: 0; font-size: clamp(1.15rem, 2.3vw, 1.8rem); }
+    .sousTitre { display: none; }
+    .cadreScan {
+      width: auto;
+      height: min(58vh, 560px);
+      aspect-ratio: 4 / 3;
+      margin-top: 8px;
+    }
+    .statutBarre { margin-top: 8px; }
+    .aide { display: none; }
+  }
+
+  @media (orientation: landscape) and (max-height: 520px) {
+    .app { padding: 6px 14px; }
+    .horloge { font-size: 1.1rem; }
+    .dateJour { font-size: 0.7rem; }
+    #logo { width: 36px; }
+    .entete h1 { font-size: 1.1rem; }
+    .cadreScan { height: min(52vh, 400px); }
+    .statutBarre { margin-top: 4px; }
+    #statut { padding: 6px 12px; font-size: 0.8rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .resultat,
+    .resultatContenu,
+    #sonBtn,
+    .boutonReessayer {
+      transition: none !important;
+    }
+    .resultatContenu { transform: none; }
+    .resultat.visible .resultatContenu { transform: none; }
+    .ligneBalayage { display: none; }
+    .cercleAnime,
+    .cocheAnimee,
+    .croixAnimee {
+      animation: none !important;
+      stroke-dashoffset: 0 !important;
+    }
+    .resultat.deja.visible .iconeResultat { animation: none; }
   }
 </style>
 </head>
 <body>
-  <img id="logo" src="/terminal/rsi-logo.png" alt="RSI" />
-  <h1>Présentez le QR code du badge devant la caméra</h1>
-  <div id="reader"></div>
-  <div id="resultat"></div>
-  <div id="statut">Initialisation de la caméra…</div>
-  <button id="sonBtn" title="Couper / activer le son">🔊</button>
-  <div id="sonBandeau">🔇 Touchez l'écran pour activer le son<button class="boutAction" type="button">Activer le son</button></div>
+  <div class="app">
+    <header class="barreHaut">
+      <div class="horlogeBloc">
+        <time id="horloge" class="horloge" aria-live="off">--:--:--</time>
+        <div id="dateJour" class="dateJour">Chargement de la date…</div>
+      </div>
+    </header>
+
+    <main class="contenu">
+      <div class="entete">
+        <img id="logo" src="/terminal/rsi-logo.png" alt="Logo RSI" />
+        <h1>Présentez votre badge</h1>
+        <p class="sousTitre">Approchez le QR code de votre badge de la caméra.</p>
+      </div>
+
+      <div id="cadreScan" class="cadreScan">
+        <div id="reader"></div>
+        <span class="coin coinHautGauche" aria-hidden="true"></span>
+        <span class="coin coinHautDroit" aria-hidden="true"></span>
+        <span class="coin coinBasGauche" aria-hidden="true"></span>
+        <span class="coin coinBasDroit" aria-hidden="true"></span>
+        <span class="ligneBalayage" aria-hidden="true"></span>
+
+        <div id="erreurCamera" class="erreurCamera" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 2l20 20" />
+            <path d="M9.5 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            <path d="M14 5h4a2 2 0 0 1 2 2v4.5" />
+            <path d="m10 10 4 4" />
+            <path d="M10 14a3 3 0 0 0 4-4" />
+          </svg>
+          <h2 id="erreurTitre">Caméra indisponible</h2>
+          <p id="erreurTexte1"></p>
+          <p id="erreurTexte2"></p>
+          <button id="reessayerBtn" class="boutonReessayer" type="button">Réessayer</button>
+        </div>
+      </div>
+
+      <div class="statutBarre">
+        <div id="statut" data-etat="init" role="status" aria-live="polite">Initialisation de la caméra…</div>
+      </div>
+      <p class="aide">Le pointage est automatique. Aucun contact n'est nécessaire.</p>
+    </main>
+  </div>
+
+  <div id="resultat" class="resultat" role="status" aria-live="assertive" aria-atomic="true" aria-hidden="true"></div>
+
+  <button id="sonBtn" type="button" title="Couper le son" aria-label="Couper le son" aria-pressed="false" data-mute="0">
+    <svg class="icoSon icoSonOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M11 5 6.5 9H3v6h3.5L11 19V5Z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    </svg>
+    <svg class="icoSon icoSonOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M11 5 6.5 9H3v6h3.5L11 19V5Z" />
+      <path d="m16 9 5 5" />
+      <path d="m21 9-5 5" />
+    </svg>
+  </button>
+
+  <div id="sonBandeau" class="bandeauSon" role="status">
+    <svg class="icoBandeau" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M11 5 6.5 9H3v6h3.5L11 19V5Z" />
+      <path d="m16 9 5 5" />
+      <path d="m21 9-5 5" />
+    </svg>
+    <span>Touchez l'écran pour activer le son</span>
+    <button class="boutAction" type="button">Activer le son</button>
+  </div>
 
 <script data-audio-son="v2">
   const API_BASE = window.location.origin;
 
   let enTraitement = false;
+
+  // ---------- Interface : statut et horloge ----------
+  const statutEl = document.getElementById("statut");
+  const horlogeEl = document.getElementById("horloge");
+  const dateJourEl = document.getElementById("dateJour");
+
+  function majStatut(texte, etat = "pret") {
+    if (!statutEl) return;
+    statutEl.textContent = texte;
+    statutEl.dataset.etat = etat;
+  }
+
+  function majHorloge() {
+    const maintenant = new Date();
+    if (horlogeEl) {
+      horlogeEl.textContent = new Intl.DateTimeFormat("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }).format(maintenant);
+      horlogeEl.dateTime = maintenant.toISOString();
+    }
+    if (dateJourEl) {
+      const date = new Intl.DateTimeFormat("fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(maintenant);
+      dateJourEl.textContent = date.charAt(0).toUpperCase() + date.slice(1);
+    }
+  }
+
+  majHorloge();
+  setInterval(majHorloge, 1000);
 
   // ---------- Sons du terminal ----------
   // v2 : déblocage audio UNIQUE et PERSISTANT via Web Audio. Le navigateur ne
@@ -194,18 +845,108 @@
     }, delai);
   }
 
-  function afficherResultat(texte, succes) {
-    const el = document.getElementById("resultat");
-    el.textContent = texte;
-    el.className = succes ? "succes" : "erreur";
-    el.style.display = "block";
-    setTimeout(() => { el.style.display = "none"; }, 3500);
+  // ---------- Retour de scan plein écran ----------
+  const resultatEl = document.getElementById("resultat");
+  let minuterieResultat = null;
+
+  const ICONE_COCHE = `
+    <svg class="iconeResultat" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+      <circle cx="60" cy="60" r="50" stroke="currentColor" stroke-opacity=".22" stroke-width="6" />
+      <circle class="cercleAnime" cx="60" cy="60" r="50" stroke="currentColor" stroke-width="6" stroke-linecap="round" transform="rotate(-90 60 60)" />
+      <path class="cocheAnimee" d="M34 61.5 52.5 80 88 42" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>`;
+
+  const ICONE_HORLOGE = `
+    <svg class="iconeResultat" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+      <circle cx="60" cy="60" r="50" stroke="currentColor" stroke-opacity=".22" stroke-width="6" />
+      <circle cx="60" cy="60" r="50" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="80" transform="rotate(-90 60 60)" />
+      <path d="M60 34v28l18 12" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>`;
+
+  const ICONE_CROIX = `
+    <svg class="iconeResultat" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+      <circle cx="60" cy="60" r="50" stroke="currentColor" stroke-opacity=".22" stroke-width="6" />
+      <path class="croixAnimee" d="M40 40 80 80M80 40 40 80" stroke="currentColor" stroke-width="8" stroke-linecap="round" />
+    </svg>`;
+
+  function echapper(texte) {
+    return String(texte ?? "").replace(/[&<>"']/g, (caractere) => {
+      switch (caractere) {
+        case "&": return "&amp;";
+        case "<": return "&lt;";
+        case ">": return "&gt;";
+        case '"': return "&quot;";
+        default: return "&#39;";
+      }
+    });
+  }
+
+  function heureCourte(date) {
+    try {
+      return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date);
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function afficherResultat(type, donnees = {}) {
+    if (!resultatEl) return;
+
+    const heure = heureCourte(donnees.heure instanceof Date ? donnees.heure : new Date());
+    const nomComplet = [donnees.prenom, donnees.nom].filter(Boolean).join(" ").trim();
+
+    let classe = "erreur";
+    let icone = ICONE_CROIX;
+    let titre = "Pointage impossible";
+    let sousTitre = donnees.message || "Une erreur est survenue. Veuillez réessayer.";
+    let detail = "Présentez le badge à nouveau.";
+
+    if (type === "succes") {
+      classe = "succes";
+      icone = ICONE_COCHE;
+      titre = nomComplet || "Pointage enregistré";
+      sousTitre = donnees.departement || "Département non renseigné";
+      detail = "Pointage à " + heure;
+    } else if (type === "deja") {
+      classe = "deja";
+      icone = ICONE_HORLOGE;
+      titre = "Déjà enregistré aujourd'hui";
+      sousTitre = "Ce badge a déjà été pointé pour la journée.";
+      detail = "Présentez le badge suivant.";
+    } else if (type === "inconnu") {
+      classe = "erreur";
+      icone = ICONE_CROIX;
+      titre = "Badge inconnu";
+      sousTitre = "Ce badge n'est pas reconnu par le système.";
+      detail = "Vérifiez le badge ou contactez un responsable.";
+    }
+
+    resultatEl.className = "resultat " + classe;
+    resultatEl.innerHTML = `
+      <div class="resultatContenu">
+        <div class="resultatIcone">${icone}</div>
+        <div class="resultatTitre">${echapper(titre)}</div>
+        <div class="resultatSousTitre">${echapper(sousTitre)}</div>
+        <div class="resultatDetail">${echapper(detail)}</div>
+      </div>`;
+    resultatEl.setAttribute("aria-hidden", "false");
+
+    // Force le navigateur à réinitialiser l'animation d'entrée.
+    void resultatEl.offsetWidth;
+    resultatEl.classList.add("visible");
+
+    if (minuterieResultat) clearTimeout(minuterieResultat);
+    minuterieResultat = setTimeout(() => {
+      resultatEl.classList.remove("visible");
+      resultatEl.setAttribute("aria-hidden", "true");
+      minuterieResultat = null;
+    }, 2500);
   }
 
   async function envoyerScan(matricule) {
     if (enTraitement) return;
     enTraitement = true;
-    document.getElementById("statut").textContent = "Envoi du badge " + matricule + "…";
+    majStatut("Vérification du badge…", "init");
     try {
       const res = await fetch(API_BASE + "/api/badgeage", {
         method: "POST",
@@ -215,43 +956,109 @@
       const data = await res.json();
       if (data.ok) {
         const o = data.ouvrier;
-        afficherResultat(`✓ Pointage enregistré : ${o.prenom} ${o.nom} (${o.departement})`, true);
+        afficherResultat("succes", {
+          prenom: o.prenom,
+          nom: o.nom,
+          departement: o.departement,
+          heure: new Date(),
+        });
         jouerSon("succes");
         jouerSon("annonceSucces", 300);
       } else if (data.code === "DEJA_BADGE_AUJOURDHUI") {
-        afficherResultat(`⚠ ${data.message || data.code}`, false);
+        afficherResultat("deja");
         jouerSon("deja");
         jouerSon("annonceDeja", 600);
       } else if (data.code === "BADGE_INCONNU") {
-        afficherResultat("✗ Ouvrier inconnu", false);
+        afficherResultat("inconnu");
         jouerSon("erreur");
         jouerSon("annonceInconnu", 150);
       } else {
-        afficherResultat(`✗ ${data.message || data.code}`, false);
+        afficherResultat("erreur", {
+          message: data.message || "Une erreur est survenue pendant le pointage.",
+        });
         jouerSon("erreur");
         jouerSon("annonceErreur", 150);
       }
     } catch (e) {
-      afficherResultat("✗ Impossible de contacter le serveur : " + e.message, false);
+      afficherResultat("erreur", {
+        message: "Impossible de contacter le serveur. Vérifiez la connexion du terminal.",
+      });
       jouerSon("erreur");
       jouerSon("annonceErreur", 150);
     } finally {
-      document.getElementById("statut").textContent = "Prêt pour le prochain scan…";
+      majStatut("Prêt pour le prochain scan…", "pret");
       setTimeout(() => { enTraitement = false; }, 2000);
     }
   }
 
   const scanner = new Html5Qrcode("reader");
-  scanner.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    (texteDecode) => envoyerScan(texteDecode.trim()),
-    () => {}
-  ).then(() => {
-    document.getElementById("statut").textContent = "Caméra prête.";
-  }).catch((err) => {
-    document.getElementById("statut").textContent = "Erreur caméra : " + err;
-  });
+  const elCadreScan = document.getElementById("cadreScan");
+  const elErreurCamera = document.getElementById("erreurCamera");
+  const boutonReessayer = document.getElementById("reessayerBtn");
+
+  function afficherErreurCamera(err) {
+    const brut = String((err && (err.name || err.message)) || err || "");
+    const permission = /NotAllowed|Permission|permission|refus|denied/i.test(brut);
+
+    const titre = document.getElementById("erreurTitre");
+    const texte1 = document.getElementById("erreurTexte1");
+    const texte2 = document.getElementById("erreurTexte2");
+
+    if (titre) titre.textContent = permission ? "Accès à la caméra refusé" : "Caméra indisponible";
+    if (texte1) {
+      texte1.textContent = permission
+        ? "Autorisez l'accès à la caméra dans les réglages du navigateur, puis réessayez."
+        : "Vérifiez qu'aucune autre application n'utilise la caméra.";
+    }
+    if (texte2) {
+      texte2.textContent = permission
+        ? "Sur tablette, vérifiez également les autorisations de l'application."
+        : "Débranchez puis rebranchez la caméra si nécessaire.";
+    }
+
+    if (elCadreScan) elCadreScan.classList.add("enErreur");
+    if (elErreurCamera) elErreurCamera.hidden = false;
+    majStatut("Caméra indisponible", "erreur");
+  }
+
+  let cameraEnCours = false;
+  let tentativesCamera = 0;
+
+  async function demarrerCamera() {
+    if (cameraEnCours) return;
+    cameraEnCours = true;
+
+    if (elCadreScan) elCadreScan.classList.remove("enErreur");
+    if (elErreurCamera) elErreurCamera.hidden = true;
+    majStatut("Initialisation de la caméra…", "init");
+
+    if (tentativesCamera > 0) {
+      try { await scanner.stop(); } catch (e) {}
+    }
+    tentativesCamera += 1;
+
+    try {
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (texteDecode) => envoyerScan(texteDecode.trim()),
+        () => {}
+      );
+      cameraEnCours = false;
+      majStatut("Caméra prête.", "pret");
+    } catch (err) {
+      cameraEnCours = false;
+      afficherErreurCamera(err);
+    }
+  }
+
+  if (boutonReessayer) {
+    boutonReessayer.addEventListener("click", () => {
+      demarrerCamera();
+    });
+  }
+
+  demarrerCamera();
 
   // Déblocage AU PREMIER contact uniquement (tactile, clavier ou souris).
   // Une fois déverrouillé, chaque badge joue automatiquement sa voix.
@@ -267,8 +1074,10 @@
   // Couper / activer le son.
   const sonBtn = document.getElementById("sonBtn");
   function majSonBtn() {
-    sonBtn.textContent = sonCoupe ? "🔇" : "🔊";
     sonBtn.dataset.mute = sonCoupe ? "1" : "0";
+    sonBtn.setAttribute("aria-pressed", sonCoupe ? "true" : "false");
+    sonBtn.setAttribute("aria-label", sonCoupe ? "Activer le son" : "Couper le son");
+    sonBtn.title = sonCoupe ? "Activer le son" : "Couper le son";
   }
   sonBtn.addEventListener("click", () => {
     sonCoupe = !sonCoupe;

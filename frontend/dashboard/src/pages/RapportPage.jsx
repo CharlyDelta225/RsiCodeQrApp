@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
+import { Download, FileDown, Mail } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
 import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
+import Card from "../ui/Card";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
 import { Field, Input, Select } from "../ui/inputs";
@@ -32,9 +34,9 @@ function csvValeur(v) {
 function messageEchecEnvoi(code, messageApi) {
   const dict = {
     SMTP_NON_CONFIGURE:
-      "Envoi email non configuré : renseignez SMTP_HOST (et SMTP_USER/SMTP_PASS) dans le .env du backend.",
+      "L'envoi par email n'est pas configuré.",
     SANS_DESTINATAIRE:
-      "Aucun destinataire : saisissez des adresses ci-dessus ou renseignez RAPPORT_EMAIL_DESTINATAIRES dans le .env du backend.",
+      "Aucun destinataire : saisissez au moins une adresse ou configurez des destinataires par défaut.",
   };
   return dict[code] || messageApi || "L'envoi a échoué";
 }
@@ -48,6 +50,7 @@ export default function RapportPage() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
   const [page, setPage] = useState(1);
+  const [exportEnCours, setExportEnCours] = useState(false);
 
   // Dialoque d'envoi email manuel
   const [envoiOuvert, setEnvoiOuvert] = useState(false);
@@ -128,6 +131,14 @@ export default function RapportPage() {
     telechargerBlob(blob, `rapport-pointage_${dateRapport}_${depAbrege}.csv`);
   }
 
+  function handleExporterPdf() {
+    setExportEnCours(true);
+    setTimeout(() => {
+      window.print();
+      setExportEnCours(false);
+    }, 150);
+  }
+
   function ouvrirModalEnvoi() {
     setDestinatairesTxt("");
     setRetourEnvoi(null);
@@ -163,25 +174,40 @@ export default function RapportPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-bordeaux-900">
-          {rapport
-            ? `${totaux.effectif} ouvrier(s) · ${totaux.presents} présent(s) · ${totaux.absents} absent(s)`
-            : "Rapport de pointage"}
-        </h2>
+    <div className="rapport-page p-4 md:p-6 space-y-4 max-w-6xl mx-auto">
+      <div className="no-print flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
+            Rapports de pointage
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Consultez, exportez ou envoyez le rapport d’une journée.
+          </p>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           {peutEcrire() && (
-            <Btn variant="secondary" onClick={handleExporterCsv} disabled={lignesAffichees.length === 0} icon="⬇">
-              Exporter en CSV
+            <Btn
+              variant="secondary"
+              onClick={handleExporterPdf}
+              loading={exportEnCours}
+              disabled={chargement || !rapport}
+              icon={<FileDown size={16} />}
+            >
+              {exportEnCours ? "Préparation…" : "Exporter en PDF"}
             </Btn>
           )}
           {peutEcrire() && (
-            <Btn variant="primary" onClick={ouvrirModalEnvoi} disabled={chargement || !rapport} icon="✉">
+            <Btn variant="primary" onClick={ouvrirModalEnvoi} disabled={chargement || !rapport} icon={<Mail size={16} />}>
               Envoyer par email
             </Btn>
           )}
         </div>
+      </div>
+
+      <div className="hidden print:block">
+        <h1 className="text-lg font-semibold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
+          Rapport de pointage — {rapport?.dateLongueur || date}
+        </h1>
       </div>
 
       {erreur && (
@@ -190,71 +216,148 @@ export default function RapportPage() {
         </p>
       )}
 
-      <form
-        onSubmit={handleFiltrer}
-        className="flex flex-wrap items-end gap-2 bg-white border border-slate-200 rounded-xl p-3"
+      <Card
+        title="Filtrer le rapport"
+        description="Choisissez une date et, si besoin, un département."
+        className="no-print"
       >
-        <Field label="Date">
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
-        <Field label="Département" className="flex-1 min-w-[200px]">
-          <Select value={departementId} onChange={(e) => setDepartementId(e.target.value)}>
-            <option value="">Tous les départements</option>
-            {departements.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nom}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Btn type="submit">Filtrer</Btn>
-      </form>
+        <form onSubmit={handleFiltrer} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] md:items-end">
+          <Field label="Date">
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Département">
+            <Select value={departementId} onChange={(e) => setDepartementId(e.target.value)}>
+              <option value="">Tous les départements</option>
+              {departements.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nom}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Btn type="submit" disabled={chargement} loading={chargement}>
+            {chargement ? "Chargement…" : "Afficher"}
+          </Btn>
+        </form>
+      </Card>
 
       {rapport && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-1.5">
-            {rapport.jourLabel} {rapport.dateLongueur}
-          </span>
-          <span className="text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-1.5">
-            {rapport.notePresence}
-          </span>
-          <Pill tonalite="vert">Présents : {totaux.presents}</Pill>
-          <Pill tonalite="rouge">Absents : {totaux.absents}</Pill>
-        </div>
+        <Card
+          title={`${rapport.jourLabel} ${rapport.dateLongueur}`}
+          description={rapport.notePresence}
+          actions={
+            <div className="flex items-center gap-2">
+              <Pill tonalite="vert">Présents : {totaux?.presents ?? 0}</Pill>
+              <Pill tonalite="rouge">Absents : {totaux?.absents ?? 0}</Pill>
+            </div>
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Effectif</p>
+              <p className="text-2xl font-semibold text-slate-900 mt-1" style={{ fontFamily: "Poppins,sans-serif" }}>
+                {totaux?.effectif ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wide text-emerald-700">Présents</p>
+              <p className="text-2xl font-semibold text-emerald-800 mt-1" style={{ fontFamily: "Poppins,sans-serif" }}>
+                {totaux?.presents ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-bordeaux-200 bg-bordeaux-50 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wide text-bordeaux-700">Absents</p>
+              <p className="text-2xl font-semibold text-bordeaux-800 mt-1" style={{ fontFamily: "Poppins,sans-serif" }}>
+                {totaux?.absents ?? 0}
+              </p>
+            </div>
+          </div>
+        </Card>
       )}
 
-      <TableShell
-        colonnes={["Matricule", "Nom", "Prénom", "Département", "Statut", "Heure"]}
-        chargement={chargement}
-        vide={
-          !chargement && rapport && lignesAffichees.length === 0
-            ? "Aucun ouvrier rattaché à la sélection"
-            : "Aucune donnée"
+      <Card
+        title="Détail des pointages"
+        description={`${lignesAffichees.length} ligne(s) affichée(s)`}
+        className="no-print"
+        actions={
+          peutEcrire() ? (
+            <Btn
+              variant="ghost"
+              size="xs"
+              onClick={handleExporterCsv}
+              disabled={lignesAffichees.length === 0}
+              icon={<Download size={14} />}
+              title="Exporter en CSV"
+            >
+              CSV
+            </Btn>
+          ) : null
         }
       >
-        {lignesPage.map(({ ligne, nomDepartement }, index) => (
-          <tr key={`${nomDepartement}-${ligne.matricule}-${index}`} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
-            <td className="px-3 py-2 font-mono text-xs">{ligne.matricule}</td>
-            <td className="px-3 py-2">{ligne.nom}</td>
-            <td className="px-3 py-2">{ligne.prenom}</td>
-            <td className="px-3 py-2">{nomDepartement}</td>
-            <td className="px-3 py-2">
-              <Pill tonalite={ligne.present ? "vert" : "rouge"}>
-                {ligne.present ? "Présent" : "Absent"}
-              </Pill>
-            </td>
-            <td className="px-3 py-2 text-xs">{ligne.heure ?? "—"}</td>
-          </tr>
-        ))}
-      </TableShell>
+        <TableShell
+          colonnes={["Matricule", "Nom", "Prénom", "Département", "Statut", "Heure"]}
+          chargement={chargement}
+          vide={
+            !chargement && rapport && lignesAffichees.length === 0
+              ? "Aucun ouvrier rattaché à la sélection"
+              : "Aucune donnée"
+          }
+        >
+          {lignesPage.map(({ ligne, nomDepartement }, index) => (
+            <tr key={`${nomDepartement}-${ligne.matricule}-${index}`} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
+              <td className="px-3 py-2 font-mono text-xs">{ligne.matricule}</td>
+              <td className="px-3 py-2">{ligne.nom}</td>
+              <td className="px-3 py-2">{ligne.prenom}</td>
+              <td className="px-3 py-2">{nomDepartement}</td>
+              <td className="px-3 py-2">
+                <Pill tonalite={ligne.present ? "vert" : "rouge"}>
+                  {ligne.present ? "Présent" : "Absent"}
+                </Pill>
+              </td>
+              <td className="px-3 py-2 text-xs">{ligne.heure ?? "—"}</td>
+            </tr>
+          ))}
+        </TableShell>
 
-      <PaginationBar
-        page={pageCourante}
-        totalPages={totalPages}
-        onPage={setPage}
-        total={lignesAffichees.length}
-        label="ouvrier(s)"
-      />
+        <div className="no-print">
+          <PaginationBar
+            page={pageCourante}
+            totalPages={totalPages}
+            onPage={setPage}
+            total={lignesAffichees.length}
+            label="ouvrier(s)"
+          />
+        </div>
+      </Card>
+
+      <div className="rapport-print-only hidden print:block">
+        <h2 className="text-sm font-semibold text-slate-800 mb-2" style={{ fontFamily: "Poppins,sans-serif" }}>
+          Détail des pointages ({lignesAffichees.length})
+        </h2>
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-bordeaux-50 text-bordeaux-900">
+              {["Matricule", "Nom", "Prénom", "Département", "Statut", "Heure"].map((c) => (
+                <th key={c} className="text-left px-2 py-1.5 border border-slate-300 text-[10px] uppercase tracking-wide">
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lignesAffichees.map(({ ligne, nomDepartement }, index) => (
+              <tr key={`print-${nomDepartement}-${ligne.matricule}-${index}`} className="border-b border-slate-200">
+                <td className="px-2 py-1.5 border border-slate-200 font-mono text-[10px]">{ligne.matricule}</td>
+                <td className="px-2 py-1.5 border border-slate-200">{ligne.nom}</td>
+                <td className="px-2 py-1.5 border border-slate-200">{ligne.prenom}</td>
+                <td className="px-2 py-1.5 border border-slate-200">{nomDepartement}</td>
+                <td className="px-2 py-1.5 border border-slate-200">{ligne.present ? "Présent" : "Absent"}</td>
+                <td className="px-2 py-1.5 border border-slate-200 text-xs">{ligne.heure ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {envoiOuvert && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">

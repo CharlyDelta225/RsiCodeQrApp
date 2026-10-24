@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import RequireRole from "./components/RequireRole.jsx";
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
@@ -15,6 +15,7 @@ const NotFoundPage = lazy(() => import("./pages/NotFoundPage.jsx"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
 const OuvriersPage = lazy(() => import("./pages/OuvriersPage.jsx"));
 const BadgesPage = lazy(() => import("./pages/BadgesPage.jsx"));
+const BadgeStudioPage = lazy(() => import("./pages/BadgeStudioPage.jsx"));
 const PointagesJourPage = lazy(() => import("./pages/PointagesJourPage.jsx"));
 const HistoriquePage = lazy(() => import("./pages/HistoriquePage.jsx"));
 const DepartementsPage = lazy(() => import("./pages/DepartementsPage.jsx"));
@@ -32,16 +33,25 @@ function PageChargement() {
   );
 }
 
+function PagePublique({ children }) {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="page-enter">
+      {children}
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <Suspense fallback={<PageChargement />}>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/inscription" element={<InscriptionPage />} />
-        <Route path="/oublie" element={<OubliePage />} />
-        <Route path="/reinitialisation" element={<ReinitialisationPage />} />
-        <Route path="/confidentialite" element={<ConfidentialitePage />} />
-        <Route path="/cgv-cgu" element={<CguPage />} />
+        <Route path="/login" element={<PagePublique><LoginPage /></PagePublique>} />
+        <Route path="/inscription" element={<PagePublique><InscriptionPage /></PagePublique>} />
+        <Route path="/oublie" element={<PagePublique><OubliePage /></PagePublique>} />
+        <Route path="/reinitialisation" element={<PagePublique><ReinitialisationPage /></PagePublique>} />
+        <Route path="/confidentialite" element={<PagePublique><ConfidentialitePage /></PagePublique>} />
+        <Route path="/cgv-cgu" element={<PagePublique><CguPage /></PagePublique>} />
 
         <Route
           element={
@@ -53,6 +63,7 @@ export default function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/ouvriers" element={<OuvriersPage />} />
           <Route path="/badges" element={<BadgesPage />} />
+          <Route path="/badges/atelier" element={<BadgeStudioPage />} />
           <Route path="/pointages" element={<PointagesJourPage />} />
           <Route path="/historique" element={<HistoriquePage />} />
           <Route path="/departements" element={<DepartementsPage />} />
@@ -83,7 +94,7 @@ export default function App() {
           />
         </Route>
 
-        <Route path="*" element={<NotFoundPage />} />
+        <Route path="*" element={<PagePublique><NotFoundPage /></PagePublique>} />
       </Routes>
     </Suspense>
   );

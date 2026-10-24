@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { C } from "../theme";
 import { usePageMeta } from "../hooks/usePageMeta";
 import Logo from "../components/Logo";
@@ -120,9 +121,9 @@ export default function ConfidentialitePage() {
           <div className="pt-2">
             <Link
               to="/login"
-              className="inline-block text-sm font-medium text-bordeaux-700 hover:text-bordeaux-800 transition-colors"
+              className="inline-flex items-center gap-1 text-sm font-medium text-bordeaux-700 hover:text-bordeaux-800 transition-colors"
             >
-              ← Retour à la connexion
+              <ArrowLeft size={14} aria-hidden="true" /> Retour à la connexion
             </Link>
           </div>
         </article>

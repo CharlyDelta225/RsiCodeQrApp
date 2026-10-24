@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { getAdmin } from "../lib/auth";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useToast } from "../components/Toast.jsx";
 import Btn from "../ui/Btn";
 import { Input, Select } from "../ui/inputs";
 import { C } from "../theme";
@@ -129,6 +130,7 @@ function SelecteurRole({ admin, moiMeme, surChangement }) {
 }
 
 export default function GestionAdminsPage() {
+  const toast = useToast();
   const moi = getAdmin();
 
   const [admins, setAdmins] = useState([]);
@@ -142,6 +144,18 @@ export default function GestionAdminsPage() {
 
   const [confirm, setConfirm] = useState(null); // { type, admin }
   const [mdpTemporaire, setMdpTemporaire] = useState(null); // { email, motDePasse } ou { email, lien }
+
+  useEffect(() => {
+    if (!succes) return;
+    toast.success(succes.titre, succes.message);
+    setSucces(null);
+  }, [succes, toast]);
+
+  useEffect(() => {
+    if (!alerte || mdpTemporaire) return;
+    toast.error(alerte.titre, alerte.message);
+    setAlerte(null);
+  }, [alerte, mdpTemporaire, toast]);
 
   const charger = async () => {
     setChargement(true);
@@ -291,34 +305,25 @@ export default function GestionAdminsPage() {
         </button>
       </div>
 
-      {alerte && (
+      {alerte && mdpTemporaire && (
         <div className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-4 py-3">
           <p className="font-semibold">{alerte.titre}</p>
           <p className="mt-0.5">{alerte.message}</p>
-          {mdpTemporaire && (
-            <div className="mt-3 p-3 rounded-lg bg-white ring-1 ring-bordeaux-200">
-              {mdpTemporaire.motDePasse ? (
-                <>
-                  <p className="text-xs text-slate-500 mb-1">Mot de passe temporaire pour {mdpTemporaire.email} :</p>
-                  <code className="text-sm font-mono font-semibold break-all">{mdpTemporaire.motDePasse}</code>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-slate-500 mb-1">
-                    Lien de réinitialisation pour {mdpTemporaire.email} (valable 1 heure) :
-                  </p>
-                  <code className="text-xs font-mono break-all">{mdpTemporaire.lien}</code>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {succes && (
-        <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
-          <p className="font-semibold">{succes.titre}</p>
-          <p className="mt-0.5">{succes.message}</p>
+          <div className="mt-3 p-3 rounded-lg bg-white ring-1 ring-bordeaux-200">
+            {mdpTemporaire.motDePasse ? (
+              <>
+                <p className="text-xs text-slate-500 mb-1">Mot de passe temporaire pour {mdpTemporaire.email} :</p>
+                <code className="text-sm font-mono font-semibold break-all">{mdpTemporaire.motDePasse}</code>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-slate-500 mb-1">
+                  Lien de réinitialisation pour {mdpTemporaire.email} (valable 1 heure) :
+                </p>
+                <code className="text-xs font-mono break-all">{mdpTemporaire.lien}</code>
+              </>
+            )}
+          </div>
         </div>
       )}
 

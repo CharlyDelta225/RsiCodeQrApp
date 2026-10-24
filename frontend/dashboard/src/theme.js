@@ -1,3 +1,17 @@
+import {
+  LayoutDashboard,
+  Users,
+  QrCode,
+  ScanLine,
+  ClipboardCheck,
+  History,
+  Building2,
+  Settings2,
+  ArrowRightLeft,
+  FileText,
+  ShieldCheck,
+} from "lucide-react";
+
 // ─── IDENTITÉ VISUELLE ────────────────────────────────────────────────────
 // Gradients et polices repris du projet "Church Activity Reporting Platform"
 // (même organisation RSI). On ne reprend QUE la structure/style visuel —
@@ -16,16 +30,17 @@ export const C = {
 // départements), pas aux écrans de la maquette (rapports de cellules, etc.)
 // `minRole` : rôle minimum pour voir l'entrée (absent = tous les rôles).
 export const navItems = [
-  { path: "/", label: "Tableau de bord", icon: "⊞", short: "Accueil" },
-  { path: "/ouvriers", label: "Ouvriers", icon: "◎", short: "Ouvriers" },
-  { path: "/badges", label: "Badges QR", icon: "⊛", short: "Badges" },
-  { path: "/pointages", label: "Pointages du jour", icon: "⊕", short: "Pointages" },
-  { path: "/historique", label: "Historique", icon: "⊡", short: "Historique" },
-  { path: "/departements", label: "Départements", icon: "▣", short: "Départ." },
-  { path: "/gestion-departements", label: "Gestion départements", icon: "◫", short: "Gest. dép.", minRole: "ADMIN" },
-  { path: "/migration-ouvrier", label: "Migration ouvrier", icon: "⇄", short: "Migration", minRole: "ADMIN" },
-  { path: "/rapports", label: "Rapport de pointage", icon: "▤", short: "Rapport" },
-  { path: "/gestion-admins", label: "Gestion admins", icon: "⚙", short: "Comptes", minRole: "SUPER_ADMIN" },
+  { path: "/", label: "Tableau de bord", icon: LayoutDashboard, short: "Accueil" },
+  { path: "/ouvriers", label: "Ouvriers", icon: Users, short: "Ouvriers" },
+  { path: "/badges", label: "Badges QR", icon: QrCode, short: "Badges" },
+  { path: "/badges/atelier", label: "Atelier badges", icon: ScanLine, short: "Atelier" },
+  { path: "/pointages", label: "Pointages du jour", icon: ClipboardCheck, short: "Pointages" },
+  { path: "/historique", label: "Historique", icon: History, short: "Historique" },
+  { path: "/departements", label: "Départements", icon: Building2, short: "Départ." },
+  { path: "/gestion-departements", label: "Gestion départements", icon: Settings2, short: "Gest. dép.", minRole: "ADMIN" },
+  { path: "/migration-ouvrier", label: "Migration ouvrier", icon: ArrowRightLeft, short: "Migration", minRole: "ADMIN" },
+  { path: "/rapports", label: "Rapport de pointage", icon: FileText, short: "Rapport" },
+  { path: "/gestion-admins", label: "Gestion admins", icon: ShieldCheck, short: "Comptes", minRole: "SUPER_ADMIN" },
 ];
 
 // Titre/sous-titre de la TopBar selon la route active
@@ -33,6 +48,7 @@ export const pageTitles = {
   "/": { title: "Tableau de bord", subtitle: "RsiCodeQrApp · Présence" },
   "/ouvriers": { title: "Ouvriers", subtitle: "Gestion du personnel" },
   "/badges": { title: "Badges QR", subtitle: "Génération et impression" },
+  "/badges/atelier": { title: "Atelier badges", subtitle: "Recto · Verso · Impression ID-1" },
   "/pointages": { title: "Pointages du jour", subtitle: "Suivi en temps réel" },
   "/historique": { title: "Historique", subtitle: "Filtrable · Exportable" },
   "/departements": { title: "Départements", subtitle: "Membres et postes" },
