@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ChevronRight, Download, Plus, X } from "lucide-react";
+import { ArrowRight, Download, Plus } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
@@ -9,6 +9,7 @@ import { useToast } from "../components/Toast.jsx";
 import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Btn from "../ui/Btn";
+import Modal from "../ui/Modal";
 import { Field, Input } from "../ui/inputs";
 import { usePagination } from "../lib/pagination";
 
@@ -143,7 +144,7 @@ export default function GestionDepartementsPage() {
     if (departementsFiltres.length === 0) return;
     const entete = ["Nom", "Membres"];
     const lignes = departementsFiltres.map((d) => [d.nom, d._count?.membres ?? 0].map(csvValeur).join(";"));
-    const csv = "\uFEFF" + [entete.join(";"), ...lignes].join("\n");
+    const csv = "﻿" + [entete.join(";"), ...lignes].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     telechargerBlob(blob, "departements.csv");
   }
@@ -271,94 +272,74 @@ export default function GestionDepartementsPage() {
         />
       </div>
 
-      {/* Popup de création d'un département */}
-      {creationOuvert && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Poppins,sans-serif" }}>
-                Créer un département
-              </h2>
-              <button
-                onClick={() => setCreationOuvert(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
-            <form onSubmit={handleCreer} className="p-6 space-y-4">
-              <Field label="Nom *">
-                <Input
-                  required
-                  value={formCreation.nom}
-                  onChange={(e) => setFormCreation({ ...formCreation, nom: e.target.value })}
-                  placeholder="Ex : Sonorisation"
-                />
-              </Field>
-              <Field label="Description (optionnel)">
-                <Input
-                  value={formCreation.description}
-                  onChange={(e) => setFormCreation({ ...formCreation, description: e.target.value })}
-                />
-              </Field>
-              {creationErreur && (
-                <p className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">
-                  {creationErreur}
-                </p>
-              )}
-              <div className="flex justify-end gap-2 pt-2">
-                <Btn variant="ghost" size="sm" onClick={() => setCreationOuvert(false)}>
-                  Annuler
-                </Btn>
-                <Btn type="submit" loading={enGestion}>
-                  {enGestion ? "Création…" : "Créer"}
-                </Btn>
-              </div>
-            </form>
+      {/* Fenêtre de création d'un département */}
+      <Modal
+        ouvert={creationOuvert}
+        titre="Créer un département"
+        onClose={() => setCreationOuvert(false)}
+        bloquee={enGestion}
+      >
+        <form onSubmit={handleCreer} className="p-6 space-y-4">
+          <Field label="Nom *">
+            <Input
+              required
+              value={formCreation.nom}
+              onChange={(e) => setFormCreation({ ...formCreation, nom: e.target.value })}
+              placeholder="Ex : Sonorisation"
+            />
+          </Field>
+          <Field label="Description (optionnel)">
+            <Input
+              value={formCreation.description}
+              onChange={(e) => setFormCreation({ ...formCreation, description: e.target.value })}
+            />
+          </Field>
+          {creationErreur && (
+            <p role="alert" className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">
+              {creationErreur}
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Btn variant="ghost" size="sm" onClick={() => setCreationOuvert(false)}>
+              Annuler
+            </Btn>
+            <Btn type="submit" loading={enGestion}>
+              {enGestion ? "Création…" : "Créer"}
+            </Btn>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
-      {/* Popup de renommage d'un département */}
-      {renommage && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Poppins,sans-serif" }}>
-                Renommer le département
-              </h2>
-              <button
-                onClick={() => setRenommage(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
-            <form onSubmit={handleRenommer} className="p-6 space-y-4">
-              <Field label="Nom *">
-                <Input
-                  required
-                  value={formRenommage.nom}
-                  onChange={(e) => setFormRenommage({ ...formRenommage, nom: e.target.value })}
-                />
-              </Field>
-              {renommageErreur && (
-                <p className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">
-                  {renommageErreur}
-                </p>
-              )}
-              <div className="flex justify-end gap-2 pt-2">
-                <Btn variant="ghost" size="sm" onClick={() => setRenommage(null)}>
-                  Annuler
-                </Btn>
-                <Btn type="submit" loading={enGestion}>
-                  {enGestion ? "Renommage…" : "Renommer"}
-                </Btn>
-              </div>
-            </form>
+      {/* Fenêtre de renommage d'un département */}
+      <Modal
+        ouvert={!!renommage}
+        titre="Renommer le département"
+        onClose={() => setRenommage(null)}
+        bloquee={enGestion}
+      >
+        <form onSubmit={handleRenommer} className="p-6 space-y-4">
+          <Field label="Nom *">
+            <Input
+              required
+              value={formRenommage.nom}
+              onChange={(e) => setFormRenommage({ ...formRenommage, nom: e.target.value })}
+            />
+          </Field>
+          {renommageErreur && (
+            <p role="alert" className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">
+              {renommageErreur}
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Btn variant="ghost" size="sm" onClick={() => setRenommage(null)}>
+              Annuler
+            </Btn>
+            <Btn type="submit" loading={enGestion}>
+              {enGestion ? "Renommage…" : "Renommer"}
+            </Btn>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       <ConfirmDialog
         ouvert={!!suppression}

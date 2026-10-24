@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ChevronRight, Download, Settings2, X } from "lucide-react";
+import { ArrowRight, Download, Settings2 } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
@@ -11,8 +11,9 @@ import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
+import Modal from "../ui/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { Select, Input } from "../ui/inputs";
+import { Field, Select, Input } from "../ui/inputs";
 import { C } from "../theme";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
@@ -230,7 +231,7 @@ export default function DepartementsPage() {
         .map(csvValeur)
         .join(";")
     );
-    const csv = "\uFEFF" + [entete.join(";"), ...lignes].join("\n");
+    const csv = "﻿" + [entete.join(";"), ...lignes].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const nomFichier = `membres_${selection.nom.replace(/\W+/g, "_")}.csv`;
     telechargerBlob(blob, nomFichier);
@@ -420,6 +421,7 @@ export default function DepartementsPage() {
                     <button
                       onClick={() => ouvrirEdition(m)}
                       title={`Modifier ${m.ouvrier?.prenom} ${m.ouvrier?.nom}`}
+                      aria-label={`Modifier ${m.ouvrier?.prenom} ${m.ouvrier?.nom}`}
                       className="w-9 h-9 flex items-center justify-center rounded-full text-slate-500 bg-slate-50 border border-slate-200 hover:text-white hover:border-transparent transition ml-auto"
                       onMouseEnter={(e) => (e.currentTarget.style.background = C.btn)}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "")}
@@ -446,93 +448,78 @@ export default function DepartementsPage() {
         )}
       </div>
 
-      {/* Popup d'édition du membre */}
+      {/* Fenêtre d'édition du membre */}
       {edition && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <div>
-                <h2 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Poppins,sans-serif" }}>
-                  {edition.ouvrier?.prenom} {edition.ouvrier?.nom}
-                </h2>
-                <p className="text-xs text-slate-500">
-                  {edition.ouvrier?.matricule} · {selection?.nom}
-                </p>
-              </div>
-              <button
-                onClick={() => setEdition(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
+        <Modal
+          titre={`${edition.ouvrier?.prenom} ${edition.ouvrier?.nom}`}
+          onClose={() => setEdition(null)}
+          bloquee={enregistrement}
+        >
+          <form onSubmit={handleEnregistrer} className="p-6 space-y-4">
+            <p className="text-xs text-slate-500 -mt-1">
+              {edition.ouvrier?.matricule} · {selection?.nom}
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nom">
+                <Input required value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} />
+              </Field>
+              <Field label="Prénom">
+                <Input required value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
+              </Field>
             </div>
 
-            <form onSubmit={handleEnregistrer} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500">Nom</label>
-                  <Input required value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500">Prénom</label>
-                  <Input required value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
-                </div>
-              </div>
+            <Field label="Téléphone">
+              <Input type="tel" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
+            </Field>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Téléphone</label>
-                <Input type="tel" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
-              </div>
+            <Field label="Poste dans le département" hint="Un seul responsable et un seul adjoint par département.">
+              <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                {ROLES.map((r) => (
+                  <option key={r.valeur} value={r.valeur}>
+                    {r.libelle}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Poste dans le département</label>
-                <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  {ROLES.map((r) => (
-                    <option key={r.valeur} value={r.valeur}>
-                      {r.libelle}
-                    </option>
-                  ))}
-                </Select>
-                <p className="text-[11px] text-slate-500">
-                  Un seul responsable et un seul adjoint par département.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, actif: !form.actif })}
-                className="flex items-center justify-between w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.actif}
+              onClick={() => setForm({ ...form, actif: !form.actif })}
+              className="flex items-center justify-between w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+            >
+              <span className="text-slate-500">Badge actif</span>
+              <span
+                aria-hidden="true"
+                className={`w-10 h-6 rounded-full p-0.5 flex items-center transition ${form.actif ? "bg-bordeaux-600 justify-end" : "bg-slate-200 justify-start"}`}
               >
-                <span className="text-slate-500">Badge actif</span>
-                <span
-                  className={`w-10 h-6 rounded-full p-0.5 flex items-center transition ${form.actif ? "bg-bordeaux-600 justify-end" : "bg-slate-200 justify-start"}`}
-                >
-                  <span className="w-5 h-5 rounded-full bg-white shadow" />
-                </span>
-              </button>
+                <span className="w-5 h-5 rounded-full bg-white shadow" />
+              </span>
+            </button>
 
-              {formErreur && (
-                <p className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">{formErreur}</p>
-              )}
+            {formErreur && (
+              <p role="alert" className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-xl px-3 py-2">{formErreur}</p>
+            )}
 
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                <Btn variant="ghost" size="sm" onClick={() => setEdition(null)}>
-                  Annuler
-                </Btn>
-                <div className="flex-1" />
-                <Btn variant="secondary" size="sm" onClick={() => demanderRetirer(edition)} disabled={enregistrement}>
-                  Retirer du département
-                </Btn>
-                <Btn variant="softDanger" size="sm" onClick={() => demanderSupprimer(edition)} disabled={enregistrement}>
-                  Supprimer
-                </Btn>
-                <Btn type="submit" loading={enregistrement}>
-                  {enregistrement ? "Enregistrement…" : "Enregistrer"}
-                </Btn>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <Btn variant="ghost" size="sm" onClick={() => setEdition(null)}>
+                Annuler
+              </Btn>
+              <div className="flex-1" />
+              <Btn variant="secondary" size="sm" onClick={() => demanderRetirer(edition)} disabled={enregistrement}>
+                Retirer du département
+              </Btn>
+              <Btn variant="softDanger" size="sm" onClick={() => demanderSupprimer(edition)} disabled={enregistrement}>
+                Supprimer
+              </Btn>
+              <Btn type="submit" loading={enregistrement}>
+                {enregistrement ? "Enregistrement…" : "Enregistrer"}
+              </Btn>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* Confirmation retirer / supprimer */}

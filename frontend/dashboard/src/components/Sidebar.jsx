@@ -4,7 +4,7 @@ import { C, navItems } from "../theme";
 import { roleAdmin, libelleRole } from "../lib/auth";
 import Logo from "./Logo";
 
-// TolÃ©rance des menus par rÃ´le (hiÃ©rarchie) : SUPER_ADMIN voit tout, ADMIN
+// Tolérance des menus par rôle (hiérarchie) : SUPER_ADMIN voit tout, ADMIN
 // voit les pages ADMIN+, LECTEUR ne voit que les pages de lecture.
 const HIERARCHIE = { LECTEUR: 0, ADMIN: 1, SUPER_ADMIN: 2 };
 
@@ -13,7 +13,7 @@ function voirMenu(item) {
   return (HIERARCHIE[roleAdmin()] ?? 0) >= HIERARCHIE[item.minRole];
 }
 
-// RecalculÃ© Ã  chaque rendu (le rÃ´le vit dans localStorage et change au login).
+// Recalculé à chaque rendu (le rôle vit dans localStorage et change au login).
 function navAutorises() {
   return navItems.filter(voirMenu);
 }
@@ -81,7 +81,7 @@ function NavButton({ item, onNavigate, iconOnly }) {
   );
 }
 
-/** Contenu complet (logo + nav + utilisateur) â€” utilisÃ© par la sidebar desktop et le drawer mobile. */
+/** Contenu complet (logo + nav + utilisateur) — utilisé par la sidebar desktop et le drawer mobile. */
 function SidebarContent({ admin, onClose, onDeconnexion }) {
   const location = useLocation();
   const items = navAutorises();
@@ -97,7 +97,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
           <Logo className="w-9 h-9 object-contain rounded-full flex-shrink-0" />
           <div className="min-w-0">
             <p className="text-white font-bold text-sm leading-tight">RSI</p>
-            <p className="text-white/80 text-[10px] leading-tight truncate">PrÃ©sence â€” Badgeage QR</p>
+            <p className="text-white/80 text-[10px] leading-tight truncate">Présence — Badgeage QR</p>
           </div>
         </div>
         {onClose && (
@@ -129,7 +129,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
             {initials(admin?.email)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-white text-xs font-semibold truncate">{admin?.email || "â€¦"}</p>
+            <p className="text-white text-xs font-semibold truncate">{admin?.email || "…"}</p>
             <p className="text-white/85 text-[10px]">{libelleRole(admin?.role)}</p>
           </div>
           <button
@@ -143,7 +143,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
         </div>
         <p className="text-[10px] flex flex-wrap gap-x-3 px-1">
           <Link to="/confidentialite" className="text-white/80 hover:text-white transition-colors">
-            ConfidentialitÃ©
+            Confidentialité
           </Link>
           <Link to="/cgv-cgu" className="text-white/80 hover:text-white transition-colors">
             CGU
@@ -154,7 +154,7 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
   );
 }
 
-/** Sidebar fixe : icÃ´nes seules sur tablette (mdâ†’lg), complÃ¨te sur desktop (lg+). */
+/** Sidebar fixe : icônes seules sur tablette (md→lg), complète sur desktop (lg+). */
 export function Sidebar({ admin, onDeconnexion }) {
   return (
     <>
@@ -192,7 +192,7 @@ export function Sidebar({ admin, onDeconnexion }) {
   );
 }
 
-/** Tiroir plein Ã©cran (mobile), ouvert via le bouton hamburger de la TopBar. */
+/** Tiroir plein écran (mobile), ouvert via le bouton hamburger de la TopBar. */
 export function MobileDrawer({ admin, onClose, onDeconnexion }) {
   return (
     <>
