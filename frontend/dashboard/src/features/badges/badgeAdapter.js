@@ -136,11 +136,13 @@ export function urlVerification(membre) {
 }
 
 /**
- * Valeur encodée dans le QR code :
- *  1. l'URL de vérification fournie par le back-end (si un jour disponible) ;
- *  2. sinon le matricule (identifiant stable déjà présent).
+ * Valeur encodée dans le QR code : TOUJOURS le matricule.
+ * Le terminal de badgeage envoie le contenu brut du QR comme matricule
+ * (POST /api/badgeage) : un QR contenant une URL serait refusé (« Badge
+ * inconnu »). L'URL de vérification, si elle est renseignée, est seulement
+ * imprimée en texte au verso.
  * Jamais le téléphone, jamais un champ sensible.
  */
 export function valeurQr(membre) {
-  return urlVerification(membre) || texte(membre?.matricule) || "";
+  return texte(membre?.matricule) || "";
 }

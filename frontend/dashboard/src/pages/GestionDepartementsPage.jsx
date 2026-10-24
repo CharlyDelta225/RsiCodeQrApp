@@ -165,7 +165,7 @@ export default function GestionDepartementsPage() {
               Gestion des départements
             </h1>
             <p className="text-sm text-slate-500">
-              {total} département(s) · {nbMembresTotal} membre(s) au total.
+              {total} département(s) · {nbMembresTotal} affectation(s) au total (un ouvrier peut appartenir à plusieurs départements).
             </p>
             <Link
               to="/departements"

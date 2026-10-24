@@ -103,17 +103,18 @@ test("GET /api/rapports/journalier : structure attendue (lieux + totaux cohéren
   assert.ok(Array.isArray(rapport.departements));
   assert.ok(typeof rapport.recap === "object");
 
-  const totaux = rapport.departements.reduce(
-    (acc, d) => ({
-      presents: acc.presents + d.presents,
-      absents: acc.absents + d.absents,
-      effectif: acc.effectif + d.effectif,
-    }),
-    { presents: 0, absents: 0, effectif: 0 }
+  // Le récap compte des PERSONNES distinctes : un ouvrier membre de plusieurs
+  // départements ne compte qu'une fois (identifié ici par son matricule).
+  const toutes = rapport.departements.flatMap((d) => d.lignes);
+  const personnes = new Set(toutes.map((l) => l.matricule));
+  const presentes = new Set(toutes.filter((l) => l.present).map((l) => l.matricule));
+  assert.strictEqual(rapport.recap.effectif, personnes.size);
+  assert.strictEqual(rapport.recap.presents, presentes.size);
+  assert.strictEqual(rapport.recap.absents, personnes.size - presentes.size);
+  assert.ok(
+    rapport.recap.effectif <= rapport.departements.reduce((n, d) => n + d.effectif, 0),
+    "le total distinct ne dépasse jamais la somme des départements"
   );
-  assert.strictEqual(rapport.recap.presents, totaux.presents);
-  assert.strictEqual(rapport.recap.absents, totaux.absents);
-  assert.strictEqual(rapport.recap.effectif, totaux.effectif);
 
   const lignes = rapport.departements.flatMap((d) => d.lignes);
   assert.ok(Array.isArray(lignes));

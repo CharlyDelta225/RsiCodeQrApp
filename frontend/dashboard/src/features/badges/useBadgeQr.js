@@ -4,9 +4,8 @@ import QRCode from "qrcode";
 /**
  * Génère un QR code côté navigateur (aucun appel serveur).
  *
- * La valeur encodée est fournie par `valeurQr()` :
- *  - URL de vérification si le back-end en fournit une ;
- *  - sinon le matricule (identifiant stable).
+ * La valeur encodée est fournie par `valeurQr()` : toujours le matricule,
+ * seul format lu par le terminal de badgeage.
  *
  * Le téléphone n'est jamais transmis à ce hook.
  */

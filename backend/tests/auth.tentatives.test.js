@@ -212,3 +212,28 @@ test("POST /api/auth/reset : token inconnu ou expiré → 400 LIEN_INVALIDE_OU_E
   b = await r2.json();
   assert.strictEqual(b.code, "LIEN_INVALIDE_OU_EXPIRE");
 });
+test("inscription publique : compte LECTEUR créé INACTIF, login refusé jusqu'à activation", async () => {
+  const email = `inscrit-${Date.now()}@test.dev`;
+  emailsCrees.push(email);
+
+  const r = await fetch(`${baseURL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, motDePasse: "MotDePasse123!" }),
+  });
+  assert.strictEqual(r.status, 200);
+
+  const cree = await prisma.admin.findUnique({ where: { email } });
+  assert.strictEqual(cree.role, "LECTEUR");
+  assert.strictEqual(cree.actif, false);
+
+  // Avant activation : aucune connexion possible (donc aucun accès aux données).
+  let l = await login(email, "MotDePasse123!");
+  assert.strictEqual(l.status, 403);
+  assert.strictEqual((await l.json()).code, "COMPTE_DESACTIVE");
+
+  // Après activation par un SUPER_ADMIN : connexion acceptée.
+  await prisma.admin.update({ where: { email }, data: { actif: true } });
+  l = await login(email, "MotDePasse123!");
+  assert.strictEqual(l.status, 200);
+});

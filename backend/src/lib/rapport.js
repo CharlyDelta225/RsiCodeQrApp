@@ -71,8 +71,10 @@ function heureFormat(mm) {
  *   date, dateISO, dateLongueur, jourLabel, seuilTexte, notePresence,
  *   departements: [{ nom, lignes: [{ matricule, nom, prenom, present, heure }],
  *                    presents, absents, effectif }],
- *   recap: { presents, absents, effectif }
+ *   recap: { presents, absents, effectif }   // personnes distinctes
  * }
+ * `dateLongueur` contient déjà le jour (« Mercredi 21 octobre 2026 ») :
+ * ne pas le préfixer par `jourLabel` à l'affichage.
  */
 export async function construireRapport(date) {
   const seuil = seuilPourJour(date); // null = hors programme → badgé = présent
@@ -103,7 +105,12 @@ export async function construireRapport(date) {
     pointages.map((p) => [p.ouvrierId, p.dateHeure])
   );
 
-  const recap = { presents: 0, absents: 0, effectif: 0 };
+  // Récap global = PERSONNES distinctes : un ouvrier membre de plusieurs
+  // départements apparaît dans chacun d'eux, mais ne compte qu'une fois au total
+  // (sinon l'effectif dépasse le nombre d'ouvriers : 218 affectations pour 193
+  // ouvriers). Les chiffres par département restent inchangés.
+  const ouvriersComptes = new Set();
+  const ouvriersPresents = new Set();
 
   const rapportDepartements = departements.map((dep) => {
     const lignes = dep.membres
@@ -114,6 +121,8 @@ export async function construireRapport(date) {
         const present =
           dateHeure !== undefined &&
           (seuil === null || heureEnMinutes(dateHeure) <= seuil);
+        ouvriersComptes.add(m.ouvrier.id);
+        if (present) ouvriersPresents.add(m.ouvrier.id);
         return {
           matricule: m.ouvrier.matricule,
           nom: m.ouvrier.nom,
@@ -125,12 +134,15 @@ export async function construireRapport(date) {
 
     const presents = lignes.filter((l) => l.present).length;
     const absents = lignes.length - presents;
-    recap.presents += presents;
-    recap.absents += absents;
-    recap.effectif += lignes.length;
 
     return { id: dep.id, nom: dep.nom, lignes, presents, absents, effectif: lignes.length };
   });
+
+  const recap = {
+    presents: ouvriersPresents.size,
+    absents: ouvriersComptes.size - ouvriersPresents.size,
+    effectif: ouvriersComptes.size,
+  };
 
   return {
     date,
@@ -265,7 +277,7 @@ function pdfRecap(rapport) {
   titrePdf(
     doc,
     "Rapport de pointage — Récapitulatif",
-    `${rapport.jourLabel} ${rapport.dateLongueur}`,
+    rapport.dateLongueur,
     rapport.notePresence
   );
 
@@ -289,7 +301,7 @@ function pdfRecap(rapport) {
 
   textePied(
     doc,
-    `Total — Présents : ${rapport.recap.presents}   Absents : ${rapport.recap.absents}   Effectif : ${rapport.recap.effectif}`
+    `Total (personnes distinctes) — Présents : ${rapport.recap.presents}   Absents : ${rapport.recap.absents}   Effectif : ${rapport.recap.effectif}`
   );
 
   doc.end();

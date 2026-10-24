@@ -182,7 +182,7 @@ Le terminal est servi directement par le backend : dev `http://localhost:3000/te
 | `ADMIN` | ✅ | ✅ | ✅ | ✅ | ❌ |
 | `SUPER_ADMIN` | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-- **Inscription** (`POST /api/auth/register`) est **publique** (page `/inscription`) : tout compte naît `LECTEUR`, aucun droit d'extraction.
+- **Inscription** (`POST /api/auth/register`) est **publique** (page `/inscription`) : tout compte naît `LECTEUR` et **inactif**. Un `SUPER_ADMIN` doit l'activer (Gestion des comptes → Réactiver) avant la première connexion.
 - **Élévation de rôle** : un `SUPER_ADMIN` change le rôle via `PATCH /api/admins/:id/role` depuis le dashboard (`/gestion-admins`).
 - **Création de compte par le SUPER_ADMIN** : le mot de passe est généré et **envoyé par email** (s'il est renvoyé dans la réponse, l'email a échoué).
 - **Anti-verrouillage** : un `SUPER_ADMIN` ne peut ni modifier son propre rôle, ni se désactiver, ni se supprimer (et le dernier `SUPER_ADMIN` ne peut pas être supprimé).
@@ -283,7 +283,7 @@ UNIQUE (ouvrierId, jour)   → migration 20260912090000_anti_double_badgeage
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
 | `POST` | `/api/auth/login` | public | Connexion → token JWT (rate-limit par IP + blocage après 3 échecs) |
-| `POST` | `/api/auth/register` | public | Créer un compte (LECTEUR) — réponse identique email déjà pris/succès (anti-énumération) |
+| `POST` | `/api/auth/register` | public | Créer une demande de compte (LECTEUR, inactif jusqu'à activation) — réponse identique email déjà pris/succès (anti-énumération) |
 | `POST` | `/api/auth/reset-demand` | public | Envoyer un lien de réinitialisation par email — réponse identique email connu/inconnu (anti-énumération) |
 | `POST` | `/api/auth/reset` | public | Poser un nouveau mot de passe (lien unique, 1 h) |
 | `GET` | `/api/auth/me` | authentifié | Infos du compte |
@@ -385,9 +385,24 @@ curl.exe -X POST http://localhost:3000/api/ouvriers/import `
 
 ## Tests
 
+Les tests écrivent en base (comptes admin, blocages, liens de réinitialisation).
+Ils tournent donc sur une **base de test locale**, jamais sur la base Supabase
+partagée : `tests/garde-base.js` refuse de les lancer si `DATABASE_URL` pointe
+vers Supabase.
+
+1. Créer une base locale vide, par exemple `rsi_code_qr_test`.
+2. Créer `backend/.env.test` (ignoré par git) :
+   ```
+   DATABASE_URL="postgresql://postgres:<mdp>@localhost:5432/rsi_code_qr_test?schema=public"
+   DIRECT_URL="postgresql://postgres:<mdp>@localhost:5432/rsi_code_qr_test?schema=public"
+   ```
+3. Appliquer les migrations puis le seed sur cette base (avec les variables de `.env.test`) :
+   `npx prisma migrate deploy` puis `npm run seed`.
+4. Lancer les tests :
+
 ```bash
 cd backend
-node --test "tests/*.test.js"
+npm test
 ```
 
 ---
