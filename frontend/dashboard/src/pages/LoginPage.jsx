@@ -202,14 +202,12 @@ export default function LoginPage() {
               <Link to="/oublie" className="text-xs text-slate-500 hover:text-bordeaux-700 transition-colors">
                 Mot de passe oublié ?
               </Link>
-              {/* Lien « Créer un compte » masqué (commenté) :
               <p className="text-xs text-slate-500">
                 Pas encore de compte ?{" "}
                 <Link to="/inscription" className="font-medium text-bordeaux-700 hover:text-bordeaux-800 transition-colors">
                   Créer un compte
                 </Link>
               </p>
-              */}
             </div>
 
             <p className="text-center text-[10px] leading-relaxed text-slate-500 border-t border-slate-100 pt-4">
