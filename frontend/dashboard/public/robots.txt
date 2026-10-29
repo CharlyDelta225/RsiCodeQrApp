@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /terminal
-
-Sitemap: https://rsi-app-phi.vercel.app/sitemap.xml
