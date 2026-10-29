@@ -258,7 +258,12 @@ export default function DashboardPage() {
       }));
   }, [deptSelectionne, pointagesAuj]);
 
-  const absentsAuj = stats ? Math.max(0, stats.actifs - stats.presentsAuj) : 0;
+  // En cas d'échec d'une requête, les stats valent "—" : ne calculer que sur des
+  // nombres, sinon la carte affichait « NaN ».
+  const absentsAuj =
+    stats && Number.isFinite(stats.actifs) && Number.isFinite(stats.presentsAuj)
+      ? Math.max(0, stats.actifs - stats.presentsAuj)
+      : "—";
   const centreValeur = deptSelectionne ? membresDept.length : stats?.presentsAuj;
   const centreLibelle = deptSelectionne ? "présents ici" : "présents";
 

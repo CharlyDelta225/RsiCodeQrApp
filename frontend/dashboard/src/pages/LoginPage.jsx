@@ -139,7 +139,7 @@ export default function LoginPage() {
 
             {inscription && (
               <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                Si votre adresse n'était pas déjà utilisée, votre compte a été créé. Vous pouvez vous connecter.
+                Si votre adresse n'était pas déjà utilisée, votre demande de compte est enregistrée. Vous pourrez vous connecter dès qu'un super administrateur l'aura activée.
               </div>
             )}
 

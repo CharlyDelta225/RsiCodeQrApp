@@ -146,7 +146,9 @@ consommé (stocké haché en base, à usage unique), et le blocage éventuel est
 Renvoie l'admin connecté : `{ "ok": true, "admin": { "id", "email", "role", "createdAt" } }`
 
 ### `POST /api/auth/register` (PUBLIC, rate-limité)
-Création d'un compte. Tout nouveau compte naît **`LECTEUR`** et **`actif`**.
+Création d'un compte. Tout nouveau compte naît **`LECTEUR`** et **inactif**
+(`actif: false`) : il ne peut pas se connecter (`403 COMPTE_DESACTIVE`) tant
+qu'un `SUPER_ADMIN` ne l'a pas activé via `PATCH /api/admins/:id/activer`.
 L'élévation vers `ADMIN`/`SUPER_ADMIN` se fait ensuite par un `SUPER_ADMIN`
 via `PATCH /api/admins/:id/role`.
 
@@ -159,7 +161,7 @@ savoir si une adresse est déjà enregistrée.
 // (rôle NON accepté ici : tout inscrit est LECTEUR, le rôle fourni est ignoré)
 
 // Réponse 200 (identique dans TOUS les cas)
-{ "ok": true, "message": "Si votre adresse n'était pas déjà enregistrée, un compte vient d'être créé. Vous pouvez vous connecter." }
+{ "ok": true, "message": "Si votre adresse n'était pas déjà enregistrée, votre demande de compte a été enregistrée. Un super administrateur doit l'activer avant votre première connexion." }
 
 // Erreurs
 // 400 motDePasse < 8 → MOT_DE_PASSE_TROP_COURT ; email/motDePasse manquants → CHAMPS_MANQUANTS
@@ -645,6 +647,7 @@ CRON_SECRET=secret-partage-pour-la-route-cron
 
 | Date | Changement |
 |---|---|
+| 2026-10-24 | **Inscription en attente de validation** : `POST /api/auth/register` crée désormais le compte **inactif** (`actif: false`). Un `SUPER_ADMIN` doit l'activer (`PATCH /api/admins/:id/activer`) avant toute connexion ; avant activation, le login renvoie `403 COMPTE_DESACTIVE`. Un inscrit anonyme ne peut donc plus lire les données personnelles des ouvriers |
 | 2026-09-15 | **Message « déjà badgé » simplifié** : `409 DEJA_BADGE_AUJOURDHUI` ne renvoie plus l'heure UTC du premier badgeage ; message fixe **« Vous avez déjà badgé »** (terminal plus simple à lire) |
 | 2026-09-15 | **Système de logs** : mini-logger maison (`backend/src/lib/logger.js`, zéro dépendance) remplaçant tous les `console.*`. Sortie **toujours** en stdout (capturée par Vercel en prod) + fichier tournant `backend/logs/app-<jour>.log` par défaut hors prod. Middleware HTTP ajouté dans `app.js` : chaque requête reçoit un `requestId` (UUID, renvoyé dans l'en-tête `X-Request-Id`) et est logguée (méthode, path, status, durée, IP, admin). Variables `LOG_LEVEL` (défaut `info`) et `LOG_FILE` ajoutées au `.env.example` ; les erreurs du handler central logguent désormais avec `requestId` |
 | 2026-09-15 | **UX ouvriers & départements** : dans la page `/ouvriers`, le champ département de la popup **Modifier** passe en liste déroulante puis en **multi-départements par cases à cocher** — à l'enregistrement, les départements cochés sont affectés via `POST /api/departements/:id/membres` et les décochés retirés via `DELETE /api/departements/:id/membres/:ouvrierId` (un ouvrier peut appartenir à plusieurs départements). Popup `ConfirmDialog` sur **Retirer du département** et **Supprimer** dans la page `/departements`. Filtre **Département** (tous / sans département / un département précis) ajouté sur `/migration-ouvrier` |

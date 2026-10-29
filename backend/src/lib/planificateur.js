@@ -73,7 +73,7 @@ export async function declencherRapportsProgrammes(dateHier = hier()) {
     const piecesJointes = await genererPdfsRapport(structure);
     const { messageId } = await envoyerRapportEmail({
       dests,
-      objet: `Rapport de pointage — ${structure.jourLabel} ${structure.dateLongueur}`,
+      objet: `Rapport de pointage — ${structure.dateLongueur}`,
       corps: corpsRapport(structure),
       piecesJointes,
     });

@@ -243,7 +243,7 @@ export default function RapportPage() {
 
       {rapport && (
         <Card
-          title={`${rapport.jourLabel} ${rapport.dateLongueur}`}
+          title={rapport.dateLongueur}
           description={rapport.notePresence}
           actions={
             <div className="flex items-center gap-2">

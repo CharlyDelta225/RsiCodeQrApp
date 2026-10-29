@@ -158,11 +158,7 @@ function BadgeVerso({ membre, branding, qrDataUrl, qrErreur }) {
         <div className="rds-verso-text">
           <p className="rds-verso-title">{BADGE_MENTION_VERSO}</p>
           <p className="rds-verso-matricule">{matricule}</p>
-          <p className="rds-verso-note">
-            {verificationUrl
-              ? "Lien de vérification fourni par le service."
-              : "QR encodé avec le matricule du membre."}
-          </p>
+          <p className="rds-verso-note">QR encodé avec le matricule du membre.</p>
           {verificationUrl && (
             <p className="rds-verso-url">{verificationUrl}</p>
           )}

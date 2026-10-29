@@ -35,8 +35,9 @@ function QrBadge({ valeur, size = 56 }) {
   return <img src={dataUrl} alt="" width={size} height={size} className="rounded" />;
 }
 
+// Le terminal attend le matricule brut dans le QR (voir badgeAdapter.valeurQr).
 function valeurQrOuvrier(o) {
-  return o.verificationUrl || o.matricule;
+  return o.matricule;
 }
 
 function CarteBadgeImpression({ ouvrier }) {

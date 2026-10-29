@@ -82,7 +82,11 @@ async function attendreImages() {
 export default function BadgeStudioPage() {
   const navigate = useNavigate();
 
-  const [source, setSource] = useState(BADGE_SOURCES.DEMO);
+  // En production, l'atelier s'ouvre sur les vrais membres ; la démo reste
+  // le défaut en développement (prévisualisation sans backend).
+  const [source, setSource] = useState(
+    import.meta.env.PROD ? BADGE_SOURCES.API : BADGE_SOURCES.DEMO
+  );
   const [membres, setMembres] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
@@ -724,8 +728,8 @@ export default function BadgeStudioPage() {
                     />
                   </Field>
                   <Field
-                    label="URL de vérification (QR)"
-                    hint="http(s) uniquement. Si vide, le QR encode le matricule. Le téléphone n'est jamais encodé."
+                    label="Lien imprimé au verso (facultatif)"
+                    hint="http(s) uniquement, imprimé en texte. Le QR encode toujours le matricule : c'est le seul format accepté par le terminal de badgeage."
                   >
                     <Input
                       type="url"
@@ -930,8 +934,8 @@ export default function BadgeStudioPage() {
               )}
 
               <p className="text-[11px] leading-relaxed text-slate-500">
-                Le QR est généré dans le navigateur. Il encode le matricule (ou
-                l'URL de vérification si elle est renseignée), jamais le
+                Le QR est généré dans le navigateur. Il encode toujours le
+                matricule (format lu par le terminal de badgeage), jamais le
                 téléphone.
               </p>
             </div>

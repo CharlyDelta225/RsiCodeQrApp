@@ -79,6 +79,7 @@ router.use("/login", limiterCompte);
  *
  * Body : { "email": "...", "motDePasse": "..." }
  *   - role NON accepté ici : tout nouveau compte naît LECTEUR, aucun pouvoir.
+ *   - le compte naît INACTIF : activation obligatoire par un SUPER_ADMIN.
  * motDePasse >= 8 caractères.
  */
 router.post("/register", async (req, res) => {
@@ -105,14 +106,18 @@ router.post("/register", async (req, res) => {
     if (!existe) {
       // Le mot de passe n'est JAMAIS stocké en clair : hash bcrypt + sel intégré
       const hash = await bcrypt.hash(motDePasse, 10);
+      // Compte créé INACTIF : il reste en attente jusqu'à son activation par
+      // un SUPER_ADMIN (Gestion des comptes → Réactiver). Sans cela, n'importe
+      // quel internaute pourrait lire les données personnelles des ouvriers
+      // (noms, téléphones, pointages) avec un simple compte LECTEUR.
       await prisma.admin.create({
-        data: { email, motDePasse: hash, role },
+        data: { email, motDePasse: hash, role, actif: false },
         select: { id: true, email: true, role: true, createdAt: true },
       });
     }
 
     const MESSAGE_NEUTRE =
-      "Si votre adresse n'était pas déjà enregistrée, un compte vient d'être créé. Vous pouvez vous connecter.";
+      "Si votre adresse n'était pas déjà enregistrée, votre demande de compte a été enregistrée. Un super administrateur doit l'activer avant votre première connexion.";
     return res.json({ ok: true, message: MESSAGE_NEUTRE });
   } catch (err) {
     logger.error("[AUTH/REGISTER]", err);
@@ -156,7 +161,7 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({
         ok: false,
         code: "COMPTE_DESACTIVE",
-        message: "Ce compte a été désactivé. Contactez un super administrateur.",
+        message: "Ce compte n'est pas actif (en attente de validation ou désactivé). Contactez un super administrateur.",
       });
     }
 
