@@ -9,7 +9,13 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Requêtes de l'app : transaction pooler Supabase (port 6543, pgbouncer=true,
+  // connection_limit=1) — indispensable en serverless (Vercel), le session
+  // pooler (5432) plafonne à 15 clients et se sature.
+  url       = env("DATABASE_URL")
+  // Migrations (prisma migrate) : connexion en mode session (port 5432),
+  // le transaction pooler ne supporte pas les verrous de migration.
+  directUrl = env("DIRECT_URL")
 }
 
 // Type de pointage : pour l'instant UNE seule action de badgeage est supportée.
