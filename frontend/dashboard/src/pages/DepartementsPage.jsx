@@ -360,10 +360,9 @@ export default function DepartementsPage() {
                       {nb}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-3">
-                    {nb} membre{nb > 1 ? "s" : ""}
-                  </p>
-                  {actif && repartitionRoles.length > 0 && (
+                  {/* Un seul compteur (la pastille) ; la répartition par poste
+                      n'apparaît que si le département a d'autres postes que « Membre ». */}
+                  {actif && repartitionRoles.some((r) => r.valeur !== "MEMBRE") && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {repartitionRoles.map((role) => (
                         <Pill key={role.valeur} className={styleRole(role.valeur)}>

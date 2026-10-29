@@ -484,8 +484,8 @@ export default function BadgeStudioPage() {
           </div>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
             Sélectionnez un membre, complétez les informations manquantes et
-            imprimez les deux faces au format carte ID-1. Aucun appel d'écriture
-            n'est effectué.
+            imprimez les deux faces au format carte ID-1. Les fiches des
+            ouvriers ne sont pas modifiées.
           </p>
         </div>
         <Btn
@@ -501,10 +501,11 @@ export default function BadgeStudioPage() {
       <div className="grid gap-2 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-bordeaux-800">
-            Sans modification de l'API
+            Compléments sur cet appareil
           </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-            Réutilise la route existante <span className="font-mono">GET /api/ouvriers</span>.
+            Fonction, églises et photo restent dans ce navigateur : ils ne sont
+            pas partagés avec les autres postes.
           </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
@@ -542,7 +543,7 @@ export default function BadgeStudioPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bordeaux-200 bg-bordeaux-50 px-3 py-2">
           <p className="text-xs text-bordeaux-800" title={erreur}>
             {source === BADGE_SOURCES.API
-              ? "Impossible de charger les données réelles. Vérifiez que l'API est démarrée, ou revenez à la démo."
+              ? "Impossible de charger les membres. Vérifiez la connexion puis réessayez."
               : erreur}
           </p>
           {source === BADGE_SOURCES.API && (
@@ -659,7 +660,7 @@ export default function BadgeStudioPage() {
 
           <Card
             title="2. Informations"
-            description="Les champs absents de l'API restent complétables localement."
+            description="Complétez les informations qui ne figurent pas sur la fiche de l'ouvrier."
             actions={
               modifie ? <Pill tonalite="orange">Non enregistré</Pill> : null
             }
@@ -669,7 +670,7 @@ export default function BadgeStudioPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field
                     label="Fonction / poste"
-                    hint="Non fournie par l'API actuelle."
+                    hint="Absente de la fiche de l'ouvrier."
                   >
                     <Input
                       value={valeurChamp("fonction")}
@@ -681,7 +682,7 @@ export default function BadgeStudioPage() {
                   </Field>
                   <Field
                     label="Département"
-                    hint="Prérempli depuis l'API si disponible."
+                    hint="Prérempli depuis la fiche de l'ouvrier."
                   >
                     <Input
                       value={valeurChamp("departement")}
@@ -772,9 +773,10 @@ export default function BadgeStudioPage() {
                 </div>
 
                 <p className="text-[11px] leading-relaxed text-slate-500">
-                  Les compléments sont stockés dans le navigateur
-                  (<span className="font-mono">localStorage</span>). Aucune
-                  donnée n'est envoyée au serveur et l'API n'est pas modifiée.
+                  Ces compléments sont enregistrés dans ce navigateur
+                  uniquement : ils ne sont ni envoyés au serveur ni visibles
+                  depuis un autre poste, et disparaissent si l'historique du
+                  navigateur est effacé.
                 </p>
               </div>
             ) : (

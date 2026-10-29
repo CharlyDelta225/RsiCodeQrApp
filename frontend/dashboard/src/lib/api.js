@@ -122,6 +122,15 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/api/pointages${qs ? `?${qs}` : ""}`);
   },
+  // Indicateurs du tableau de bord calculés en base (aucune troncature) :
+  // { ouvriers: { total, actifs, desactives }, departements, presentsAuj,
+  //   parJour: [{ date, presents }], pointagesAuj: [...] }
+  getStatsTableauDeBord: (jours = 7) => request(`/api/pointages/stats?jours=${jours}`),
+  // CSV de toute la période filtrée (ADMIN/SUPER_ADMIN) — renvoie un Blob.
+  getPointagesExportBlob: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/pointages/export${qs ? `?${qs}` : ""}`);
+  },
 
   // Départements
   getDepartements: (params = {}) => {

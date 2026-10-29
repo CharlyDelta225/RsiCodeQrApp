@@ -85,7 +85,7 @@ export default function BadgesPage() {
     setChargement(true);
     setErreur(null);
     try {
-      const params = { limit: 200 };
+      const params = { limit: 2000 };
       if (recherche) params.recherche = recherche;
       if (filtreActif === "actifs") params.actif = "true";
       if (filtreActif === "desactives") params.actif = "false";
@@ -104,7 +104,9 @@ export default function BadgesPage() {
     api
       .getDepartements({ limit: 100 })
       .then((d) => setDepartements(d.departements || []))
-      .catch(() => {});
+      .catch(() =>
+        setErreur("La liste des départements du filtre n'a pas pu être chargée. Actualisez la page.")
+      );
   }, []);
 
   useEffect(() => {

@@ -42,7 +42,7 @@ export default function MigrationOuvrierPage() {
     setErreur(null);
     try {
       const [dataOuvriers, dataDepartements] = await Promise.all([
-        api.getOuvriers({ limit: 200 }),
+        api.getOuvriers({ limit: 2000 }),
         api.getDepartements({ limit: 100 }),
       ]);
       setOuvriers(dataOuvriers.ouvriers || []);

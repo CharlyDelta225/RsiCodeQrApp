@@ -135,6 +135,9 @@ export default function GestionAdminsPage() {
 
   const [admins, setAdmins] = useState([]);
   const [chargement, setChargement] = useState(true);
+  // Échec du chargement de la liste : bandeau persistant (le toast disparaît
+  // et laissait une page vide, comme s'il n'existait aucun compte).
+  const [erreurChargement, setErreurChargement] = useState(null);
   const [alerte, setAlerte] = useState(null);
   const [succes, setSucces] = useState(null);
 
@@ -160,11 +163,12 @@ export default function GestionAdminsPage() {
   const charger = async () => {
     setChargement(true);
     setAlerte(null);
+    setErreurChargement(null);
     try {
       const data = await api.getAdmins();
       setAdmins(data.admins || []);
     } catch (err) {
-      setAlerte({ titre: "Erreur de chargement", message: err instanceof ApiError ? err.message : "Impossible de charger les comptes" });
+      setErreurChargement(err instanceof ApiError ? err.message : "Impossible de charger les comptes");
     } finally {
       setChargement(false);
     }
@@ -304,6 +308,22 @@ export default function GestionAdminsPage() {
           + Nouveau compte
         </button>
       </div>
+
+      {erreurChargement && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2"
+          role="alert"
+        >
+          <span>La liste des comptes n'a pas pu être chargée : {erreurChargement}</span>
+          <button
+            type="button"
+            onClick={charger}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-bordeaux-200 bg-white hover:bg-bordeaux-50"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
 
       {alerte && mdpTemporaire && (
         <div className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-4 py-3">

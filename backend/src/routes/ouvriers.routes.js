@@ -9,6 +9,11 @@ import { requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
+// Plafond de `limit` : le dashboard charge la liste complète (filtres, listes
+// déroulantes, pagination côté client). 2000 laisse une large marge au-delà
+// des ~200 ouvriers actuels ; le champ `total` permet de détecter un dépassement.
+const LIMITE_MAX = 2000;
+
 // Seuls ADMIN et SUPER_ADMIN peuvent modifier/supprimer des ouvriers.
 // La lecture (GET) reste ouverte à tous les rôles authentifiés (dont LECTEUR).
 const ECRITURE = requireRole("ADMIN", "SUPER_ADMIN");
@@ -42,7 +47,7 @@ function extraireChamps(body) {
 router.get("/", async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page ?? "1", 10) || 1);
-    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit ?? "50", 10) || 50));
+    const limit = Math.min(LIMITE_MAX, Math.max(1, parseInt(req.query.limit ?? "50", 10) || 50));
 
     const ou = {};
     if (req.query.actif === "true") ou.actif = true;
