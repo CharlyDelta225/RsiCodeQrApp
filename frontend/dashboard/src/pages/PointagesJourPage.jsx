@@ -43,16 +43,18 @@ export default function PointagesJourPage() {
 
   useEffect(() => {
     api
-      .getOuvriers({ limit: 500 })
+      .getOuvriers({ limit: 2000 })
       .then((data) => setOuvriers(data.ouvriers))
-      .catch(() => {});
+      .catch(() =>
+        setErreur("La liste des ouvriers du filtre n'a pas pu être chargée. Actualisez la page.")
+      );
   }, []);
 
   const charger = useCallback(async () => {
     if (premierChargement.current) setChargement(true);
     setErreur(null);
     try {
-      const params = { du, au, limit: 200 };
+      const params = { du, au, limit: 2000 };
       if (ouvrierId) params.ouvrierId = ouvrierId;
       const data = await api.getPointages(params);
       setPointages(data.pointages);

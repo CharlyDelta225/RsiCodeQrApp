@@ -379,7 +379,9 @@ Règles :
 Query optionnels :
 - `du=YYYY-MM-DD` / `au=YYYY-MM-DD` — plage de dates (bornes incluses sur `au`)
 - `ouvrierId=uuid` — filtre par ouvrier
-- `page=1&limit=50` — pagination
+- `jourSemaine=0..6` — seulement ce jour de la semaine (0 = dimanche), appliqué en base (exige `du` et `au`)
+- `ordre=date` — du plus récent au plus ancien (par défaut : alphabétique par ouvrier)
+- `page=1&limit=50` — pagination (`limit` max **2000**, comme `GET /api/ouvriers`)
 
 ```json
 {
@@ -399,6 +401,27 @@ Query optionnels :
 ```
 
 > `type` est présent mais **non utilisé** pour l'instant (toujours `ENTRER`).
+
+### `GET /api/pointages/stats?jours=7` (tout rôle authentifié)
+Indicateurs du tableau de bord, **calculés en base** (aucune troncature de
+liste). `jours` : 1 à 90 (défaut 7). Jour civil UTC, comme le badgeage.
+```json
+{
+  "ok": true, "jour": "2026-10-29",
+  "ouvriers": { "total": 193, "actifs": 193, "desactives": 0 },
+  "departements": 19,
+  "presentsAuj": 12,
+  "parJour": [ { "date": "2026-10-23", "presents": 0 }, "…", { "date": "2026-10-29", "presents": 12 } ],
+  "pointagesAuj": [ /* même format que GET /api/pointages, du plus ancien au plus récent */ ]
+}
+```
+
+### `GET /api/pointages/export` (**ADMIN/SUPER_ADMIN**)
+Mêmes filtres que `GET /api/pointages` (`du`, `au`, `ouvrierId`, `jourSemaine`).
+Renvoie un **CSV** (`text/csv`, séparateur `;`, UTF-8 avec BOM pour Excel) de
+**toute** la période filtrée, du plus récent au plus ancien. Colonnes :
+`Date;Heure;Matricule;Nom;Prénom;Département(s)`.
+Erreurs : `403 ACCES_REFUSE` (LECTEUR), `413 EXPORT_TROP_GROS` (> 50 000 lignes : réduire la période).
 
 ---
 
@@ -560,6 +583,12 @@ Rapport du dashboard : filtre + affichage présent/absent + export CSV).
 }
 ```
 
+> **`recap` = personnes distinctes.** Un ouvrier membre de plusieurs
+> départements figure dans les `lignes` de chacun, mais ne compte qu'une fois
+> dans `recap` (donc `recap.effectif` = nombre d'ouvriers actifs, et non la
+> somme des `effectif` par département). `dateLongueur` contient déjà le nom du
+> jour : ne pas le préfixer par `jourLabel`.
+
 **Réponses d'erreur** :
 | HTTP | code | message |
 |---|---|---|
@@ -647,6 +676,7 @@ CRON_SECRET=secret-partage-pour-la-route-cron
 
 | Date | Changement |
 |---|---|
+| 2026-10-29 | **Corrections de l'audit (lot 2)** : nouvelles routes `GET /api/pointages/stats` (indicateurs du tableau de bord calculés en base) et `GET /api/pointages/export` (CSV de toute la période, ADMIN/SUPER_ADMIN) ; `GET /api/pointages` accepte `jourSemaine` et `ordre=date` ; `limit` max passe de 200 à **2000** sur `GET /api/ouvriers` et `GET /api/pointages`. `recap` du rapport journalier = personnes distinctes. En-têtes de sécurité sur toutes les réponses (`nosniff`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy`), `X-Powered-By` retiré. Une adresse inconnue du dashboard renvoie la page « introuvable » avec un statut **404** (et non 200) |
 | 2026-10-24 | **Inscription en attente de validation** : `POST /api/auth/register` crée désormais le compte **inactif** (`actif: false`). Un `SUPER_ADMIN` doit l'activer (`PATCH /api/admins/:id/activer`) avant toute connexion ; avant activation, le login renvoie `403 COMPTE_DESACTIVE`. Un inscrit anonyme ne peut donc plus lire les données personnelles des ouvriers |
 | 2026-09-15 | **Message « déjà badgé » simplifié** : `409 DEJA_BADGE_AUJOURDHUI` ne renvoie plus l'heure UTC du premier badgeage ; message fixe **« Vous avez déjà badgé »** (terminal plus simple à lire) |
 | 2026-09-15 | **Système de logs** : mini-logger maison (`backend/src/lib/logger.js`, zéro dépendance) remplaçant tous les `console.*`. Sortie **toujours** en stdout (capturée par Vercel en prod) + fichier tournant `backend/logs/app-<jour>.log` par défaut hors prod. Middleware HTTP ajouté dans `app.js` : chaque requête reçoit un `requestId` (UUID, renvoyé dans l'en-tête `X-Request-Id`) et est logguée (méthode, path, status, durée, IP, admin). Variables `LOG_LEVEL` (défaut `info`) et `LOG_FILE` ajoutées au `.env.example` ; les erreurs du handler central logguent désormais avec `requestId` |

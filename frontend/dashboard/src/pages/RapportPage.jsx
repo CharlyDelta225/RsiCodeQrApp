@@ -62,7 +62,9 @@ export default function RapportPage() {
     api
       .getDepartements({ limit: 100 })
       .then((data) => setDepartements(data.departements))
-      .catch(() => {});
+      .catch(() =>
+        setErreur("La liste des départements du filtre n'a pas pu être chargée. Actualisez la page.")
+      );
   }, []);
 
   const charger = useCallback(async () => {
@@ -92,10 +94,36 @@ export default function RapportPage() {
     charger();
   }
 
-  // Lignes affichées : toutes les lignes du(des) département(s) de la sélection.
+  // Lignes affichées, toujours regroupées par département :
+  //  - un département précis : TOUS ses membres, même ceux qui appartiennent
+  //    aussi à d'autres départements ;
+  //  - « Tous les départements » : UNE ligne par ouvrier (le nombre de lignes
+  //    = le nombre exact d'ouvriers). Un ouvrier membre de plusieurs
+  //    départements apparaît sous le premier, avec tous ses départements
+  //    dans la colonne Département.
   const departementsAffiches = rapport?.departements ?? [];
+  const tousLesDepartements = !departementId;
+  const departementsParMatricule = new Map();
+  for (const dep of departementsAffiches) {
+    for (const ligne of dep.lignes) {
+      const noms = departementsParMatricule.get(ligne.matricule) ?? [];
+      noms.push(dep.nom);
+      departementsParMatricule.set(ligne.matricule, noms);
+    }
+  }
+  const dejaAffiches = new Set();
   const lignesAffichees = departementsAffiches.flatMap((dep) =>
-    dep.lignes.map((ligne) => ({ ligne, nomDepartement: dep.nom }))
+    dep.lignes.flatMap((ligne) => {
+      if (!tousLesDepartements) return [{ ligne, nomDepartement: dep.nom }];
+      if (dejaAffiches.has(ligne.matricule)) return [];
+      dejaAffiches.add(ligne.matricule);
+      return [
+        {
+          ligne,
+          nomDepartement: departementsParMatricule.get(ligne.matricule).join(", "),
+        },
+      ];
+    })
   );
   const totaux = rapport?.recap;
 
@@ -277,7 +305,11 @@ export default function RapportPage() {
 
       <Card
         title="Détail des pointages"
-        description={`${lignesAffichees.length} ligne(s) affichée(s)`}
+        description={
+          tousLesDepartements
+            ? `${lignesAffichees.length} ouvrier(s), regroupés par département (un ouvrier membre de plusieurs départements n'apparaît qu'une fois)`
+            : `${lignesAffichees.length} membre(s) du département`
+        }
         className="no-print"
         actions={
           peutEcrire() ? (

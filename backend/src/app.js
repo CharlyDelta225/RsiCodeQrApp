@@ -26,6 +26,24 @@ const app = express();
 // confiance au 1er proxy pour résoudre l'IP cliente (req.ip) — sinon
 // express-rate-limit lève ERR_ERL_UNEXPECTED_X_FORWARDED_FOR sur Vercel.
 app.set("trust proxy", 1);
+app.disable("x-powered-by"); // ne pas annoncer la techno serveur
+
+// En-têtes de sécurité sur toutes les réponses (dashboard, terminal, API) :
+//  - nosniff : le navigateur respecte le Content-Type déclaré ;
+//  - pas d'affichage dans une iframe d'un autre site (anti-clickjacking) ;
+//  - Referrer limité à l'origine vers les autres sites ;
+//  - caméra autorisée pour ce site seulement (terminal de scan), micro et
+//    géolocalisation refusés.
+// (Pas de CSP complète : le terminal utilise des scripts en ligne.)
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  next();
+});
 
 // Middlewares globaux
 // CORS restreint : seules les origines du dashboard sont acceptées. Le
@@ -169,10 +187,23 @@ app.use("/api/cron", cronRoutes);
 // --- Fallback SPA du dashboard (BrowserRouter) ---
 // Toute requête GET non-API et non-terminal reçoit index.html pour que React
 // Router gère la route côté client. Placé AVANT le 404 JSON.
+// Les routes connues du dashboard répondent 200 ; toute autre adresse reçoit
+// la même page (qui affiche « Page introuvable ») mais avec un vrai statut 404,
+// pour que les moteurs de recherche ne l'indexent pas (« soft 404 »).
+// À tenir à jour avec les <Route> de frontend/dashboard/src/App.jsx.
+const ROUTES_DASHBOARD = new Set([
+  "/", "/login", "/inscription", "/oublie", "/reinitialisation",
+  "/confidentialite", "/cgv-cgu",
+  "/ouvriers", "/badges", "/badges/atelier", "/pointages", "/historique",
+  "/departements", "/gestion-departements", "/migration-ouvrier",
+  "/rapports", "/gestion-admins",
+]);
 if (DASHBOARD_DIR) {
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path.startsWith("/api") || req.path.startsWith("/terminal")) return next();
+    const chemin = req.path.length > 1 ? req.path.replace(/\/+$/, "") : req.path;
+    if (!ROUTES_DASHBOARD.has(chemin)) res.status(404);
     return res.sendFile(path.join(DASHBOARD_DIR, "index.html"));
   });
 }

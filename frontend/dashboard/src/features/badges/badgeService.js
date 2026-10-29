@@ -21,7 +21,7 @@ import { BADGE_SOURCES } from "./badgeTypes";
 
 /** Charge les membres réels via l'API existante. */
 export async function chargerMembresApi() {
-  const donnees = await api.getOuvriers({ limit: 200 });
+  const donnees = await api.getOuvriers({ limit: 2000 });
   const ouvriers = Array.isArray(donnees?.ouvriers) ? donnees.ouvriers : [];
   return ouvriers.map((ouvrier) => mapOuvrierToBadgeMember(ouvrier));
 }

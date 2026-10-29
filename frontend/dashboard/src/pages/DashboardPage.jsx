@@ -46,14 +46,6 @@ const COULEURS_PIE = [
 const INTERVALLE_ACTUALISATION_MS = 60000;
 const TIMEOUT_REQUETE_MS = 20000;
 
-function dateISO(decalageJours = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + decalageJours);
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const j = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${j}`;
-}
-
 function labelJour(iso) {
   const d = new Date(iso + "T12:00:00");
   return JOURS_COURTS[d.getDay()] + " " + d.getDate();
@@ -97,9 +89,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
 
   const [stats, setStats] = useState(null);
-  const [pointagesPeriode, setPointagesPeriode] = useState([]);
+  const [parJourBrut, setParJourBrut] = useState([]);
   const [pointagesAuj, setPointagesAuj] = useState([]);
-  const [ouvriers, setOuvriers] = useState([]);
   const [erreur, setErreur] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [derniereMaj, setDerniereMaj] = useState(null);
@@ -119,9 +110,6 @@ export default function DashboardPage() {
       if (statsRef.current === null && !calme) setChargement(true);
       setErreur(null);
       try {
-        const auj = dateISO(0);
-        const duPeriode = echelle === "30" ? dateISO(-29) : dateISO(-6);
-
         // Garde-fou : si le batch de requêtes dépasse le délai, on lève une
         // erreur claire au lieu de rester bloqué sur "Chargement…" indéfiniment
         // (file d'attente d'instances serverless, réseau lent…).
@@ -131,11 +119,10 @@ export default function DashboardPage() {
               reject(new Error("Délai de chargement dépassé. L'application reste utilisable, réessayez dans un instant.")),
             TIMEOUT_REQUETE_MS
           );
-          Promise.all([
-            api.getOuvriers({ limit: 500 }),
-            api.getPointages({ du: duPeriode, au: auj, limit: 2000 }),
-            api.getPointages({ du: auj, au: auj, limit: 500 }),
-          ])
+          // Une seule requête : les compteurs et les séries sont calculés en
+          // base, sans la troncature des listes paginées.
+          api
+            .getStatsTableauDeBord(echelle === "30" ? 30 : 7)
             .then((vals) => {
               clearTimeout(timer);
               resolve(vals);
@@ -146,24 +133,16 @@ export default function DashboardPage() {
             });
         });
 
-        const [dataOuvriers, dataPeriode, dataAuj] = await egaliteDuLot;
+        const data = await egaliteDuLot;
 
-        const liste = dataOuvriers.ouvriers || [];
-        const actifs = liste.filter((o) => o.actif).length;
-
-        setOuvriers(liste);
-        setPointagesPeriode(dataPeriode.pointages || []);
-        setPointagesAuj(dataAuj.pointages || []);
+        setParJourBrut(data.parJour || []);
+        setPointagesAuj(data.pointagesAuj || []);
         const nouvellesStats = {
-          total: dataOuvriers.total ?? liste.length,
-          actifs,
-          desactives: (dataOuvriers.total ?? liste.length) - actifs,
-          departements: new Set(
-            liste.flatMap((o) =>
-              (o.departements || []).map((l) => l?.departement?.nom).filter(Boolean)
-            ) || []
-          ).size,
-          presentsAuj: (dataAuj.pointages || []).length,
+          total: data.ouvriers.total,
+          actifs: data.ouvriers.actifs,
+          desactives: data.ouvriers.desactives,
+          departements: data.departements,
+          presentsAuj: data.presentsAuj,
         };
         statsRef.current = nouvellesStats;
         setStats(nouvellesStats);
@@ -207,18 +186,14 @@ export default function DashboardPage() {
   const nbJours = echelle === "30" ? 30 : 7;
 
   // Évolution des présences sur la période choisie (7 ou 30 derniers jours)
-  const dataParJour = useMemo(() => {
-    const map = {};
-    for (let i = nbJours - 1; i >= 0; i--) {
-      const iso = dateISO(-i);
-      map[iso] = { date: iso, label: labelJour(iso), presents: 0 };
-    }
-    for (const p of pointagesPeriode) {
-      const iso = p.dateHeure?.slice(0, 10);
-      if (iso && map[iso]) map[iso].presents += 1;
-    }
-    return Object.values(map);
-  }, [pointagesPeriode, nbJours]);
+  // (série calculée par le serveur : un point par jour, jours sans badgeage à 0)
+  const dataParJour = useMemo(
+    () =>
+      parJourBrut
+        .slice(-nbJours)
+        .map((j) => ({ date: j.date, label: labelJour(j.date), presents: j.presents })),
+    [parJourBrut, nbJours]
+  );
 
   // Répartition horaire du jour
   const dataParHeure = useMemo(() => {

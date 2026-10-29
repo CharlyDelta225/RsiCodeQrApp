@@ -146,7 +146,8 @@ test("reset-demand sur compte connu : token stocké HASHÉ + expiration (email c
   assert.strictEqual(r.status, 200);
   const b = await r.json();
   assert.strictEqual(b.ok, true);
-  assert.strictEqual(b.emailEnvoye, false); // SMTP coupé en test
+  // Anti-énumération : la réponse ne dit pas si un email est parti.
+  assert.ok(!("emailEnvoye" in b), "aucun indicateur d'envoi dans la réponse");
 
   const a = await prisma.admin.findUnique({ where: { email } });
   assert.ok(a.resetTokenHash, "empreinte du token attendue");

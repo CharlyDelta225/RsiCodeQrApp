@@ -87,14 +87,16 @@ test("corps JSON trop gros => 413 CORPS_TROP_GROS", async () => {
   assert.strictEqual(body.code, "CORPS_TROP_GROS");
 });
 
-test("rate limit : login -> 429 TROP_DE_TENTATIVES après 5 essais", async () => {
+test("rate limit : login -> 429 TROP_DE_TENTATIVES une fois la limite dépassée", async () => {
+  // Limite par minute : AUTH_RATE_LIMIT_MAX (défaut 10, cf. routes/auth.routes.js).
+  const max = parseInt(process.env.AUTH_RATE_LIMIT_MAX || "10", 10) || 10;
   const tenter = () =>
     fetch(`${baseURL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "nobody@test.dev", motDePasse: "mauvais-mot-de-passe" }),
     });
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < max; i++) {
     const r = await tenter();
     assert.strictEqual(r.status, 401); // échec normal tant que le quota n'est pas dépassé
   }

@@ -9,12 +9,12 @@ import TableShell from "../ui/TableShell";
 import Btn from "../ui/Btn";
 import { Field, Input, Select } from "../ui/inputs";
 
-const LIMIT = 17;
+const LIMIT = 25;
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
 // L'export CSV extrait des données : réservé aux rôles à écriture (un LECTEUR
-// consulte l'écran, il n'exporte pas).
+// consulte l'écran, il n'exporte pas). Le serveur applique la même règle.
 function peutEcrire() {
   return ROLE_ECRITURE.includes(getAdmin()?.role);
 }
@@ -37,17 +37,14 @@ function formatDateHeure(iso) {
   });
 }
 
-function csvValeur(v) {
-  const s = String(v ?? "");
-  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
 export default function HistoriquePage() {
   const [pointages, setPointages] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const [erreurOuvriers, setErreurOuvriers] = useState(null);
+  const [exportEnCours, setExportEnCours] = useState(false);
 
   const [du, setDu] = useState(dateDuJour(-7));
   const [au, setAu] = useState(dateDuJour(0));
@@ -55,20 +52,33 @@ export default function HistoriquePage() {
   const [ouvriers, setOuvriers] = useState([]);
   const [jourSemaine, setJourSemaine] = useState("");
 
-  useEffect(() => {
+  const chargerOuvriers = useCallback(() => {
+    setErreurOuvriers(null);
     api
-      .getOuvriers({ limit: 500 })
+      .getOuvriers({ limit: 2000 })
       .then((data) => setOuvriers(data.ouvriers))
-      .catch(() => {});
+      .catch(() => setErreurOuvriers("La liste des ouvriers du filtre n'a pas pu être chargée."));
   }, []);
+
+  useEffect(() => {
+    chargerOuvriers();
+  }, [chargerOuvriers]);
+
+  // Filtres communs à l'affichage et à l'export. Le jour de la semaine est
+  // appliqué en base : il vaut pour toutes les pages, pas seulement la page affichée.
+  const filtres = useCallback(() => {
+    const params = { du, au };
+    if (ouvrierId) params.ouvrierId = ouvrierId;
+    if (jourSemaine !== "") params.jourSemaine = jourSemaine;
+    return params;
+  }, [du, au, ouvrierId, jourSemaine]);
 
   const charger = useCallback(async () => {
     setChargement(true);
     setErreur(null);
     try {
-      const params = { du, au, page, limit: LIMIT };
-      if (ouvrierId) params.ouvrierId = ouvrierId;
-      const data = await api.getPointages(params);
+      // Tri chronologique : le plus récent d'abord.
+      const data = await api.getPointages({ ...filtres(), page, limit: LIMIT, ordre: "date" });
       setPointages(data.pointages);
       setTotal(data.total);
     } catch (err) {
@@ -76,7 +86,7 @@ export default function HistoriquePage() {
     } finally {
       setChargement(false);
     }
-  }, [du, au, ouvrierId, page]);
+  }, [filtres, page]);
 
   useEffect(() => {
     charger();
@@ -88,52 +98,61 @@ export default function HistoriquePage() {
     charger();
   }
 
-  function handleExporterCsv() {
-    const entete = ["Date/heure", "Matricule", "Nom", "Prénom", "Département"];
-    const lignes = pointages.map((p) =>
-      [
-        formatDateHeure(p.dateHeure),
-        p.ouvrier?.matricule,
-        p.ouvrier?.nom,
-        p.ouvrier?.prenom,
-        libelleDepartement(p.ouvrier),
-      ]
-        .map(csvValeur)
-        .join(";")
-    );
-    const csv = "\uFEFF" + [entete.join(";"), ...lignes].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    telechargerBlob(blob, `historique-pointages_${du}_a_${au}_page${page}.csv`);
+  // Export de TOUTE la période filtrée, généré par le serveur.
+  async function handleExporterCsv() {
+    setExportEnCours(true);
+    setErreur(null);
+    try {
+      const blob = await api.getPointagesExportBlob(filtres());
+      telechargerBlob(blob, `historique-pointages_${du}_a_${au}.csv`);
+    } catch (err) {
+      setErreur(err instanceof ApiError ? err.message : "L'export a échoué. Réessayez.");
+    } finally {
+      setExportEnCours(false);
+    }
   }
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
-  const pointagesAffiches =
-    jourSemaine === ""
-      ? pointages
-      : pointages.filter((p) => new Date(p.dateHeure).getDay() === Number(jourSemaine));
 
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm font-semibold text-bordeaux-900">
-          {pointagesAffiches.length} pointage(s) affiché(s) sur {total}
+          {total} pointage(s) sur la période
         </h2>
         {peutEcrire() && (
           <Btn
             variant="secondary"
             onClick={handleExporterCsv}
-            disabled={pointages.length === 0}
+            disabled={total === 0 || exportEnCours}
             icon={<Download size={16} />}
           >
-            Exporter cette page en CSV
+            {exportEnCours ? "Export en cours…" : "Exporter la période en CSV"}
           </Btn>
         )}
       </div>
 
       {erreur && (
-        <p className="text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
-          {erreur}
-        </p>
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 text-sm text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2"
+          role="alert"
+        >
+          <span>{erreur}</span>
+          <Btn variant="secondary" size="sm" onClick={charger}>
+            Réessayer
+          </Btn>
+        </div>
+      )}
+      {erreurOuvriers && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"
+          role="alert"
+        >
+          <span>{erreurOuvriers}</span>
+          <Btn variant="secondary" size="sm" onClick={chargerOuvriers}>
+            Réessayer
+          </Btn>
+        </div>
       )}
 
       <form
@@ -157,7 +176,13 @@ export default function HistoriquePage() {
           </Select>
         </Field>
         <Field label="Jour de la semaine">
-          <Select value={jourSemaine} onChange={(e) => setJourSemaine(e.target.value)}>
+          <Select
+            value={jourSemaine}
+            onChange={(e) => {
+              setJourSemaine(e.target.value);
+              setPage(1);
+            }}
+          >
             <option value="">Tous les jours</option>
             {JOURS.map((nom, index) => (
               <option key={index} value={index}>
@@ -174,7 +199,7 @@ export default function HistoriquePage() {
         chargement={chargement}
         vide="Aucun pointage sur cette période"
       >
-        {pointagesAffiches.map((p) => (
+        {pointages.map((p) => (
           <tr key={p.id} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
             <td className="px-3 py-2 text-xs">{formatDateHeure(p.dateHeure)}</td>
             <td className="px-3 py-2 font-mono text-xs">{p.ouvrier?.matricule}</td>

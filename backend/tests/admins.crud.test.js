@@ -156,12 +156,21 @@ test("cycle de vie complet d'un admin géré par le SUPER_ADMIN", async () => {
   lr = await login(email, "MotDePasse123!");
   assert.strictEqual(lr.status, 200);
 
-  // Réinitialisation du mot de passe (génère + renvoie car SMTP coupé)
+  // Réinitialisation du mot de passe : un LIEN (1 h, usage unique) est renvoyé
+  // quand l'email ne part pas (SMTP coupé en test) ; on l'utilise pour choisir
+  // un nouveau mot de passe, puis on se connecte avec.
   r = await (await fetch(`${baseURL}/api/admins/${admin.id}/reinitialiser-mot-de-passe`, { method: "POST", ...auth() })).json();
   assert.strictEqual(r.ok, true);
   assert.strictEqual(r.emailEnvoye, false);
-  assert.ok(r.motDePasseTemporaire);
-  await loginOk(email, r.motDePasseTemporaire);
+  assert.ok(r.lien, "le lien doit être renvoyé quand l'email échoue");
+  const jeton = new URL(r.lien).searchParams.get("token");
+  const reset = await fetch(`${baseURL}/api/auth/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: jeton, motDePasse: "NouveauMdp456!" }),
+  });
+  assert.strictEqual(reset.status, 200);
+  await loginOk(email, "NouveauMdp456!");
 
   // Suppression
   r = await (await fetch(`${baseURL}/api/admins/${admin.id}`, { method: "DELETE", ...auth() })).json();

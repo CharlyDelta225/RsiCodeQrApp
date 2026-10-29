@@ -90,7 +90,7 @@ export default function OuvriersPage() {
     setChargement(true);
     setAlerte(null);
     try {
-      const params = { limit: 500 };
+      const params = { limit: 2000 };
       if (recherche) params.recherche = recherche;
       const [data, dataDepts] = await Promise.all([
         api.getOuvriers(params),
