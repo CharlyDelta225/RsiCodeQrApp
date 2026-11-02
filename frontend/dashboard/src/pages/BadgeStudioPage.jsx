@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, Download, Printer, RotateCcw } from "lucide-react";
+import { ArrowLeft, Download, Pencil, Printer } from "lucide-react";
 import Card from "../ui/Card";
 import Btn from "../ui/Btn";
 import Pill from "../ui/Pill";
@@ -13,51 +13,11 @@ import BadgePrintSheet, {
 import { useBadgeQr } from "../features/badges/useBadgeQr";
 import { chargerMembres } from "../features/badges/badgeService";
 import {
-  applyOverrides,
   initiales,
   nomComplet,
   valeurQr,
 } from "../features/badges/badgeAdapter";
-import {
-  chargerBranding,
-  chargerOverridesMembre,
-  enregistrerBranding,
-  enregistrerOverridesMembre,
-  reinitialiserOverridesMembre,
-} from "../features/badges/badgeLocalStore";
-import { BADGE_SOURCES } from "../features/badges/badgeTypes";
-import { compresserImage } from "../features/badges/imageUtils";
 import { telechargerBadgePng } from "../features/badges/downloadUtils";
-
-const CHAMPS_OVERRIDES = [
-  "photoUrl",
-  "fonction",
-  "departement",
-  "egliseOrigine",
-  "egliseActuelle",
-  "verificationUrl",
-];
-
-const SOURCES = [
-  { value: BADGE_SOURCES.DEMO, label: "Démo" },
-  { value: BADGE_SOURCES.API, label: "Données réelles" },
-];
-
-function differences(membreBase, brouillon) {
-  const resultat = {};
-
-  for (const champ of CHAMPS_OVERRIDES) {
-    const valeur = brouillon[champ] ?? "";
-    const origine = membreBase?.[champ] ?? "";
-
-    if (String(valeur).trim() !== String(origine).trim()) {
-      resultat[champ] =
-        typeof valeur === "string" ? valeur.trim() : valeur;
-    }
-  }
-
-  return resultat;
-}
 
 async function attendreImages() {
   const images = Array.from(
@@ -79,22 +39,29 @@ async function attendreImages() {
   }
 }
 
+/** Ligne de la fiche en lecture seule (aucune donnée inventée). */
+function LigneInfo({ label, valeur }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </dt>
+      <dd className="mt-0.5 truncate text-sm text-slate-800" title={valeur || undefined}>
+        {valeur || "—"}
+      </dd>
+    </div>
+  );
+}
+
 export default function BadgeStudioPage() {
   const navigate = useNavigate();
 
-  // En production, l'atelier s'ouvre sur les vrais membres ; la démo reste
-  // le défaut en développement (prévisualisation sans backend).
-  const [source, setSource] = useState(
-    import.meta.env.PROD ? BADGE_SOURCES.API : BADGE_SOURCES.DEMO
-  );
   const [membres, setMembres] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
+  const [rechargement, setRechargement] = useState(0);
   const [recherche, setRecherche] = useState("");
   const [selectionId, setSelectionId] = useState(null);
-  const [overrides, setOverrides] = useState({});
-  const [modifie, setModifie] = useState(false);
-  const [branding, setBranding] = useState({ logoUrl: null });
   const [face, setFace] = useState("recto");
   const [modeImpression, setModeImpression] = useState(
     BADGE_PRINT_MODES.PLANCHE
@@ -105,10 +72,7 @@ export default function BadgeStudioPage() {
   const refCaptureRecto = useRef(null);
   const refCaptureVerso = useRef(null);
 
-  useEffect(() => {
-    setBranding(chargerBranding());
-  }, []);
-
+  // L'atelier travaille uniquement sur les ouvriers réels de l'API.
   useEffect(() => {
     let actif = true;
 
@@ -117,7 +81,7 @@ export default function BadgeStudioPage() {
     setMembres([]);
     setSelectionId(null);
 
-    chargerMembres(source)
+    chargerMembres()
       .then((liste) => {
         if (!actif) return;
         setMembres(liste);
@@ -131,7 +95,7 @@ export default function BadgeStudioPage() {
       .catch((err) => {
         if (!actif) return;
         setErreur(
-          err?.message || "Impossible de charger la liste des membres."
+          err?.message || "Impossible de charger la liste des ouvriers."
         );
       })
       .finally(() => {
@@ -141,14 +105,7 @@ export default function BadgeStudioPage() {
     return () => {
       actif = false;
     };
-  }, [source]);
-
-  useEffect(() => {
-    setOverrides(
-      selectionId ? chargerOverridesMembre(selectionId) : {}
-    );
-    setModifie(false);
-  }, [selectionId]);
+  }, [rechargement]);
 
   useEffect(() => {
     if (!message) return undefined;
@@ -156,14 +113,9 @@ export default function BadgeStudioPage() {
     return () => clearTimeout(minuteur);
   }, [message]);
 
-  const membreBase = useMemo(
+  const membre = useMemo(
     () => membres.find((m) => m.id === selectionId) ?? null,
     [membres, selectionId]
-  );
-
-  const membre = useMemo(
-    () => (membreBase ? applyOverrides(membreBase, overrides) : null),
-    [membreBase, overrides]
   );
 
   const { dataUrl: qrDataUrl, erreur: qrErreur } = useBadgeQr(
@@ -175,215 +127,16 @@ export default function BadgeStudioPage() {
     if (!requete) return membres;
 
     return membres.filter((m) =>
-      [
-        m.nom,
-        m.prenom,
-        m.matricule,
-        m.departement,
-        m.fonction,
-        m.egliseOrigine,
-        m.egliseActuelle,
-      ]
+      [m.nom, m.prenom, m.matricule, m.departement, m.fonction]
         .filter(Boolean)
         .some((valeur) => String(valeur).toLowerCase().includes(requete))
     );
   }, [membres, recherche]);
 
-  function valeurChamp(champ) {
-    if (Object.prototype.hasOwnProperty.call(overrides, champ)) {
-      return overrides[champ] ?? "";
-    }
-    return membreBase?.[champ] ?? "";
-  }
-
-  function majChamp(champ, valeur) {
-    setOverrides((precedent) => ({ ...precedent, [champ]: valeur }));
-    setModifie(true);
-  }
-
-  function sauvegarderSilencieusement() {
-    if (!modifie || !membreBase) return true;
-
-    const ok = enregistrerOverridesMembre(
-      membreBase.id,
-      differences(membreBase, overrides)
-    );
-
-    if (!ok) {
-      setMessage({
-        type: "erreur",
-        texte:
-          "Stockage local saturé : les modifications en cours n'ont pas pu être enregistrées.",
-      });
-    }
-
-    return ok;
-  }
-
   function choisirMembre(id) {
     if (!id || id === selectionId) return;
-
-    sauvegarderSilencieusement();
-
-    setOverrides(chargerOverridesMembre(id));
     setSelectionId(id);
-    setModifie(false);
     setFace("recto");
-  }
-
-  function changerSource(nouvelleSource) {
-    if (nouvelleSource === source) return;
-
-    sauvegarderSilencieusement();
-
-    setSource(nouvelleSource);
-    setRecherche("");
-    setMessage(null);
-  }
-
-  function handleEnregistrer() {
-    if (!membreBase) return;
-
-    const diff = differences(membreBase, overrides);
-    const ok = enregistrerOverridesMembre(membreBase.id, diff);
-
-    if (!ok) {
-      setMessage({
-        type: "erreur",
-        texte:
-          "Le stockage local est saturé. Retirez la photo ou le logo, puis réessayez.",
-      });
-      return;
-    }
-
-    setOverrides(diff);
-    setModifie(false);
-    setMessage({
-      type: "succes",
-      texte: "Compléments enregistrés dans ce navigateur.",
-    });
-  }
-
-  function handleReinitialiser() {
-    if (!membreBase) return;
-
-    reinitialiserOverridesMembre(membreBase.id);
-    setOverrides({});
-    setModifie(false);
-    setMessage({
-      type: "succes",
-      texte: "Compléments du membre réinitialisés.",
-    });
-  }
-
-  async function handlePhoto(evenement) {
-    const fichier = evenement.target.files?.[0];
-    evenement.target.value = "";
-    if (!fichier) return;
-
-    if (!fichier.type.startsWith("image/")) {
-      setMessage({
-        type: "erreur",
-        texte: "Choisissez un fichier image (JPEG, PNG…).",
-      });
-      return;
-    }
-
-    if (fichier.size > 5 * 1024 * 1024) {
-      setMessage({
-        type: "erreur",
-        texte: "Image trop lourde : 5 Mo maximum.",
-      });
-      return;
-    }
-
-    try {
-      const dataUrl = await compresserImage(fichier, {
-        maxSize: 640,
-        mimeType: "image/jpeg",
-        quality: 0.82,
-      });
-
-      majChamp("photoUrl", dataUrl);
-      setMessage({
-        type: "succes",
-        texte:
-          "Photo ajoutée à l'aperçu. Enregistrez pour la conserver dans ce navigateur.",
-      });
-    } catch {
-      setMessage({
-        type: "erreur",
-        texte: "Impossible de lire cette image.",
-      });
-    }
-  }
-
-  async function handleLogo(evenement) {
-    const fichier = evenement.target.files?.[0];
-    evenement.target.value = "";
-    if (!fichier) return;
-
-    if (!fichier.type.startsWith("image/")) {
-      setMessage({
-        type: "erreur",
-        texte: "Choisissez un fichier image pour le logo.",
-      });
-      return;
-    }
-
-    if (fichier.size > 3 * 1024 * 1024) {
-      setMessage({
-        type: "erreur",
-        texte: "Logo trop lourd : 3 Mo maximum.",
-      });
-      return;
-    }
-
-    try {
-      const dataUrl = await compresserImage(fichier, {
-        maxSize: 256,
-        mimeType: "image/png",
-        quality: 0.92,
-      });
-
-      const nouveau = { logoUrl: dataUrl };
-      if (!enregistrerBranding(nouveau)) {
-        setMessage({
-          type: "erreur",
-          texte:
-            "Le stockage local est saturé : le logo n'a pas pu être enregistré.",
-        });
-        return;
-      }
-
-      setBranding(nouveau);
-      setMessage({
-        type: "succes",
-        texte: "Logo enregistré dans ce navigateur.",
-      });
-    } catch {
-      setMessage({
-        type: "erreur",
-        texte: "Impossible de lire ce logo.",
-      });
-    }
-  }
-
-  function retirerLogo() {
-    const nouveau = { logoUrl: null };
-    if (!enregistrerBranding(nouveau)) {
-      setMessage({
-        type: "erreur",
-        texte: "Le stockage local est saturé.",
-      });
-      return;
-    }
-
-    setBranding(nouveau);
-    setMessage({
-      type: "succes",
-      texte: "Logo RSI par défaut rétabli.",
-    });
   }
 
   async function handleImprimer() {
@@ -395,7 +148,7 @@ export default function BadgeStudioPage() {
       setMessage({
         type: "erreur",
         texte:
-          "Ce membre n'a pas de matricule : le QR code ne peut pas être généré.",
+          "Cet ouvrier n'a pas de matricule : le QR code ne peut pas être généré.",
       });
       return;
     }
@@ -427,7 +180,7 @@ export default function BadgeStudioPage() {
       setMessage({
         type: "erreur",
         texte:
-          "Ce membre n'a pas de matricule : le QR code ne peut pas être généré.",
+          "Cet ouvrier n'a pas de matricule : le QR code ne peut pas être généré.",
       });
       return;
     }
@@ -469,8 +222,6 @@ export default function BadgeStudioPage() {
     }
   }
 
-  const sourceActive = SOURCES.find((s) => s.value === source);
-
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-[1400px] mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -480,12 +231,10 @@ export default function BadgeStudioPage() {
               Atelier badges
             </h1>
             <Pill tonalite="or">Recto / verso</Pill>
-            <Pill tonalite="bleu">STAFF</Pill>
           </div>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-            Sélectionnez un membre, complétez les informations manquantes et
-            imprimez les deux faces au format carte ID-1. Les fiches des
-            ouvriers ne sont pas modifiées.
+            Sélectionnez un ouvrier puis imprimez les deux faces au format carte
+            ID-1. Les informations affichées proviennent directement de sa fiche.
           </p>
         </div>
         <Btn
@@ -496,34 +245,6 @@ export default function BadgeStudioPage() {
         >
           Retour aux badges
         </Btn>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-bordeaux-800">
-            Compléments sur cet appareil
-          </p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-            Fonction, églises et photo restent dans ce navigateur : ils ne sont
-            pas partagés avec les autres postes.
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-bordeaux-800">
-            QR = matricule
-          </p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-            Le téléphone n'est jamais affiché ni encodé.
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-bordeaux-800">
-            Format ID-1
-          </p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-            85,6 × 54 mm · impression recto et verso.
-          </p>
-        </div>
       </div>
 
       {message && (
@@ -542,59 +263,26 @@ export default function BadgeStudioPage() {
       {erreur && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bordeaux-200 bg-bordeaux-50 px-3 py-2">
           <p className="text-xs text-bordeaux-800" title={erreur}>
-            {source === BADGE_SOURCES.API
-              ? "Impossible de charger les membres. Vérifiez la connexion puis réessayez."
-              : erreur}
+            Impossible de charger les ouvriers. Vérifiez la connexion puis
+            réessayez.
           </p>
-          {source === BADGE_SOURCES.API && (
-            <Btn
-              variant="secondary"
-              size="xs"
-              onClick={() => changerSource(BADGE_SOURCES.DEMO)}
-            >
-              Revenir à la démo
-            </Btn>
-          )}
+          <Btn
+            variant="secondary"
+            size="xs"
+            onClick={() => setRechargement((n) => n + 1)}
+          >
+            Réessayer
+          </Btn>
         </div>
       )}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)]">
         <div className="space-y-4">
           <Card
-            title="1. Membre"
+            title="1. Ouvrier"
             description="Choisissez le titulaire du badge."
-            actions={
-              <Pill tonalite={source === BADGE_SOURCES.DEMO ? "or" : "bleu"}>
-                {sourceActive?.label}
-              </Pill>
-            }
           >
             <div className="space-y-3">
-              <div
-                className="inline-flex w-full rounded-lg border border-slate-300 bg-slate-50 p-1 sm:w-auto"
-                role="group"
-                aria-label="Source des données"
-              >
-                {SOURCES.map((option) => {
-                  const actif = source === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={actif}
-                      onClick={() => changerSource(option.value)}
-                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition sm:flex-none ${
-                        actif
-                          ? "bg-white text-bordeaux-800 shadow-sm"
-                          : "text-slate-600 hover:text-slate-800"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-
               <Input
                 placeholder="Rechercher un nom, un matricule, un département…"
                 value={recherche}
@@ -604,13 +292,13 @@ export default function BadgeStudioPage() {
 
               {chargement ? (
                 <p className="py-6 text-center text-xs text-slate-500">
-                  Chargement des membres…
+                  Chargement des ouvriers…
                 </p>
               ) : membresFiltres.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-xs text-slate-500">
                   {membres.length === 0
-                    ? "Aucun membre disponible."
-                    : "Aucun membre ne correspond à la recherche."}
+                    ? "Aucun ouvrier disponible."
+                    : "Aucun ouvrier ne correspond à la recherche."}
                 </p>
               ) : (
                 <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
@@ -641,8 +329,8 @@ export default function BadgeStudioPage() {
                               {m.departement ? ` · ${m.departement}` : ""}
                             </span>
                           </span>
-                          {m.source === BADGE_SOURCES.DEMO && (
-                            <Pill tonalite="or">Démo</Pill>
+                          {m.actif === false && (
+                            <Pill tonalite="neutre">Inactif</Pill>
                           )}
                         </span>
                       </button>
@@ -652,181 +340,58 @@ export default function BadgeStudioPage() {
               )}
 
               <p className="text-[11px] text-slate-500">
-                {membresFiltres.length} membre(s) affiché(s) sur{" "}
+                {membresFiltres.length} ouvrier(s) affiché(s) sur{" "}
                 {membres.length}.
               </p>
             </div>
           </Card>
 
           <Card
-            title="2. Informations"
-            description="Complétez les informations qui ne figurent pas sur la fiche de l'ouvrier."
+            title="2. Fiche de l'ouvrier"
+            description="Données réelles enregistrées dans l'application."
             actions={
-              modifie ? <Pill tonalite="orange">Non enregistré</Pill> : null
+              <Btn
+                variant="ghost"
+                size="xs"
+                icon={<Pencil size={13} />}
+                onClick={() => navigate("/ouvriers")}
+              >
+                Modifier la fiche
+              </Btn>
             }
           >
-            {membreBase ? (
+            {membre ? (
               <div className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field
-                    label="Fonction / poste"
-                    hint="Absente de la fiche de l'ouvrier."
-                  >
-                    <Input
-                      value={valeurChamp("fonction")}
-                      onChange={(e) => majChamp("fonction", e.target.value)}
-                      placeholder="Ex. Pasteur, Responsable accueil"
-                      maxLength={60}
-                      autoComplete="off"
-                    />
-                  </Field>
-                  <Field
-                    label="Département"
-                    hint="Prérempli depuis la fiche de l'ouvrier."
-                  >
-                    <Input
-                      value={valeurChamp("departement")}
-                      onChange={(e) => majChamp("departement", e.target.value)}
-                      placeholder="Ex. Louange"
-                      maxLength={80}
-                      autoComplete="off"
-                    />
-                  </Field>
-                  <Field label="Église d'origine" hint="Optionnel.">
-                    <Input
-                      value={valeurChamp("egliseOrigine")}
-                      onChange={(e) =>
-                        majChamp("egliseOrigine", e.target.value)
-                      }
-                      placeholder="Ex. Assemblée Bethel"
-                      maxLength={80}
-                      autoComplete="off"
-                    />
-                  </Field>
-                  <Field label="Église actuelle" hint="Optionnel.">
-                    <Input
-                      value={valeurChamp("egliseActuelle")}
-                      onChange={(e) =>
-                        majChamp("egliseActuelle", e.target.value)
-                      }
-                      placeholder="Ex. Assemblée Eben-Ezer"
-                      maxLength={80}
-                      autoComplete="off"
-                    />
-                  </Field>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field
+                <dl className="grid gap-2 sm:grid-cols-2">
+                  <LigneInfo label="Prénom" valeur={membre.prenom} />
+                  <LigneInfo label="Nom" valeur={membre.nom} />
+                  <LigneInfo label="Matricule" valeur={membre.matricule} />
+                  <LigneInfo label="Département" valeur={membre.departement} />
+                  <LigneInfo
                     label="Photo"
-                    hint="JPEG/PNG, compressée et conservée uniquement dans ce navigateur."
-                  >
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhoto}
-                      className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-bordeaux-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-bordeaux-700 hover:file:bg-bordeaux-100"
-                    />
-                  </Field>
-                  <Field
-                    label="Lien imprimé au verso (facultatif)"
-                    hint="http(s) uniquement, imprimé en texte. Le QR encode toujours le matricule : c'est le seul format accepté par le terminal de badgeage."
-                  >
-                    <Input
-                      type="url"
-                      value={valeurChamp("verificationUrl")}
-                      onChange={(e) =>
-                        majChamp("verificationUrl", e.target.value)
-                      }
-                      placeholder="https://…"
-                      autoComplete="off"
-                    />
-                  </Field>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Btn
-                    variant="primary"
-                    size="sm"
-                    icon={<Check size={14} />}
-                    onClick={handleEnregistrer}
-                  >
-                    Enregistrer
-                  </Btn>
-                  <Btn
-                    variant="secondary"
-                    size="sm"
-                    icon={<RotateCcw size={14} />}
-                    onClick={handleReinitialiser}
-                  >
-                    Réinitialiser ce membre
-                  </Btn>
-                  {membre?.photoUrl && (
-                    <Btn
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => majChamp("photoUrl", null)}
-                    >
-                      Retirer la photo
-                    </Btn>
-                  )}
-                </div>
+                    valeur={
+                      membre.photoUrl
+                        ? "Photo enregistrée"
+                        : "Aucune photo — initiales affichées"
+                    }
+                  />
+                  <LigneInfo
+                    label="Statut"
+                    valeur={membre.actif === false ? "Inactif" : "Actif"}
+                  />
+                </dl>
 
                 <p className="text-[11px] leading-relaxed text-slate-500">
-                  Ces compléments sont enregistrés dans ce navigateur
-                  uniquement : ils ne sont ni envoyés au serveur ni visibles
-                  depuis un autre poste, et disparaissent si l'historique du
-                  navigateur est effacé.
+                  Le badge reprend uniquement ces données : nom, prénom,
+                  matricule, département et photo. Le téléphone n'est jamais
+                  affiché ni encodé dans le QR code.
                 </p>
               </div>
             ) : (
               <p className="text-sm text-slate-500">
-                Sélectionnez un membre pour compléter son badge.
+                Sélectionnez un ouvrier pour afficher sa fiche.
               </p>
             )}
-          </Card>
-
-          <Card
-            title="3. Logo"
-            description="Le logo RSI est utilisé par défaut."
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
-                {branding.logoUrl ? (
-                  <img
-                    src={branding.logoUrl}
-                    alt="Logo personnalisé"
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <span className="text-[10px] font-semibold text-slate-400">
-                    RSI
-                  </span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogo}
-                  className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-bordeaux-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-bordeaux-700 hover:file:bg-bordeaux-100"
-                />
-                <div className="flex flex-wrap items-center gap-2">
-                  {branding.logoUrl && (
-                    <Btn
-                      variant="ghost"
-                      size="xs"
-                      onClick={retirerLogo}
-                    >
-                      Retirer le logo
-                    </Btn>
-                  )}
-                  <span className="text-[11px] text-slate-500">
-                    PNG/JPEG · conservé dans ce navigateur
-                  </span>
-                </div>
-              </div>
-            </div>
           </Card>
         </div>
 
@@ -834,12 +399,10 @@ export default function BadgeStudioPage() {
           <Card
             title="Aperçu"
             description="Recto et verso, au format carte ID-1."
-            actions={<Pill tonalite="or">STAFF</Pill>}
           >
             {membre ? (
               <BadgePreview
                 membre={membre}
-                branding={branding}
                 face={face}
                 onFaceChange={setFace}
                 qrDataUrl={qrDataUrl}
@@ -848,7 +411,7 @@ export default function BadgeStudioPage() {
             ) : (
               <div className="rds-flip-stage">
                 <div className="flex aspect-[856/540] items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center text-xs text-slate-500">
-                  Sélectionnez un membre pour afficher l'aperçu.
+                  Sélectionnez un ouvrier pour afficher l'aperçu.
                 </div>
               </div>
             )}
@@ -920,7 +483,7 @@ export default function BadgeStudioPage() {
 
               {membre && !valeurQr(membre) && (
                 <p className="text-[11px] text-bordeaux-700">
-                  Ce membre n'a pas de matricule : le QR code ne peut pas être
+                  Cet ouvrier n'a pas de matricule : le QR code ne peut pas être
                   généré.
                 </p>
               )}
@@ -948,7 +511,6 @@ export default function BadgeStudioPage() {
       {membre && (
         <BadgePrintSheet
           membre={membre}
-          branding={branding}
           mode={modeImpression}
           qrDataUrl={qrDataUrl}
           qrErreur={qrErreur}
@@ -969,7 +531,6 @@ export default function BadgeStudioPage() {
           <BadgeCapture
             ref={refCaptureRecto}
             membre={membre}
-            branding={branding}
             face="recto"
             qrDataUrl={qrDataUrl}
             qrErreur={qrErreur}
@@ -977,7 +538,6 @@ export default function BadgeStudioPage() {
           <BadgeCapture
             ref={refCaptureVerso}
             membre={membre}
-            branding={branding}
             face="verso"
             qrDataUrl={qrDataUrl}
             qrErreur={qrErreur}

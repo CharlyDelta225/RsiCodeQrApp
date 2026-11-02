@@ -11,6 +11,7 @@ import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
+import Modal from "../ui/Modal";
 import { Input, Select } from "../ui/inputs";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
@@ -467,12 +468,17 @@ export default function BadgesPage() {
 
       {/* Modal badge individuel */}
       {badgeUrl && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 text-center space-y-3">
-            <h2 className="font-bold text-slate-900">
-              Badge — {badgeOuvrier?.prenom} {badgeOuvrier?.nom}
-            </h2>
-            <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-auto" />
+        <Modal
+          titre={`Badge — ${badgeOuvrier?.prenom || ""} ${badgeOuvrier?.nom || ""}`.trim()}
+          onClose={fermerModal}
+          taille="sm"
+        >
+          <div className="p-6 text-center space-y-3">
+            <img
+              src={badgeUrl}
+              alt={`QR code du badge de ${badgeOuvrier?.prenom || ""} ${badgeOuvrier?.nom || ""}`.trim()}
+              className="mx-auto block w-auto h-auto max-w-full max-h-[55vh] object-contain"
+            />
             <p className="text-xs font-mono text-slate-500">{badgeOuvrier?.matricule}</p>
             {badgeOuvrier && (
               <>
@@ -491,7 +497,7 @@ export default function BadgesPage() {
               </Btn>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

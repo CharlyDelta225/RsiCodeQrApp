@@ -8,15 +8,6 @@
  * IMPORTANT : ne jamais mapper ni encoder le téléphone dans le badge.
  */
 
-const CHAMPS_OVERRIDABLES = [
-  "photoUrl",
-  "fonction",
-  "departement",
-  "egliseOrigine",
-  "egliseActuelle",
-  "verificationUrl",
-];
-
 function texte(valeur) {
   if (valeur === undefined || valeur === null) return null;
   const s = String(valeur).trim();
@@ -43,26 +34,6 @@ function nomsDepartements(ouvrier) {
 }
 
 /**
- * Applique des compléments locaux (saisis dans le navigateur) par-dessus un
- * membre. Les champs absents ou vides repassent à null sans inventer de valeur.
- *
- * @param {import("./badgeTypes").BadgeMember} membre
- * @param {import("./badgeTypes").BadgeOverrides} [overrides]
- * @returns {import("./badgeTypes").BadgeMember}
- */
-export function applyOverrides(membre, overrides = {}) {
-  const resultat = { ...membre };
-
-  for (const champ of CHAMPS_OVERRIDABLES) {
-    if (Object.prototype.hasOwnProperty.call(overrides, champ)) {
-      resultat[champ] = texte(overrides[champ]);
-    }
-  }
-
-  return resultat;
-}
-
-/**
  * Convertit un ouvrier renvoyé par l'API existante (`GET /api/ouvriers`) en
  * `BadgeMember`. Aucun champ n'est supposé exister : tout est optionnel.
  *
@@ -72,11 +43,10 @@ export function applyOverrides(membre, overrides = {}) {
  * fonction/poste, egliseOrigine, egliseActuelle, verificationUrl.
  *
  * @param {object} ouvrier
- * @param {import("./badgeTypes").BadgeOverrides} [overrides]
  * @returns {import("./badgeTypes").BadgeMember}
  */
-export function mapOuvrierToBadgeMember(ouvrier = {}, overrides = {}) {
-  const base = {
+export function mapOuvrierToBadgeMember(ouvrier = {}) {
+  return {
     id: String(ouvrier.id ?? ""),
     matricule: texte(ouvrier.matricule) ?? "",
     nom: texte(ouvrier.nom) ?? "",
@@ -92,10 +62,7 @@ export function mapOuvrierToBadgeMember(ouvrier = {}, overrides = {}) {
     ),
     verificationUrl: texte(ouvrier.verificationUrl),
     actif: ouvrier.actif !== false,
-    source: "api",
   };
-
-  return applyOverrides(base, overrides);
 }
 
 /** « Prénom NOM » avec repli propre si les champs sont vides. */

@@ -10,6 +10,7 @@ import { useToast } from "../components/Toast.jsx";
 import TableShell from "../ui/TableShell";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
+import Modal from "../ui/Modal";
 import { Field, Input, Select } from "../ui/inputs";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
@@ -287,6 +288,12 @@ export default function OuvriersPage() {
     }
   }
 
+  function fermerBadge() {
+    if (badgeUrl) URL.revokeObjectURL(badgeUrl);
+    setBadgeUrl(null);
+    setBadgeOuvrier(null);
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -535,12 +542,17 @@ export default function OuvriersPage() {
 
       {/* Modal badge */}
       {badgeUrl && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 text-center space-y-3">
-            <h2 className="font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
-              Badge — {badgeOuvrier?.prenom} {badgeOuvrier?.nom}
-            </h2>
-            <img src={badgeUrl} alt="QR code du badge" className="mx-auto w-64 h-auto" />
+        <Modal
+          titre={`Badge — ${badgeOuvrier?.prenom || ""} ${badgeOuvrier?.nom || ""}`.trim()}
+          onClose={fermerBadge}
+          taille="sm"
+        >
+          <div className="p-6 text-center space-y-3">
+            <img
+              src={badgeUrl}
+              alt={`QR code du badge de ${badgeOuvrier?.prenom || ""} ${badgeOuvrier?.nom || ""}`.trim()}
+              className="mx-auto block w-auto h-auto max-w-full max-h-[55vh] object-contain"
+            />
             <p className="text-xs font-mono text-slate-500">{badgeOuvrier?.matricule}</p>
             {badgeOuvrier && (
               <>
@@ -548,18 +560,11 @@ export default function OuvriersPage() {
                 {badgeOuvrier.telephone && <p className="text-xs text-slate-500">Tél. {badgeOuvrier.telephone}</p>}
               </>
             )}
-            <Btn
-              variant="secondary"
-              onClick={() => {
-                URL.revokeObjectURL(badgeUrl);
-                setBadgeUrl(null);
-                setBadgeOuvrier(null);
-              }}
-            >
+            <Btn variant="secondary" onClick={fermerBadge}>
               Fermer
             </Btn>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

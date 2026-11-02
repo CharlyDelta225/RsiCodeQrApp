@@ -13,7 +13,6 @@ const ONGLETS = [
  */
 export default function BadgePreview({
   membre,
-  branding,
   face = "recto",
   onFaceChange,
   qrDataUrl,
@@ -29,7 +28,6 @@ export default function BadgePreview({
             <BadgeCard
               face="recto"
               membre={membre}
-              branding={branding}
               qrDataUrl={qrDataUrl}
               qrErreur={qrErreur}
             />
@@ -41,7 +39,6 @@ export default function BadgePreview({
             <BadgeCard
               face="verso"
               membre={membre}
-              branding={branding}
               qrDataUrl={qrDataUrl}
               qrErreur={qrErreur}
             />

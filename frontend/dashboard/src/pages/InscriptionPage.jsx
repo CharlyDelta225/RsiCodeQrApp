@@ -15,6 +15,8 @@ export default function InscriptionPage() {
   );
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [prenom, setPrenom] = useState("");
+  const [nom, setNom] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [erreur, setErreur] = useState(null);
@@ -31,7 +33,7 @@ export default function InscriptionPage() {
 
     setLoading(true);
     try {
-      await api.register(email.trim(), motDePasse);
+      await api.register(email.trim(), motDePasse, nom.trim(), prenom.trim());
       navigate("/login", {
         replace: true,
         state: { inscription: true },
@@ -88,6 +90,29 @@ export default function InscriptionPage() {
             {erreur}
           </div>
         )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Prénom">
+            <Input
+              required
+              autoComplete="given-name"
+              value={prenom}
+              onChange={(e) => setPrenom(e.target.value)}
+              placeholder="Marie"
+              maxLength={80}
+            />
+          </Field>
+          <Field label="Nom">
+            <Input
+              required
+              autoComplete="family-name"
+              value={nom}
+              onChange={(e) => setNom(e.target.value)}
+              placeholder="Broujean"
+              maxLength={80}
+            />
+          </Field>
+        </div>
 
         <div>
           <Field label="Email">

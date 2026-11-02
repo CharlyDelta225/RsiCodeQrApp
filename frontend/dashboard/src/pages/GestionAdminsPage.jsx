@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
-import { getAdmin } from "../lib/auth";
+import { getAdmin, majAdminLocal } from "../lib/auth";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useToast } from "../components/Toast.jsx";
 import Btn from "../ui/Btn";
@@ -42,9 +42,21 @@ function Statut({ admin }) {
   return <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">Actif</span>;
 }
 
-function initials(email) {
-  if (!email) return "?";
-  return email.split("@")[0].slice(0, 2).toUpperCase();
+function initials(admin) {
+  const complet = [admin?.prenom, admin?.nom].filter(Boolean).join(" ").trim();
+  const base = complet || admin?.email?.split("@")[0] || "";
+  if (!base) return "?";
+  const mots = base.split(/\s+/).filter(Boolean);
+  if (mots.length >= 2) {
+    return `${mots[0].charAt(0)}${mots[1].charAt(0)}`.toUpperCase();
+  }
+  return base.slice(0, 2).toUpperCase();
+}
+
+/** Nom affiché : « Prénom Nom » si renseigné, sinon l'email. */
+function nomAdmin(admin) {
+  const complet = [admin?.prenom, admin?.nom].filter(Boolean).join(" ").trim();
+  return complet || admin?.email || "…";
 }
 
 /** Boutons d'action d'un compte — partagés entre tableau (desktop) et cartes (mobile). */
@@ -72,6 +84,15 @@ function ActionsCompte({ admin, moiMeme, onAction }) {
       </button>
     );
   }
+  boutons.push(
+    <button
+      key="identite"
+      onClick={() => onAction("identite", admin)}
+      className="text-xs px-2 py-1 rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100 transition-colors"
+    >
+      Modifier nom
+    </button>
+  );
   boutons.push(
     <button
       key="reinit"
@@ -142,8 +163,12 @@ export default function GestionAdminsPage() {
   const [succes, setSucces] = useState(null);
 
   const [modalOuvert, setModalOuvert] = useState(false);
-  const [form, setForm] = useState({ email: "", role: "ADMIN" });
+  const [form, setForm] = useState({ email: "", role: "ADMIN", prenom: "", nom: "" });
   const [envoi, setEnvoi] = useState(false);
+
+  // Édition du nom/prénom d'un compte existant.
+  const [edition, setEdition] = useState(null); // { admin, prenom, nom }
+  const [envoiEdition, setEnvoiEdition] = useState(false);
 
   const [confirm, setConfirm] = useState(null); // { type, admin }
   const [mdpTemporaire, setMdpTemporaire] = useState(null); // { email, motDePasse } ou { email, lien }
@@ -184,9 +209,9 @@ export default function GestionAdminsPage() {
     setAlerte(null);
     setMdpTemporaire(null);
     try {
-      const data = await api.creerAdmin(form.email.trim(), form.role);
+      const data = await api.creerAdmin(form.email.trim(), form.role, form.nom.trim(), form.prenom.trim());
       setModalOuvert(false);
-      setForm({ email: "", role: "ADMIN" });
+      setForm({ email: "", role: "ADMIN", prenom: "", nom: "" });
       await charger();
       if (data.emailEnvoye === false) {
         setMdpTemporaire({ email: data.admin.email, motDePasse: data.motDePasseTemporaire });
@@ -208,10 +233,35 @@ export default function GestionAdminsPage() {
     setAlerte(null);
     try {
       await api.changerRoleAdmin(admin.id, role);
-      setSucces({ titre: "Rôle modifié", message: `${admin.email} est désormais ${libelleRole(role)}.` });
+      setSucces({ titre: "Rôle modifié", message: `${nomAdmin(admin)} est désormais ${libelleRole(role)}.` });
       await charger();
     } catch (err) {
       setAlerte({ titre: "Échec", message: err.message || "Impossible de changer le rôle" });
+    }
+  }
+
+  async function handleModifierIdentite(e) {
+    e.preventDefault();
+    if (!edition) return;
+    setEnvoiEdition(true);
+    setAlerte(null);
+    try {
+      const data = await api.majIdentiteAdmin(edition.admin.id, {
+        prenom: edition.prenom.trim(),
+        nom: edition.nom.trim(),
+      });
+      // Si c'est mon compte, le nom affiché (dashboard, sidebar) doit suivre
+      // immédiatement : on met à jour la copie locale de l'admin connecté.
+      if (edition.admin.id === moi?.id && data?.admin) {
+        majAdminLocal({ prenom: data.admin.prenom, nom: data.admin.nom });
+      }
+      setEdition(null);
+      setSucces({ titre: "Nom mis à jour", message: `Le nom affiché de ${edition.admin.email} a été enregistré.` });
+      await charger();
+    } catch (err) {
+      setAlerte({ titre: "Échec", message: err.message || "Impossible de mettre à jour le nom" });
+    } finally {
+      setEnvoiEdition(false);
     }
   }
 
@@ -261,6 +311,10 @@ export default function GestionAdminsPage() {
       activer(admin);
       return;
     }
+    if (type === "identite") {
+      setEdition({ admin, prenom: admin.prenom || "", nom: admin.nom || "" });
+      return;
+    }
     setConfirm({ type, admin });
   }
 
@@ -293,7 +347,7 @@ export default function GestionAdminsPage() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-sm text-slate-600">
-            Création et gestion des comptes. Un mot de passe temporaire est envoyé par email à chaque création.
+            Création et gestion des comptes. Renseignez le prénom et le nom pour un affichage lisible dans le dashboard. Un mot de passe temporaire est envoyé par email à chaque création.
           </p>
         </div>
         <button
@@ -302,6 +356,7 @@ export default function GestionAdminsPage() {
           onClick={() => {
             setMdpTemporaire(null);
             setAlerte(null);
+            setForm({ email: "", role: "ADMIN", prenom: "", nom: "" });
             setModalOuvert(true);
           }}
         >
@@ -362,12 +417,13 @@ export default function GestionAdminsPage() {
                       className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                       style={{ background: C.avatar }}
                     >
-                      {initials(a.email)}
+                      {initials(a)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-slate-800 truncate">
-                        {a.email} {moiMeme && <span className="text-[10px] uppercase text-slate-500">(vous)</span>}
+                        {nomAdmin(a)} {moiMeme && <span className="text-[10px] uppercase text-slate-500">(vous)</span>}
                       </p>
+                      <p className="text-[11px] text-slate-500 truncate">{a.email}</p>
                       {a.tentativesEchouees > 0 && !a.bloqueJusqua && (
                         <p className="text-[11px] text-orange-600">
                           {a.tentativesEchouees}/3 tentative(s) échouée(s)
@@ -411,8 +467,9 @@ export default function GestionAdminsPage() {
                     <tr key={a.id} className="border-b border-slate-100 last:border-b-0 align-middle">
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-800">
-                          {a.email} {moiMeme && <span className="text-[10px] uppercase text-slate-500">(vous)</span>}
+                          {nomAdmin(a)} {moiMeme && <span className="text-[10px] uppercase text-slate-500">(vous)</span>}
                         </p>
+                        <p className="text-[11px] text-slate-500">{a.email}</p>
                         {a.tentativesEchouees > 0 && !a.bloqueJusqua && (
                           <p className="text-[11px] text-orange-600">
                             {a.tentativesEchouees}/3 tentative(s) échouée(s)
@@ -452,6 +509,29 @@ export default function GestionAdminsPage() {
               Nouveau compte admin
             </h2>
 
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Prénom</label>
+                <Input
+                  value={form.prenom}
+                  onChange={(e) => setForm({ ...form, prenom: e.target.value })}
+                  placeholder="Marie"
+                  autoComplete="given-name"
+                  maxLength={80}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Nom</label>
+                <Input
+                  value={form.nom}
+                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                  placeholder="Broujean"
+                  autoComplete="family-name"
+                  maxLength={80}
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
               <Input
@@ -484,6 +564,58 @@ export default function GestionAdminsPage() {
               </Btn>
               <Btn type="submit" loading={envoi}>
                 {envoi ? "Création…" : "Créer le compte"}
+              </Btn>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {edition && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <form
+            onSubmit={handleModifierIdentite}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"
+          >
+            <h2 className="font-semibold text-slate-800 text-sm" style={{ fontFamily: "Poppins,sans-serif" }}>
+              Nom affiché
+            </h2>
+            <p className="text-xs text-slate-500">
+              Compte : <span className="font-medium text-slate-700">{edition.admin.email}</span>
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Prénom</label>
+                <Input
+                  value={edition.prenom}
+                  onChange={(e) => setEdition({ ...edition, prenom: e.target.value })}
+                  placeholder="Marie"
+                  autoComplete="given-name"
+                  maxLength={80}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Nom</label>
+                <Input
+                  value={edition.nom}
+                  onChange={(e) => setEdition({ ...edition, nom: e.target.value })}
+                  placeholder="Broujean"
+                  autoComplete="family-name"
+                  maxLength={80}
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Ce libellé remplace l'email dans la salutation du tableau de bord et la barre latérale.
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <Btn variant="secondary" onClick={() => setEdition(null)} disabled={envoiEdition}>
+                Annuler
+              </Btn>
+              <Btn type="submit" loading={envoiEdition}>
+                {envoiEdition ? "Enregistrement…" : "Enregistrer"}
               </Btn>
             </div>
           </form>

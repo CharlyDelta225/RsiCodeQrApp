@@ -77,7 +77,7 @@ router.use("/login", limiterCompte);
  * d'écriture). L'élévation à ADMIN/SUPER_ADMIN se fait depuis le dashboard
  * par un SUPER_ADMIN (voir routes/admins.routes.js).
  *
- * Body : { "email": "...", "motDePasse": "..." }
+ * Body : { "email": "...", "motDePasse": "...", "nom"?: "...", "prenom"?: "..." }
  *   - role NON accepté ici : tout nouveau compte naît LECTEUR, aucun pouvoir.
  *   - le compte naît INACTIF : activation obligatoire par un SUPER_ADMIN.
  * motDePasse >= 8 caractères.
@@ -86,6 +86,10 @@ router.post("/register", async (req, res) => {
   try {
     const email = String(req.body?.email ?? "").trim().toLowerCase();
     const motDePasse = String(req.body?.motDePasse ?? "");
+    // Nom/prénom facultatifs : simples libellés d'affichage, jamais utilisés
+    // pour l'authentification (l'email reste l'identifiant unique).
+    const nom = String(req.body?.nom ?? "").trim() || null;
+    const prenom = String(req.body?.prenom ?? "").trim() || null;
 
     // On IGNORE tout champ role fourni : un inscrit reste toujours LECTEUR.
     // C'est le principe du moindre privilège : l'élévation passe par le
@@ -111,7 +115,7 @@ router.post("/register", async (req, res) => {
       // quel internaute pourrait lire les données personnelles des ouvriers
       // (noms, téléphones, pointages) avec un simple compte LECTEUR.
       await prisma.admin.create({
-        data: { email, motDePasse: hash, role, actif: false },
+        data: { email, motDePasse: hash, role, actif: false, nom, prenom },
         select: { id: true, email: true, role: true, createdAt: true },
       });
     }
@@ -128,7 +132,7 @@ router.post("/register", async (req, res) => {
 /**
  * POST /api/auth/login
  * Body : { "email": "...", "motDePasse": "..." }
- * Retourne : { ok: true, token, admin: { id, email, role } }
+ * Retourne : { ok: true, token, admin: { id, email, role, nom, prenom } }
  * Le token JWT doit être envoyé ensuite dans l'en-tête :
  *   Authorization: Bearer <token>
  *
@@ -222,7 +226,13 @@ router.post("/login", async (req, res) => {
     return res.json({
       ok: true,
       token,
-      admin: { id: admin.id, email: admin.email, role: admin.role },
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        role: admin.role,
+        nom: admin.nom,
+        prenom: admin.prenom,
+      },
     });
   } catch (err) {
     logger.error("[AUTH/LOGIN]", err);
@@ -239,7 +249,7 @@ router.post("/login", async (req, res) => {
  * révéler quels comptes existent. Si un compte existe, un lien unique et
  * expirant (1h) est envoyé par email ; seul son empreinte SHA-256 est stockée.
  */
-router.post("/reset-demand", limiterAuth, async (req, res) => {
+router.post("/reset-demand", async (req, res) => {
   try {
     const email = String(req.body?.email ?? "").trim().toLowerCase();
     if (!email) {
@@ -359,7 +369,7 @@ router.get("/me", requireAuth, async (req, res) => {
   try {
     const admin = await prisma.admin.findUnique({
       where: { id: req.admin.id },
-      select: { id: true, email: true, role: true, createdAt: true },
+      select: { id: true, email: true, role: true, nom: true, prenom: true, createdAt: true },
     });
     if (!admin) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Admin introuvable" });

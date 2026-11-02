@@ -1,11 +1,17 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert";
-import app from "../src/app.js";
 
+// Quota relâché à 5/min pour tester le dépassement sans attendre les 10/min de
+// production. À définir AVANT le chargement de l'app (valeur lue au moment de
+// l'import des routes).
+process.env.AUTH_RATE_LIMIT_MAX = "5";
+
+let app;
 let serveur;
 let baseURL;
 
 before(async () => {
+  ({ default: app } = await import("../src/app.js"));
   serveur = app.listen(0); // port 0 = port éphémère (pas de conflit)
   const port = serveur.address().port;
   baseURL = `http://127.0.0.1:${port}`;

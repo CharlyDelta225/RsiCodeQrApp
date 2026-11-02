@@ -25,6 +25,13 @@ function roleValide(role) {
   return ROLES_VALIDES.includes(String(role || "").toUpperCase());
 }
 
+// Nom/prénom : simples libellés d'affichage, facultatifs. On borne la longueur
+// et on convertit une chaîne vide en null (pas de " " stocké en base).
+function texteOuNull(valeur, max = 80) {
+  const texte = String(valeur ?? "").trim();
+  return texte ? texte.slice(0, max) : null;
+}
+
 /**
  * Envoie (ou tente d'envoyer) un email contenant le mot de passe temporaire.
  * En cas d'échec SMTP, on ne perd pas le mot de passe : il est renvoyé dans
@@ -84,6 +91,8 @@ router.get("/", SUPER_SEULEMENT, async (_req, res) => {
       select: {
         id: true,
         email: true,
+        nom: true,
+        prenom: true,
         role: true,
         actif: true,
         tentativesEchouees: true,
@@ -102,7 +111,7 @@ router.get("/", SUPER_SEULEMENT, async (_req, res) => {
 /**
  * POST /api/admins
  * Crée un compte admin. Réservé au SUPER_ADMIN.
- * Body : { "email": "...", "role": "SUPER_ADMIN" | "ADMIN" | "LECTEUR" }
+ * Body : { "email": "...", "role": "SUPER_ADMIN" | "ADMIN" | "LECTEUR", "nom"?: "...", "prenom"?: "..." }
  * Un mot de passe temporaire fort est GÉNÉRÉ côté serveur puis envoyé par
  * email au compte. Voir envoyerIdentifiants pour le comportement si l'envoi
  * échoue (mot de passe renvoyé une seule fois dans la réponse).
@@ -111,6 +120,8 @@ router.post("/", SUPER_SEULEMENT, async (req, res) => {
   try {
     const email = String(req.body?.email ?? "").trim().toLowerCase();
     const role = String(req.body?.role ?? "").toUpperCase();
+    const nom = texteOuNull(req.body?.nom);
+    const prenom = texteOuNull(req.body?.prenom);
 
     if (!email) {
       return res.status(400).json({ ok: false, code: "CHAMPS_MANQUANTS", message: "email est requis" });
@@ -128,8 +139,8 @@ router.post("/", SUPER_SEULEMENT, async (req, res) => {
     const hash = await bcrypt.hash(motDePasseTemporaire, 10);
 
     const admin = await prisma.admin.create({
-      data: { email, motDePasse: hash, role },
-      select: { id: true, email: true, role: true, actif: true, createdAt: true },
+      data: { email, motDePasse: hash, role, nom, prenom },
+      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, createdAt: true },
     });
 
     const envoi = await envoyerIdentifiants({
@@ -154,6 +165,44 @@ router.post("/", SUPER_SEULEMENT, async (req, res) => {
       return res.status(409).json({ ok: false, code: "EMAIL_EXISTANT", message: "Cet email est déjà enregistré" });
     }
     logger.error("[ADMINS/CREATION]", err);
+    return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
+  }
+});
+
+/**
+ * PATCH /api/admins/:id
+ * Met à jour le nom et/ou le prénom d'un compte (libellés d'affichage).
+ * Réservé au SUPER_ADMIN. La modification de son propre compte est autorisée
+ * (contrairement au rôle), pour que chacun puisse corriger son nom affiché.
+ * Body : { "nom"?: "...", "prenom"?: "..." }
+ */
+router.patch("/:id", SUPER_SEULEMENT, async (req, res) => {
+  try {
+    const cible = await prisma.admin.findUnique({ where: { id: req.params.id } });
+    if (!cible) {
+      return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
+    }
+
+    const data = {};
+    if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "nom")) {
+      data.nom = texteOuNull(req.body.nom);
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "prenom")) {
+      data.prenom = texteOuNull(req.body.prenom);
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ ok: false, code: "CHAMPS_MANQUANTS", message: "nom ou prenom est requis" });
+    }
+
+    const admin = await prisma.admin.update({
+      where: { id: cible.id },
+      data,
+      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
+    });
+
+    return res.json({ ok: true, admin });
+  } catch (err) {
+    logger.error("[ADMINS/IDENTITE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });
@@ -186,7 +235,7 @@ router.patch("/:id/role", SUPER_SEULEMENT, async (req, res) => {
     const admin = await prisma.admin.update({
       where: { id: cible.id },
       data: { role },
-      select: { id: true, email: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
+      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
     });
 
     return res.json({ ok: true, admin });
@@ -210,7 +259,7 @@ router.patch("/:id/activer", SUPER_SEULEMENT, async (req, res) => {
     const admin = await prisma.admin.update({
       where: { id: cible.id },
       data: { actif: true },
-      select: { id: true, email: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
+      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
     });
     return res.json({ ok: true, admin });
   } catch (err) {
@@ -236,7 +285,7 @@ router.patch("/:id/desactiver", SUPER_SEULEMENT, async (req, res) => {
     const admin = await prisma.admin.update({
       where: { id: cible.id },
       data: { actif: false },
-      select: { id: true, email: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
+      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
     });
     return res.json({ ok: true, admin });
   } catch (err) {
@@ -259,7 +308,7 @@ router.patch("/:id/debloquer", SUPER_SEULEMENT, async (req, res) => {
     const admin = await prisma.admin.update({
       where: { id: cible.id },
       data: { tentativesEchouees: 0, bloqueJusqua: null },
-      select: { id: true, email: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
+      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
     });
     return res.json({ ok: true, admin });
   } catch (err) {

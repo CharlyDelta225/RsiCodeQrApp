@@ -20,7 +20,6 @@ const MODES = Object.freeze({
  */
 export default function BadgePrintSheet({
   membre,
-  branding,
   mode = MODES.PLANCHE,
   qrDataUrl,
   qrErreur,
@@ -67,7 +66,6 @@ export default function BadgePrintSheet({
           <BadgeCard
             face="recto"
             membre={membre}
-            branding={branding}
             qrDataUrl={qrDataUrl}
             qrErreur={qrErreur}
           />
@@ -76,7 +74,6 @@ export default function BadgePrintSheet({
           <BadgeCard
             face="verso"
             membre={membre}
-            branding={branding}
             qrDataUrl={qrDataUrl}
             qrErreur={qrErreur}
           />
@@ -94,7 +91,6 @@ export default function BadgePrintSheet({
           <BadgeCard
             face="recto"
             membre={membre}
-            branding={branding}
             qrDataUrl={qrDataUrl}
             qrErreur={qrErreur}
           />
@@ -106,7 +102,6 @@ export default function BadgePrintSheet({
           <BadgeCard
             face="verso"
             membre={membre}
-            branding={branding}
             qrDataUrl={qrDataUrl}
             qrErreur={qrErreur}
           />

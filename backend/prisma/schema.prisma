@@ -107,6 +107,8 @@ model Pointage {
 model Admin {
   id         String    @id @default(uuid())
   email      String    @unique
+  nom        String? // nom de famille (facultatif, affiché dans le dashboard)
+  prenom     String? // prénom (facultatif, affiché dans le dashboard)
   motDePasse String // haché avec bcrypt
   role       RoleAdmin @default(ADMIN) // hiérarchie SUPER_ADMIN > ADMIN > LECTEUR
   actif      Boolean   @default(true) // compte activable/désactivable par le SUPER_ADMIN

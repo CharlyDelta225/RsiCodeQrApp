@@ -40,6 +40,18 @@ export function setSession(token, admin) {
   localStorage.setItem(ADMIN_KEY, JSON.stringify(admin));
 }
 
+/**
+ * Met à jour une partie de l'admin stocké localement (ex. nom/prénom après
+ * édition dans « Gestion des admins »), sans toucher au token.
+ */
+export function majAdminLocal(partiel) {
+  const admin = getAdmin();
+  if (!admin) return null;
+  const fusion = { ...admin, ...partiel };
+  localStorage.setItem(ADMIN_KEY, JSON.stringify(fusion));
+  return fusion;
+}
+
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ADMIN_KEY);

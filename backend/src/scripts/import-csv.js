@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import prisma from "../lib/prisma.js";
 import { genererMatricule } from "../lib/matricule.js";
+import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -101,6 +102,25 @@ async function main() {
   let maj = 0;
   let erreurs = 0;
 
+  // Cache des départements existants, indexés par nom normalisé (casse/accents),
+  // pour éviter une requête par ligne. Le nom est stocké en majuscules, comme
+  // les routes HTTP.
+  const departementsParClef = new Map(
+    (await prisma.departement.findMany({ select: { id: true, nom: true } })).map((d) => [
+      normaliserNomDepartement(d.nom),
+      d,
+    ])
+  );
+
+  async function resoudreDepartement(nom) {
+    const clef = normaliserNomDepartement(nom);
+    const existant = departementsParClef.get(clef);
+    if (existant) return existant;
+    const cree = await prisma.departement.create({ data: { nom: String(nom).trim().toUpperCase() } });
+    departementsParClef.set(clef, cree);
+    return cree;
+  }
+
   for (const ligne of donnees) {
     try {
       const nom = String(ligne[index.nom] ?? "").trim();
@@ -119,12 +139,28 @@ async function main() {
       // Matricule absent => auto-génération (comme la route POST /api/ouvriers)
       const matriculeFinal = matricule ?? (await genererMatricule());
 
+      // Résout (ou crée) le département cible par nom (insensible casse/accents).
+      const departementCible = await resoudreDepartement(departement);
+
       const existeDeja = await prisma.ouvrier.findUnique({ where: { matricule: matriculeFinal } });
 
-      await prisma.ouvrier.upsert({
+      const ouvrier = await prisma.ouvrier.upsert({
         where: { matricule: matriculeFinal },
-        update: { nom, prenom, departement, actif },
-        create: { matricule: matriculeFinal, nom, prenom, departement, actif },
+        update: { nom, prenom, actif },
+        create: { matricule: matriculeFinal, nom, prenom, actif },
+      });
+
+      // Rattache l'ouvrier au département via la table de jonction, role MEMBRE.
+      await prisma.ouvrierDepartement.upsert({
+        where: {
+          ouvrierId_departementId: { ouvrierId: ouvrier.id, departementId: departementCible.id },
+        },
+        create: {
+          ouvrierId: ouvrier.id,
+          departementId: departementCible.id,
+          roleDansDepartement: "MEMBRE",
+        },
+        update: {},
       });
 
       if (existeDeja) maj++;

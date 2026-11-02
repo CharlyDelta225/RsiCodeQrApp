@@ -250,25 +250,6 @@
   color: rgba(255, 255, 255, 0.78);
 }
 
-.rds-staff {
-  flex-shrink: 0;
-  padding: 1.1cqw 2.1cqw;
-  border-radius: 5cqw;
-  font-family: "Poppins", sans-serif;
-  font-size: 2.5cqw;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  color: var(--rds-ink);
-  background: linear-gradient(
-    135deg,
-    #f2c94c,
-    #d4a017 60%,
-    #b8860b
-  );
-  box-shadow: 0 0.5cqw 1.4cqw rgba(0, 0, 0, 0.25),
-    inset 0 0.2cqw rgba(255, 255, 255, 0.5);
-}
-
 .rds-main {
   position: relative;
   z-index: 3;
@@ -579,11 +560,6 @@
 .rds-verso-head .rds-org-sub {
   font-size: 1.65cqw;
   color: rgba(255, 255, 255, 0.75);
-}
-
-.rds-verso-head .rds-staff {
-  padding: 0.8cqw 1.6cqw;
-  font-size: 2.1cqw;
 }
 
 .rds-verso-body {

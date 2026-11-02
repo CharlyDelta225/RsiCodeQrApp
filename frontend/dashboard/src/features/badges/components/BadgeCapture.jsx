@@ -8,7 +8,7 @@ import "../badge.css";
  * pour obtenir un rendu net et fidèle.
  */
 const BadgeCapture = forwardRef(function BadgeCapture(
-  { membre, branding, face = "recto", qrDataUrl, qrErreur },
+  { membre, face = "recto", qrDataUrl, qrErreur },
   ref
 ) {
   if (!membre) return null;
@@ -29,7 +29,6 @@ const BadgeCapture = forwardRef(function BadgeCapture(
         <BadgeCard
           face="verso"
           membre={membre}
-          branding={branding}
           qrDataUrl={qrDataUrl}
           qrErreur={qrErreur}
         />
@@ -37,7 +36,6 @@ const BadgeCapture = forwardRef(function BadgeCapture(
         <BadgeCard
           face="recto"
           membre={membre}
-          branding={branding}
           qrDataUrl={qrDataUrl}
           qrErreur={qrErreur}
         />

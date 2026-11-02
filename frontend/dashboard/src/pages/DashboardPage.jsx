@@ -16,7 +16,6 @@ import {
   AlertCircle,
   BadgeCheck,
   Building2,
-  CalendarClock,
   Clock,
   LayoutDashboard,
   RefreshCw,
@@ -26,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { getAdmin } from "../lib/auth";
 import KpiCard from "../components/KpiCard";
 import Btn from "../ui/Btn";
 import Spinner from "../ui/Spinner";
@@ -57,6 +57,25 @@ function formatHeure(iso) {
 
 function deptDe(p) {
   return p.ouvrier?.departements?.[0]?.departement?.nom || "Non renseigné";
+}
+
+/**
+ * Nom affiché dans la salutation.
+ * Les comptes admin ne stockent aujourd'hui qu'un email : on privilégie
+ * prénom + nom s'ils existent un jour, sinon on dérive un libellé lisible
+ * depuis la partie locale de l'adresse (broujeanmarie697 -> Broujeanmarie).
+ */
+function nomAffichage(admin) {
+  if (!admin) return "Administrateur";
+  const complet = [admin.prenom, admin.nom].filter(Boolean).join(" ").trim();
+  if (complet) return complet;
+  const local = String(admin.email || "")
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .replace(/\d+$/, "")
+    .trim();
+  if (!local) return "Administrateur";
+  return local.replace(/\b\p{L}/gu, (c) => c.toUpperCase());
 }
 
 /** Sélecteur segmenté 7 / 30 jours — pastille bordeaux sur l'option active. */
@@ -242,9 +261,7 @@ export default function DashboardPage() {
   const centreValeur = deptSelectionne ? membresDept.length : stats?.presentsAuj;
   const centreLibelle = deptSelectionne ? "présents ici" : "présents";
 
-  const admin = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("rsi_admin") || "null") : null;
-  const nomAffiche = admin?.nom || admin?.prenom || admin?.email?.split("@")[0] || "Administrateur";
-  const dateJour = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+  const nomAffiche = nomAffichage(getAdmin());
 
   const tooltipStyle = { fontSize: 12, borderRadius: 10, border: "1px solid #f1f5f9", boxShadow: "0 10px 30px -20px rgba(123,21,21,0.9)" };
 
@@ -267,21 +284,15 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-sm text-slate-500">Bonjour,</p>
-            <h1 className="text-lg md:text-xl font-semibold text-slate-900 capitalize" style={{ fontFamily: "Poppins,sans-serif" }}>
+            <h1 className="text-lg md:text-xl font-semibold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
               {nomAffiche}
             </h1>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
-              <span className="inline-flex items-center gap-1 capitalize">
-                <CalendarClock size={12} aria-hidden="true" />
-                {dateJour}
-              </span>
-              {derniereMaj && (
-                <span className="inline-flex items-center gap-1">
-                  <Clock size={12} aria-hidden="true" />
-                  Dernière actualisation à {derniereMaj.toLocaleTimeString("fr-FR")}
-                </span>
-              )}
-            </div>
+            {derniereMaj && (
+              <p className="inline-flex items-center gap-1 text-xs text-slate-500 mt-1">
+                <Clock size={12} aria-hidden="true" />
+                Dernière actualisation à {derniereMaj.toLocaleTimeString("fr-FR")}
+              </p>
+            )}
           </div>
         </div>
         <Btn variant="secondary" size="sm" onClick={() => charger(true)} icon={<RefreshCw size={14} />}>

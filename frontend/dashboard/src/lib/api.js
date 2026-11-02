@@ -64,8 +64,8 @@ export const api = {
   // Auth
   login: (email, motDePasse) =>
     request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, motDePasse }) }),
-  register: (email, motDePasse) =>
-    request("/api/auth/register", { method: "POST", body: JSON.stringify({ email, motDePasse }) }),
+  register: (email, motDePasse, nom, prenom) =>
+    request("/api/auth/register", { method: "POST", body: JSON.stringify({ email, motDePasse, nom, prenom }) }),
   me: () => request("/api/auth/me"),
   // Récupération de mot de passe oublié (public).
   // POST /api/auth/reset-demand { email } → toujours { ok, emailEnvoye }.
@@ -79,8 +79,12 @@ export const api = {
   // La création envoie le mot de passe par email ; si l'envoi échoue, la
   // réponse contient `motDePasseTemporaire` (à transmettre à la main).
   getAdmins: () => request("/api/admins"),
-  creerAdmin: (email, role) =>
-    request("/api/admins", { method: "POST", body: JSON.stringify({ email, role }) }),
+  creerAdmin: (email, role, nom, prenom) =>
+    request("/api/admins", { method: "POST", body: JSON.stringify({ email, role, nom, prenom }) }),
+  // Nom/prénom affichés dans le dashboard (facultatifs, modifiables y compris
+  // sur son propre compte).
+  majIdentiteAdmin: (id, { nom, prenom }) =>
+    request(`/api/admins/${id}`, { method: "PATCH", body: JSON.stringify({ nom, prenom }) }),
   changerRoleAdmin: (id, role) =>
     request(`/api/admins/${id}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
   activerAdmin: (id) => request(`/api/admins/${id}/activer`, { method: "PATCH" }),

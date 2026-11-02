@@ -7,7 +7,6 @@ import {
   urlVerification,
 } from "../badgeAdapter";
 import {
-  BADGE_MENTION_STAFF,
   BADGE_MENTION_VERSO,
   BADGE_ORGANISATION,
   BADGE_SOUS_TITRE,
@@ -18,7 +17,7 @@ function valeurOuTiret(valeur) {
   return valeur && String(valeur).trim() ? valeur : "—";
 }
 
-function BadgeRecto({ membre, branding }) {
+function BadgeRecto({ membre }) {
   const photoUrl = membre?.photoUrl || null;
   const [photoCassee, setPhotoCassee] = useState(false);
 
@@ -29,8 +28,9 @@ function BadgeRecto({ membre, branding }) {
   const nom = nomComplet(membre);
   const afficherPhoto = Boolean(photoUrl) && !photoCassee;
   const departement = valeurOuTiret(membre?.departement);
-  const fonction = valeurOuTiret(membre?.fonction);
+  const fonction = membre?.fonction ? String(membre.fonction).trim() : "";
   const eglises = libelleEglises(membre);
+  const aEglise = eglises !== "—";
   const matricule = valeurOuTiret(membre?.matricule);
 
   return (
@@ -46,13 +46,12 @@ function BadgeRecto({ membre, branding }) {
 
       <header className="rds-head">
         <div className="rds-logo-box">
-          <BadgeLogo logoUrl={branding?.logoUrl} />
+          <BadgeLogo />
         </div>
         <div className="rds-org">
           <p className="rds-org-name">{BADGE_ORGANISATION}</p>
           <p className="rds-org-sub">{BADGE_SOUS_TITRE}</p>
         </div>
-        <span className="rds-staff">{BADGE_MENTION_STAFF}</span>
       </header>
 
       <main className="rds-main">
@@ -80,9 +79,11 @@ function BadgeRecto({ membre, branding }) {
           <p className="rds-name" title={nom}>
             {nom}
           </p>
-          <p className="rds-fonction" title={fonction}>
-            {fonction}
-          </p>
+          {fonction && (
+            <p className="rds-fonction" title={fonction}>
+              {fonction}
+            </p>
+          )}
 
           <div className="rds-rule" aria-hidden="true" />
 
@@ -91,10 +92,12 @@ function BadgeRecto({ membre, branding }) {
               <dt>Département</dt>
               <dd title={departement}>{departement}</dd>
             </div>
-            <div className="rds-row">
-              <dt>Église</dt>
-              <dd title={eglises}>{eglises}</dd>
-            </div>
+            {aEglise && (
+              <div className="rds-row">
+                <dt>Église</dt>
+                <dd title={eglises}>{eglises}</dd>
+              </div>
+            )}
           </dl>
 
           <div className="rds-matricule">
@@ -114,7 +117,7 @@ function BadgeRecto({ membre, branding }) {
   );
 }
 
-function BadgeVerso({ membre, branding, qrDataUrl, qrErreur }) {
+function BadgeVerso({ membre, qrDataUrl, qrErreur }) {
   const nom = nomComplet(membre);
   const matricule = valeurOuTiret(membre?.matricule);
   const verificationUrl = urlVerification(membre);
@@ -130,13 +133,12 @@ function BadgeVerso({ membre, branding, qrDataUrl, qrErreur }) {
 
       <header className="rds-verso-head">
         <div className="rds-logo-box">
-          <BadgeLogo logoUrl={branding?.logoUrl} />
+          <BadgeLogo />
         </div>
         <div className="rds-org">
           <p className="rds-org-name">{BADGE_ORGANISATION}</p>
           <p className="rds-org-sub">Vérification du membre</p>
         </div>
-        <span className="rds-staff">{BADGE_MENTION_STAFF}</span>
       </header>
 
       <div className="rds-verso-body">
@@ -179,25 +181,18 @@ function BadgeVerso({ membre, branding, qrDataUrl, qrErreur }) {
  * @param {Object} props
  * @param {"recto"|"verso"} [props.face]
  * @param {import("../badgeTypes").BadgeMember} props.membre
- * @param {import("../badgeTypes").BadgeBranding} [props.branding]
  * @param {string|null} [props.qrDataUrl] QR déjà généré (partagé avec l'impression).
  * @param {Error|null} [props.qrErreur]
  */
 export default function BadgeCard({
   face = "recto",
   membre,
-  branding,
   qrDataUrl,
   qrErreur,
 }) {
   return face === "verso" ? (
-    <BadgeVerso
-      membre={membre}
-      branding={branding}
-      qrDataUrl={qrDataUrl}
-      qrErreur={qrErreur}
-    />
+    <BadgeVerso membre={membre} qrDataUrl={qrDataUrl} qrErreur={qrErreur} />
   ) : (
-    <BadgeRecto membre={membre} branding={branding} />
+    <BadgeRecto membre={membre} />
   );
 }

@@ -1,10 +1,15 @@
 import { Calendar, LogOut } from "lucide-react";
 import { C } from "../theme";
-import { libelleRole } from "../lib/auth";
 
-function initials(email) {
-  if (!email) return "?";
-  return email.split("@")[0].slice(0, 2).toUpperCase();
+function initials(admin) {
+  const complet = [admin?.prenom, admin?.nom].filter(Boolean).join(" ").trim();
+  const base = complet || admin?.email?.split("@")[0] || "";
+  if (!base) return "?";
+  const mots = base.split(/\s+/).filter(Boolean);
+  if (mots.length >= 2) {
+    return `${mots[0].charAt(0)}${mots[1].charAt(0)}`.toUpperCase();
+  }
+  return base.slice(0, 2).toUpperCase();
 }
 
 export default function TopBar({ title, subtitle, onMenuToggle, onDeconnexion, admin }) {
@@ -35,25 +40,26 @@ export default function TopBar({ title, subtitle, onMenuToggle, onDeconnexion, a
         {subtitle && <p className="text-[10px] text-slate-500 hidden sm:block truncate">{subtitle}</p>}
       </div>
 
-      <div className="hidden lg:flex items-center gap-2 text-xs text-slate-500">
+      {/* Date : affichée une seule fois, ici (la page ne la répète plus). */}
+      <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 flex-shrink-0">
         <Calendar size={14} aria-hidden="true" />
-        <span className="capitalize">{dateJour}</span>
+        <span>{dateJour}</span>
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0 pl-2 border-l border-slate-100">
-        <div className="hidden sm:flex flex-col items-end">
-          <p className="text-xs font-medium text-slate-700 truncate max-w-[160px]">{admin?.email || "…"}</p>
-          <p className="text-[10px] text-slate-500">{libelleRole(admin?.role)}</p>
-        </div>
+      {/* Compte : uniquement sur mobile — dès md, la sidebar (ou le tiroir) affiche
+          déjà l'email, le rôle et la déconnexion. */}
+      <div className="flex md:hidden items-center gap-2 flex-shrink-0 pl-2 border-l border-slate-100">
         <div
           className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ring-1 ring-white/40 shadow-sm"
           style={{ background: C.btn }}
+          aria-hidden="true"
         >
-          {initials(admin?.email)}
+          {initials(admin)}
         </div>
         <button
           onClick={onDeconnexion}
           title="Se déconnecter"
+          aria-label="Se déconnecter"
           className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-bordeaux-700 hover:bg-bordeaux-50 transition-colors flex-shrink-0"
         >
           <LogOut size={16} aria-hidden="true" />

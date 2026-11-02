@@ -18,10 +18,20 @@ function navAutorises() {
   return navItems.filter(voirMenu);
 }
 
-function initials(email) {
-  if (!email) return "?";
-  const name = email.split("@")[0];
-  return name.slice(0, 2).toUpperCase();
+function initials(admin) {
+  const complet = [admin?.prenom, admin?.nom].filter(Boolean).join(" ").trim();
+  const base = complet || admin?.email?.split("@")[0] || "";
+  if (!base) return "?";
+  const mots = base.split(/\s+/).filter(Boolean);
+  if (mots.length >= 2) {
+    return `${mots[0].charAt(0)}${mots[1].charAt(0)}`.toUpperCase();
+  }
+  return base.slice(0, 2).toUpperCase();
+}
+
+function nomAdmin(admin) {
+  const complet = [admin?.prenom, admin?.nom].filter(Boolean).join(" ").trim();
+  return complet || admin?.email || "…";
 }
 
 const GROUPS = [
@@ -126,11 +136,16 @@ function SidebarContent({ admin, onClose, onDeconnexion }) {
             className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ring-1 ring-white/20"
             style={{ background: C.avatar }}
           >
-            {initials(admin?.email)}
+            {initials(admin)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-white text-xs font-semibold truncate">{admin?.email || "…"}</p>
-            <p className="text-white/85 text-[10px]">{libelleRole(admin?.role)}</p>
+            <p className="text-white text-xs font-semibold truncate" title={admin?.email}>
+              {nomAdmin(admin)}
+            </p>
+            <p className="text-white/85 text-[10px] truncate">
+              {libelleRole(admin?.role)}
+              {admin?.nom || admin?.prenom ? ` · ${admin?.email}` : ""}
+            </p>
           </div>
           <button
             onClick={onDeconnexion}
@@ -172,7 +187,7 @@ export function Sidebar({ admin, onDeconnexion }) {
             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
             style={{ background: C.avatar }}
           >
-            {initials(admin?.email)}
+            {initials(admin)}
           </div>
           <button
             onClick={onDeconnexion}
