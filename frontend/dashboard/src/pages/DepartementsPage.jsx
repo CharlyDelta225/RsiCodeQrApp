@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Download, Settings2 } from "lucide-react";
+import { ArrowRight, ChevronDown, Download, Settings2 } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { telechargerBlob } from "../lib/download";
 import { getAdmin } from "../lib/auth";
@@ -20,6 +20,36 @@ const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
 function peutEcrire() {
   return ROLE_ECRITURE.includes(getAdmin()?.role);
+}
+
+/**
+ * Nombre de colonnes réellement affichées par la grille de départements.
+ * Sert à découper les cartes en lignes pour insérer la liste des membres
+ * juste sous la ligne du département sélectionné.
+ */
+function useNombreColonnes() {
+  const [colonnes, setColonnes] = useState(() => {
+    if (typeof window === "undefined") return 3;
+    if (window.matchMedia("(min-width: 1024px)").matches) return 3;
+    if (window.matchMedia("(min-width: 640px)").matches) return 2;
+    return 1;
+  });
+
+  useEffect(() => {
+    const lg = window.matchMedia("(min-width: 1024px)");
+    const sm = window.matchMedia("(min-width: 640px)");
+    const maj = () => setColonnes(lg.matches ? 3 : sm.matches ? 2 : 1);
+
+    maj();
+    lg.addEventListener("change", maj);
+    sm.addEventListener("change", maj);
+    return () => {
+      lg.removeEventListener("change", maj);
+      sm.removeEventListener("change", maj);
+    };
+  }, []);
+
+  return colonnes;
 }
 
 const ROLES = [
@@ -114,6 +144,8 @@ export default function DepartementsPage() {
     }
     setChargementDetail(true);
     setErreur(null);
+    // Évite d'afficher les membres du département précédent sous la nouvelle carte.
+    setSelection(null);
     try {
       const data = await api.getDepartement(selectedId);
       const membres = [...(data.departement.membres || [])];
@@ -246,145 +278,22 @@ export default function DepartementsPage() {
 
   const pagination = usePagination(selection?.membres ?? []);
 
-  return (
-    <div className="p-4 md:p-8 space-y-5 max-w-6xl mx-auto">
-      {/* Bandeau titre */}
-      <div
-        className="rounded-2xl p-5 md:p-6 shadow-sm"
-        style={{
-          background: "linear-gradient(135deg,#FFF6F4 0%,#FBE7E3 55%,#F4CFC7 100%)",
-          border: "1px solid #F1C4BB",
-        }}
-      >
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
-              Départements
-            </h1>
-            <p className="text-sm text-slate-500">Gérez les membres et leurs postes dans chaque département.</p>
-            {peutEcrire() && (
-            <Link
-              to="/gestion-departements"
-              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-bordeaux-700 bg-white ring-1 ring-bordeaux-200 hover:bg-bordeaux-50 rounded-full px-4 py-2 transition"
-            >
-              Créer / renommer / exporter les départements
-              <ArrowRight size={12} aria-hidden="true" />
-            </Link>
-          )}
-          </div>
-          {peutEcrire() && (
-            <button
-              onClick={handleExporterCsv}
-              disabled={!selection || nbMembres === 0}
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 disabled:opacity-50 rounded-xl px-4 py-2 shadow-sm transition"
-            >
-              <Download size={16} aria-hidden="true" /> Exporter en CSV
-            </button>
-          )}
-        </div>
-      </div>
+  const colonnes = useNombreColonnes();
+  const departementSelectionne = departements.find((d) => d.id === selectedId) || null;
+  const lignesDepartements = [];
+  for (let i = 0; i < departements.length; i += colonnes) {
+    lignesDepartements.push(departements.slice(i, i + colonnes));
+  }
 
-      {(erreur || succes) && (
-        <div
-          className={`text-sm rounded-xl px-4 py-3 border ${
-            erreur
-              ? "text-bordeaux-700 bg-bordeaux-50 border-bordeaux-200"
-              : "text-emerald-700 bg-emerald-50 border-emerald-200"
-          }`}
-        >
-          {erreur || succes}
-        </div>
-      )}
-
-      {/* Cartes de départements */}
-      <div>
-        <div className="flex items-end justify-between flex-wrap gap-2 mb-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
-              Départements
-            </h2>
-            <p className="text-xs text-slate-500">Cliquez sur une carte pour afficher ses membres.</p>
-          </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-500">
-            {departements.length} département{departements.length > 1 ? "s" : ""}
-          </span>
-        </div>
-
-        {chargement ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 rounded-2xl bg-slate-100 animate-pulse" />
-            ))}
-          </div>
-        ) : departements.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-500">
-            Aucun département disponible.
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {departements.map((d, index) => {
-              const actif = selectedId === d.id;
-              const nb = d._count?.membres ?? 0;
-              return (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(d.id);
-                    setSucces(null);
-                  }}
-                  aria-pressed={actif}
-                  className={`text-left rounded-2xl border bg-white p-4 transition-all ${
-                    actif
-                      ? "border-bordeaux-300 ring-2 ring-bordeaux-200 shadow-md"
-                      : "border-slate-200 hover:border-bordeaux-200 hover:shadow-sm"
-                  }`}
-                >
-                  <div
-                    className="h-1.5 w-14 rounded-full mb-3"
-                    style={{ background: ACCENTS[index % ACCENTS.length] }}
-                  />
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 truncate">{d.nom}</p>
-                      {d.description && (
-                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{d.description}</p>
-                      )}
-                    </div>
-                    <span
-                      className={`flex-shrink-0 inline-flex items-center justify-center min-w-9 h-9 rounded-xl text-sm font-semibold ${
-                        actif ? "bg-bordeaux-700 text-white" : "bg-slate-100 text-slate-700"
-                      }`}
-                      title={`${nb} membre(s)`}
-                    >
-                      {nb}
-                    </span>
-                  </div>
-                  {/* Un seul compteur (la pastille) ; la répartition par poste
-                      n'apparaît que si le département a d'autres postes que « Membre ». */}
-                  {actif && repartitionRoles.some((r) => r.valeur !== "MEMBRE") && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {repartitionRoles.map((role) => (
-                        <Pill key={role.valeur} className={styleRole(role.valeur)}>
-                          {role.nombre} {role.libelle}
-                        </Pill>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Membres */}
+  /** Liste des membres, affichée juste sous la ligne du département choisi. */
+  function renderMembres() {
+    return (
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
           <h2 className="text-sm font-semibold text-slate-700" style={{ fontFamily: "Poppins,sans-serif" }}>
-            {selection ? selection.nom : "Membres"}
+            {selection?.nom ?? departementSelectionne?.nom ?? "Membres"}
           </h2>
-          {selection && (
+          {departementSelectionne && !chargementDetail && (
             <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-500">
               {nbMembres} membre{nbMembres > 1 ? "s" : ""}
             </span>
@@ -444,6 +353,164 @@ export default function DepartementsPage() {
             total={nbMembres}
             label="membre(s)"
           />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-8 space-y-5 max-w-6xl mx-auto">
+      {/* Bandeau titre */}
+      <div
+        className="rounded-2xl p-5 md:p-6 shadow-sm"
+        style={{
+          background: "linear-gradient(135deg,#FFF6F4 0%,#FBE7E3 55%,#F4CFC7 100%)",
+          border: "1px solid #F1C4BB",
+        }}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
+              Départements
+            </h1>
+            <p className="text-sm text-slate-500">Gérez les membres et leurs postes dans chaque département.</p>
+            {peutEcrire() && (
+            <Link
+              to="/gestion-departements"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-bordeaux-700 bg-white ring-1 ring-bordeaux-200 hover:bg-bordeaux-50 rounded-full px-4 py-2 transition"
+            >
+              Créer / renommer / exporter les départements
+              <ArrowRight size={12} aria-hidden="true" />
+            </Link>
+          )}
+          </div>
+          {peutEcrire() && (
+            <button
+              onClick={handleExporterCsv}
+              disabled={!selection || nbMembres === 0}
+              className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 disabled:opacity-50 rounded-xl px-4 py-2 shadow-sm transition"
+            >
+              <Download size={16} aria-hidden="true" /> Exporter en CSV
+            </button>
+          )}
+        </div>
+      </div>
+
+      {(erreur || succes) && (
+        <div
+          className={`text-sm rounded-xl px-4 py-3 border ${
+            erreur
+              ? "text-bordeaux-700 bg-bordeaux-50 border-bordeaux-200"
+              : "text-emerald-700 bg-emerald-50 border-emerald-200"
+          }`}
+        >
+          {erreur || succes}
+        </div>
+      )}
+
+      {/* Cartes de départements — la liste des membres s'ouvre juste sous la
+          ligne du département sélectionné. */}
+      <div>
+        <div className="flex items-end justify-between flex-wrap gap-2 mb-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800" style={{ fontFamily: "Poppins,sans-serif" }}>
+              Départements
+            </h2>
+            <p className="text-xs text-slate-500">Cliquez sur un département pour afficher ses membres juste en dessous.</p>
+          </div>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-500">
+            {departements.length} département{departements.length > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {chargement ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 rounded-2xl bg-slate-100 animate-pulse" />
+            ))}
+          </div>
+        ) : departements.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-500">
+            Aucun département disponible.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {lignesDepartements.map((ligne, indexLigne) => {
+              const contientSelection = ligne.some((d) => d.id === selectedId);
+              return (
+                <Fragment key={indexLigne}>
+                  <div
+                    className="grid gap-3"
+                    style={{ gridTemplateColumns: `repeat(${colonnes}, minmax(0, 1fr))` }}
+                  >
+                    {ligne.map((d, index) => {
+                      const indexGlobal = indexLigne * colonnes + index;
+                      const actif = selectedId === d.id;
+                      const nb = d._count?.membres ?? 0;
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedId((precedent) => (precedent === d.id ? "" : d.id));
+                            setSucces(null);
+                          }}
+                          aria-pressed={actif}
+                          className={`text-left rounded-2xl border bg-white p-4 transition-all ${
+                            actif
+                              ? "border-bordeaux-300 ring-2 ring-bordeaux-200 shadow-md"
+                              : "border-slate-200 hover:border-bordeaux-200 hover:shadow-sm"
+                          }`}
+                        >
+                          <div
+                            className="h-1.5 w-14 rounded-full mb-3"
+                            style={{ background: ACCENTS[indexGlobal % ACCENTS.length] }}
+                          />
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900 truncate">{d.nom}</p>
+                              {d.description && (
+                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{d.description}</p>
+                              )}
+                            </div>
+                            <span
+                              className={`flex-shrink-0 inline-flex items-center justify-center min-w-9 h-9 rounded-xl text-sm font-semibold ${
+                                actif ? "bg-bordeaux-700 text-white" : "bg-slate-100 text-slate-700"
+                              }`}
+                              title={`${nb} membre(s)`}
+                            >
+                              {nb}
+                            </span>
+                          </div>
+                          {/* Un seul compteur (la pastille) ; la répartition par poste
+                              n'apparaît que si le département a d'autres postes que « Membre ». */}
+                          {actif && repartitionRoles.some((r) => r.valeur !== "MEMBRE") && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {repartitionRoles.map((role) => (
+                                <Pill key={role.valeur} className={styleRole(role.valeur)}>
+                                  {role.nombre} {role.libelle}
+                                </Pill>
+                              ))}
+                            </div>
+                          )}
+                          <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-bordeaux-700">
+                            {actif ? "Masquer les membres" : "Voir les membres"}
+                            <ChevronDown
+                              size={12}
+                              aria-hidden="true"
+                              className={`transition-transform ${actif ? "rotate-180" : ""}`}
+                            />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {contientSelection && renderMembres()}
+                </Fragment>
+              );
+            })}
+          </div>
         )}
       </div>
 
