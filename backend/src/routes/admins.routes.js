@@ -3,6 +3,15 @@ import crypto from "node:crypto";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma.js";
+import {
+  creerAdmin,
+  executerAdmin,
+  mettreAJourAdmin,
+  SELECT_ADMIN_BASE,
+  SELECT_ADMIN_IDENTITE,
+  trouverAdminParEmail,
+  trouverAdminParId,
+} from "../lib/adminCompat.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 import { envoyerEmailSimple, genererMotDePasse, urlDashboard } from "../lib/mailer.js";
 
@@ -87,20 +96,18 @@ async function envoyerIdentifiants({ email, motDePasse, type }) {
  */
 router.get("/", SUPER_SEULEMENT, async (_req, res) => {
   try {
-    const admins = await prisma.admin.findMany({
-      select: {
-        id: true,
-        email: true,
-        nom: true,
-        prenom: true,
-        role: true,
-        actif: true,
-        tentativesEchouees: true,
-        bloqueJusqua: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const admins = await executerAdmin(
+      () =>
+        prisma.admin.findMany({
+          select: SELECT_ADMIN_IDENTITE,
+          orderBy: { createdAt: "asc" },
+        }),
+      () =>
+        prisma.admin.findMany({
+          select: SELECT_ADMIN_BASE,
+          orderBy: { createdAt: "asc" },
+        })
+    );
     return res.json({ ok: true, admins });
   } catch (err) {
     logger.error("[ADMINS/LISTE]", err);
@@ -130,7 +137,7 @@ router.post("/", SUPER_SEULEMENT, async (req, res) => {
       return res.status(400).json({ ok: false, code: "ROLE_INVALIDE", message: "Le rôle doit être SUPER_ADMIN, ADMIN ou LECTEUR" });
     }
 
-    const existe = await prisma.admin.findUnique({ where: { email } });
+    const existe = await trouverAdminParEmail(email);
     if (existe) {
       return res.status(409).json({ ok: false, code: "EMAIL_EXISTANT", message: "Cet email est déjà enregistré" });
     }
@@ -138,10 +145,10 @@ router.post("/", SUPER_SEULEMENT, async (req, res) => {
     const motDePasseTemporaire = genererMotDePasse();
     const hash = await bcrypt.hash(motDePasseTemporaire, 10);
 
-    const admin = await prisma.admin.create({
-      data: { email, motDePasse: hash, role, nom, prenom },
-      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, createdAt: true },
-    });
+    const admin = await creerAdmin(
+      { email, motDePasse: hash, role, nom, prenom },
+      SELECT_ADMIN_IDENTITE
+    );
 
     const envoi = await envoyerIdentifiants({
       email,
@@ -178,7 +185,7 @@ router.post("/", SUPER_SEULEMENT, async (req, res) => {
  */
 router.patch("/:id", SUPER_SEULEMENT, async (req, res) => {
   try {
-    const cible = await prisma.admin.findUnique({ where: { id: req.params.id } });
+    const cible = await trouverAdminParId(req.params.id);
     if (!cible) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
@@ -194,11 +201,7 @@ router.patch("/:id", SUPER_SEULEMENT, async (req, res) => {
       return res.status(400).json({ ok: false, code: "CHAMPS_MANQUANTS", message: "nom ou prenom est requis" });
     }
 
-    const admin = await prisma.admin.update({
-      where: { id: cible.id },
-      data,
-      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
-    });
+    const admin = await mettreAJourAdmin(cible.id, data);
 
     return res.json({ ok: true, admin });
   } catch (err) {
@@ -222,7 +225,7 @@ router.patch("/:id/role", SUPER_SEULEMENT, async (req, res) => {
       return res.status(400).json({ ok: false, code: "ROLE_INVALIDE", message: "Le rôle doit être ADMIN, LECTEUR ou SUPER_ADMIN" });
     }
 
-    const cible = await prisma.admin.findUnique({ where: { id: req.params.id } });
+    const cible = await trouverAdminParId(req.params.id);
     if (!cible) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
@@ -232,11 +235,7 @@ router.patch("/:id/role", SUPER_SEULEMENT, async (req, res) => {
       return res.status(403).json({ ok: false, code: "ACTION_IMPOSSIBLE", message: "Vous ne pouvez pas modifier votre propre rôle" });
     }
 
-    const admin = await prisma.admin.update({
-      where: { id: cible.id },
-      data: { role },
-      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
-    });
+    const admin = await mettreAJourAdmin(cible.id, { role });
 
     return res.json({ ok: true, admin });
   } catch (err) {
@@ -252,15 +251,11 @@ router.patch("/:id/role", SUPER_SEULEMENT, async (req, res) => {
  */
 router.patch("/:id/activer", SUPER_SEULEMENT, async (req, res) => {
   try {
-    const cible = await prisma.admin.findUnique({ where: { id: req.params.id } });
+    const cible = await trouverAdminParId(req.params.id);
     if (!cible) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
-    const admin = await prisma.admin.update({
-      where: { id: cible.id },
-      data: { actif: true },
-      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
-    });
+    const admin = await mettreAJourAdmin(cible.id, { actif: true });
     return res.json({ ok: true, admin });
   } catch (err) {
     logger.error("[ADMINS/ACTIVER]", err);
@@ -275,18 +270,14 @@ router.patch("/:id/activer", SUPER_SEULEMENT, async (req, res) => {
  */
 router.patch("/:id/desactiver", SUPER_SEULEMENT, async (req, res) => {
   try {
-    const cible = await prisma.admin.findUnique({ where: { id: req.params.id } });
+    const cible = await trouverAdminParId(req.params.id);
     if (!cible) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
     if (cible.id === req.admin.id) {
       return res.status(403).json({ ok: false, code: "ACTION_IMPOSSIBLE", message: "Vous ne pouvez pas désactiver votre propre compte" });
     }
-    const admin = await prisma.admin.update({
-      where: { id: cible.id },
-      data: { actif: false },
-      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
-    });
+    const admin = await mettreAJourAdmin(cible.id, { actif: false });
     return res.json({ ok: true, admin });
   } catch (err) {
     logger.error("[ADMINS/DESACTIVER]", err);
@@ -301,14 +292,13 @@ router.patch("/:id/desactiver", SUPER_SEULEMENT, async (req, res) => {
  */
 router.patch("/:id/debloquer", SUPER_SEULEMENT, async (req, res) => {
   try {
-    const cible = await prisma.admin.findUnique({ where: { id: req.params.id } });
+    const cible = await trouverAdminParId(req.params.id);
     if (!cible) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
-    const admin = await prisma.admin.update({
-      where: { id: cible.id },
-      data: { tentativesEchouees: 0, bloqueJusqua: null },
-      select: { id: true, email: true, nom: true, prenom: true, role: true, actif: true, tentativesEchouees: true, bloqueJusqua: true, createdAt: true },
+    const admin = await mettreAJourAdmin(cible.id, {
+      tentativesEchouees: 0,
+      bloqueJusqua: null,
     });
     return res.json({ ok: true, admin });
   } catch (err) {
@@ -328,7 +318,7 @@ router.patch("/:id/debloquer", SUPER_SEULEMENT, async (req, res) => {
  */
 router.post("/:id/reinitialiser-mot-de-passe", SUPER_SEULEMENT, async (req, res) => {
   try {
-    const cible = await prisma.admin.findUnique({ where: { id: req.params.id } });
+    const cible = await trouverAdminParId(req.params.id);
     if (!cible) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
@@ -342,6 +332,7 @@ router.post("/:id/reinitialiser-mot-de-passe", SUPER_SEULEMENT, async (req, res)
         tentativesEchouees: 0,
         bloqueJusqua: null,
       },
+      select: { id: true },
     });
 
     const lien = `${urlDashboard()}/reinitialisation?token=${token}&email=${encodeURIComponent(cible.email)}`;
@@ -390,7 +381,7 @@ router.post("/:id/reinitialiser-mot-de-passe", SUPER_SEULEMENT, async (req, res)
  */
 router.delete("/:id", SUPER_SEULEMENT, async (req, res) => {
   try {
-    const cible = await prisma.admin.findUnique({ where: { id: req.params.id } });
+    const cible = await trouverAdminParId(req.params.id);
     if (!cible) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Compte admin introuvable" });
     }
@@ -405,7 +396,7 @@ router.delete("/:id", SUPER_SEULEMENT, async (req, res) => {
       }
     }
 
-    await prisma.admin.delete({ where: { id: cible.id } });
+    await prisma.admin.delete({ where: { id: cible.id }, select: { id: true } });
     return res.json({ ok: true });
   } catch (err) {
     if (err.code === "P2025") {

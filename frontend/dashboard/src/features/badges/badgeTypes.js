@@ -8,6 +8,8 @@
 
 export const BADGE_ORGANISATION = "ROYAUME DE STABILITÉ";
 export const BADGE_SOUS_TITRE = "Carte professionnelle";
+export const BADGE_DECLARATION = "DÉCLARATION N° 2104/MIS/DGAT/SDVA";
+export const BADGE_BANDEAU = "STAFF";
 export const BADGE_MENTION_VERSO =
   "Scannez pour vérifier l'identité du titulaire";
 

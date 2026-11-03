@@ -7,9 +7,10 @@ import {
   urlVerification,
 } from "../badgeAdapter";
 import {
+  BADGE_BANDEAU,
+  BADGE_DECLARATION,
   BADGE_MENTION_VERSO,
   BADGE_ORGANISATION,
-  BADGE_SOUS_TITRE,
 } from "../badgeTypes";
 import "../badge.css";
 
@@ -38,80 +39,90 @@ function BadgeRecto({ membre }) {
       className="rds-badge-card rds-badge-recto"
       aria-label={`Recto du badge de ${nom}`}
     >
-      <div className="rds-bg" aria-hidden="true">
-        <span className="rds-bg-orb rds-bg-orb-1" />
-        <span className="rds-bg-orb rds-bg-orb-2" />
-        <span className="rds-bg-swoosh" />
+      <div className="rds-recto-bg" aria-hidden="true">
+        <span className="rds-recto-halo" />
       </div>
 
-      <header className="rds-head">
-        <div className="rds-logo-box">
+      <header className="rds-recto-head">
+        <div className="rds-seal">
           <BadgeLogo />
         </div>
-        <div className="rds-org">
-          <p className="rds-org-name">{BADGE_ORGANISATION}</p>
-          <p className="rds-org-sub">{BADGE_SOUS_TITRE}</p>
+        <div className="rds-recto-org">
+          <p className="rds-recto-org-name">
+            Royaume de <strong>Stabilité</strong>
+          </p>
+          <p className="rds-recto-declaration">{BADGE_DECLARATION}</p>
         </div>
       </header>
 
-      <main className="rds-main">
-        <div className="rds-photo">
-          <div className="rds-photo-inner">
+      <main className="rds-recto-panel">
+        {afficherPhoto && (
+          <img
+            src={photoUrl}
+            alt=""
+            aria-hidden="true"
+            className="rds-recto-ghost"
+          />
+        )}
+
+        <div className="rds-recto-photo">
+          <div className="rds-recto-photo-inner">
             {afficherPhoto ? (
               <img
                 src={photoUrl}
                 alt={`Photo de ${nom}`}
-                className="rds-photo-img"
+                className="rds-recto-photo-img"
                 onError={() => setPhotoCassee(true)}
               />
             ) : (
-              <div className="rds-photo-fallback" aria-hidden="true">
-                <span className="rds-photo-initiales">
+              <div className="rds-recto-photo-fallback" aria-hidden="true">
+                <span className="rds-recto-photo-initiales">
                   {initiales(membre)}
                 </span>
-                <span className="rds-photo-label">Photo</span>
+                <span className="rds-recto-photo-label">Photo</span>
               </div>
             )}
           </div>
         </div>
 
-        <div className="rds-info">
-          <p className="rds-name" title={nom}>
+        <div className="rds-recto-info">
+          <p className="rds-recto-name" title={nom}>
             {nom}
           </p>
           {fonction && (
-            <p className="rds-fonction" title={fonction}>
+            <p className="rds-recto-fonction" title={fonction}>
               {fonction}
             </p>
           )}
 
-          <div className="rds-rule" aria-hidden="true" />
+          <div className="rds-recto-sep" aria-hidden="true" />
 
-          <dl className="rds-rows">
-            <div className="rds-row">
+          <dl className="rds-recto-rows">
+            <div className="rds-recto-row">
               <dt>Département</dt>
               <dd title={departement}>{departement}</dd>
             </div>
             {aEglise && (
-              <div className="rds-row">
+              <div className="rds-recto-row">
                 <dt>Église</dt>
                 <dd title={eglises}>{eglises}</dd>
               </div>
             )}
           </dl>
 
-          <div className="rds-matricule">
-            <span className="rds-matricule-label">Matricule</span>
+          <div className="rds-recto-matricule">
+            <span className="rds-recto-matricule-label">
+              N° Matricule :
+            </span>
             <strong>{matricule}</strong>
           </div>
         </div>
       </main>
 
-      <footer className="rds-foot">
-        <span className="rds-foot-dot" aria-hidden="true" />
-        <span>{BADGE_ORGANISATION}</span>
-        <span className="rds-foot-sep" aria-hidden="true" />
-        <span>Carte de membre</span>
+      <footer className="rds-recto-foot">
+        <span className="rds-recto-foot-line" aria-hidden="true" />
+        <span className="rds-recto-foot-label">{BADGE_BANDEAU}</span>
+        <span className="rds-recto-foot-line" aria-hidden="true" />
       </footer>
     </article>
   );

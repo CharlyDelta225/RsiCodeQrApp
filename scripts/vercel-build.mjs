@@ -18,6 +18,47 @@ if (process.env.SKIP_INSTALL !== "1") {
 }
 run("npx prisma generate", path.join(RACINE, "backend"));
 
+// 1bis) Migrations de la base de production.
+//       Sans cette étape, un déploiement qui ajoute une colonne (ex.
+//       Admin.nom/Admin.prenom) casse l'API tant que la migration n'a pas été
+//       appliquée à la main. On utilise DIRECT_URL (session pooler, port 5432)
+//       car le transaction pooler ne gère pas les verrous de migration ; à
+//       défaut on retombe sur DATABASE_URL.
+//
+//       Un échec n'interrompt PAS le déploiement : le code applicatif tolère
+//       les colonnes nom/prenom absentes (voir backend/src/lib/adminCompat.js).
+//       On garde une trace très visible dans les logs Vercel.
+function appliquerMigrations() {
+  const direct = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  if (!process.env.DATABASE_URL && !direct) {
+    console.warn(
+      "[vercel-build] DATABASE_URL absent : migrations Prisma ignorées."
+    );
+    return;
+  }
+
+  console.log("\n[vercel-build] Application des migrations Prisma…");
+  try {
+    execSync("npx prisma migrate deploy", {
+      cwd: path.join(RACINE, "backend"),
+      stdio: "inherit",
+      shell: true,
+      timeout: 120_000,
+      env: { ...process.env, DIRECT_URL: direct },
+    });
+    console.log("[vercel-build] Migrations Prisma à jour.");
+  } catch (err) {
+    console.error(
+      "[vercel-build] ÉCHEC des migrations Prisma (déploiement poursuivi) :",
+      err?.message || err
+    );
+    console.error(
+      "[vercel-build] Vérifier DIRECT_URL/DATABASE_URL puis relancer : npx prisma migrate deploy"
+    );
+  }
+}
+appliquerMigrations();
+
 // 2) Build du dashboard Vite (VITE_API_URL vide → mêmes-origine /api/...).
 run("npm run build", path.join(RACINE, "frontend/dashboard"));
 

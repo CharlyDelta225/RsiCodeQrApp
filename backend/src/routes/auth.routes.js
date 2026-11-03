@@ -5,6 +5,11 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { rateLimit } from "express-rate-limit";
 import prisma from "../lib/prisma.js";
+import {
+  creerAdmin,
+  executerAdmin,
+  trouverAdminParEmail,
+} from "../lib/adminCompat.js";
 import requireAuth from "../middleware/auth.middleware.js";
 import { envoyerEmailSimple, urlDashboard } from "../lib/mailer.js";
 import { ipReelle } from "../lib/ip.js";
@@ -106,7 +111,7 @@ router.post("/register", async (req, res) => {
     // Anti-énumération : que le compte existe ou non, on répond EXACTEMENT la
     // même chose (même code HTTP, même corps). Un attaquant ne peut pas savoir
     // si une adresse est déjà un compte admin.
-    const existe = await prisma.admin.findUnique({ where: { email } });
+    const existe = await trouverAdminParEmail(email);
     if (!existe) {
       // Le mot de passe n'est JAMAIS stocké en clair : hash bcrypt + sel intégré
       const hash = await bcrypt.hash(motDePasse, 10);
@@ -114,10 +119,10 @@ router.post("/register", async (req, res) => {
       // un SUPER_ADMIN (Gestion des comptes → Réactiver). Sans cela, n'importe
       // quel internaute pourrait lire les données personnelles des ouvriers
       // (noms, téléphones, pointages) avec un simple compte LECTEUR.
-      await prisma.admin.create({
-        data: { email, motDePasse: hash, role, actif: false, nom, prenom },
-        select: { id: true, email: true, role: true, createdAt: true },
-      });
+      await creerAdmin(
+        { email, motDePasse: hash, role, actif: false, nom, prenom },
+        { id: true, email: true, role: true, createdAt: true }
+      );
     }
 
     const MESSAGE_NEUTRE =
@@ -152,7 +157,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ ok: false, code: "CHAMPS_MANQUANTS", message: "email et motDePasse sont requis" });
     }
 
-    const admin = await prisma.admin.findUnique({ where: { email } });
+    const admin = await trouverAdminParEmail(email);
     if (!admin) {
       // Réponse volontairement identique au cas "mauvais mot de passe" :
       // ne pas révéler si l'email existe ou non (anti-énumération).
@@ -187,6 +192,7 @@ router.post("/login", async (req, res) => {
         await prisma.admin.update({
           where: { id: admin.id },
           data: { tentativesEchouees: 0, bloqueJusqua: new Date(maintenant.getTime() + DUREE_BLOCAGE_MS) },
+          select: { id: true },
         });
         const reste = MAX_TENTATIVES;
         return res.status(423).json({
@@ -199,6 +205,7 @@ router.post("/login", async (req, res) => {
       await prisma.admin.update({
         where: { id: admin.id },
         data: { tentativesEchouees: tentative },
+        select: { id: true },
       });
       return res.status(401).json({
         ok: false,
@@ -213,6 +220,7 @@ router.post("/login", async (req, res) => {
       await prisma.admin.update({
         where: { id: admin.id },
         data: { tentativesEchouees: 0, bloqueJusqua: null },
+        select: { id: true },
       });
     }
 
@@ -256,7 +264,7 @@ router.post("/reset-demand", async (req, res) => {
       return res.status(400).json({ ok: false, code: "CHAMPS_MANQUANTS", message: "email est requis" });
     }
 
-    const admin = await prisma.admin.findUnique({ where: { email } });
+    const admin = await trouverAdminParEmail(email);
     if (!admin) {
       // Anti-énumération : réponse STRICTEMENT identique à celle d'un compte
       // existant (même statut, même corps — aucun champ distinctif).
@@ -273,6 +281,7 @@ router.post("/reset-demand", async (req, res) => {
         resetTokenHash: sha256Hex(token),
         resetTokenExpire: new Date(Date.now() + DUREE_LIEN_RESET_MS),
       },
+      select: { id: true },
     });
 
     const lien = `${urlDashboard()}/reinitialisation?token=${token}&email=${encodeURIComponent(admin.email)}`;
@@ -332,6 +341,7 @@ router.post("/reset", async (req, res) => {
         resetTokenHash: sha256Hex(token),
         resetTokenExpire: { gt: new Date() },
       },
+      select: { id: true, email: true, actif: true },
     });
 
     if (!admin) {
@@ -352,6 +362,7 @@ router.post("/reset", async (req, res) => {
         tentativesEchouees: 0,
         bloqueJusqua: null,
       },
+      select: { id: true },
     });
 
     return res.json({ ok: true, message: "Mot de passe réinitialisé. Vous pouvez vous connecter." });
@@ -367,10 +378,25 @@ router.post("/reset", async (req, res) => {
  */
 router.get("/me", requireAuth, async (req, res) => {
   try {
-    const admin = await prisma.admin.findUnique({
-      where: { id: req.admin.id },
-      select: { id: true, email: true, role: true, nom: true, prenom: true, createdAt: true },
-    });
+    const admin = await executerAdmin(
+      () =>
+        prisma.admin.findUnique({
+          where: { id: req.admin.id },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            nom: true,
+            prenom: true,
+            createdAt: true,
+          },
+        }),
+      () =>
+        prisma.admin.findUnique({
+          where: { id: req.admin.id },
+          select: { id: true, email: true, role: true, createdAt: true },
+        })
+    );
     if (!admin) {
       return res.status(404).json({ ok: false, code: "ADMIN_INCONNU", message: "Admin introuvable" });
     }
