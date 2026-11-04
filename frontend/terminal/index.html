@@ -25,22 +25,53 @@
   #logo { width: 88px; height: 88px; object-fit: contain; margin-bottom: 6px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
   h1 { font-size: 18px; font-weight: 500; margin: 8px 0 16px; color: #F3E3B3; text-align: center; }
   #reader { width: 100%; max-width: 400px; border-radius: 12px; overflow: hidden; border: 2px solid #D4A017; }
+  /* Popup de résultat : centré, à la taille de l'écran, fermé par le bouton. */
   #resultat {
-    margin-top: 20px;
-    width: 100%;
-    max-width: 400px;
-    padding: 16px;
-    border-radius: 12px;
-    text-align: center;
-    display: none;
+    position: fixed; inset: 0; z-index: 40;
+    display: none; align-items: center; justify-content: center;
+    padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+    background: rgba(20,3,3,0.78);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    box-sizing: border-box;
   }
-  .succes { background: #eaf3de; color: #27500a; }
-  .visiteur { background: #fdf0cf; color: #5a3d00; }
-  .erreur { background: #fde2e2; color: #7a1a1a; }
-  #resultat .qui { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
-  #resultat dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; text-align: left; font-size: 14px; }
-  #resultat dt { opacity: 0.75; }
-  #resultat dd { margin: 0; font-weight: 600; }
+  #resultat.ouvert { display: flex; }
+  #resultat .carte {
+    width: min(94vw, 560px); max-height: 92vh; overflow-y: auto;
+    box-sizing: border-box; border-radius: 22px;
+    padding: clamp(18px, 4vmin, 34px);
+    text-align: center; box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+    animation: apparition 0.18s ease-out;
+    display: flex; flex-direction: column; gap: clamp(10px, 2.2vmin, 18px);
+  }
+  @keyframes apparition { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .succes .carte { background: #eaf3de; color: #1f4207; border-top: 10px solid #3b7d12; }
+  .visiteur .carte { background: #fdf0cf; color: #4d3400; border-top: 10px solid #D4A017; }
+  .erreur .carte { background: #fde2e2; color: #6e1616; border-top: 10px solid #b42318; }
+  #resultat .icone {
+    width: clamp(56px, 13vmin, 92px); height: clamp(56px, 13vmin, 92px); margin: 0 auto;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: clamp(30px, 7vmin, 52px); font-weight: 800; color: #fff;
+  }
+  .succes .icone { background: #3b7d12; }
+  .visiteur .icone { background: #b8860b; }
+  .erreur .icone { background: #b42318; }
+  #resultat .etat { font-size: clamp(14px, 2.6vmin, 18px); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.85; }
+  #resultat .qui { font-size: clamp(24px, 5.6vmin, 40px); font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
+  #resultat .message { font-size: clamp(18px, 3.6vmin, 26px); font-weight: 600; line-height: 1.3; }
+  #resultat dl {
+    display: grid; grid-template-columns: auto 1fr; gap: clamp(6px, 1.4vmin, 12px) 16px;
+    margin: 0; text-align: left; font-size: clamp(16px, 3.1vmin, 22px);
+    background: rgba(255,255,255,0.6); border-radius: 14px; padding: clamp(12px, 2.6vmin, 20px);
+  }
+  #resultat dt { opacity: 0.7; }
+  #resultat dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+  #resultat .fermer {
+    border: none; border-radius: 14px; cursor: pointer; width: 100%;
+    padding: clamp(14px, 3vmin, 20px); font-size: clamp(18px, 3.4vmin, 24px); font-weight: 700;
+    background: #7B1515; color: #fff; box-shadow: 0 4px 0 #4a0b0b;
+  }
+  #resultat .fermer:active { transform: translateY(2px); box-shadow: 0 2px 0 #4a0b0b; }
+  #resultat .fermer:focus-visible { outline: 4px solid #D4A017; outline-offset: 3px; }
   #lieu {
     display: none; align-items: center; gap: 6px;
     background: rgba(212,160,23,0.18); border: 1px solid rgba(212,160,23,0.6);
@@ -90,7 +121,7 @@
   <button id="lieu" type="button" title="Changer le temple de ce terminal">📍 <span id="lieuNom"></span></button>
   <h1>Présentez le QR code du badge devant la caméra</h1>
   <div id="reader"></div>
-  <div id="resultat"></div>
+  <div id="resultat" role="dialog" aria-modal="true" aria-live="assertive"></div>
   <div id="statut">Initialisation de la caméra…</div>
   <button id="sonBtn" title="Couper / activer le son">🔊</button>
   <div id="choixTemple" role="dialog" aria-modal="true" aria-labelledby="choixTitre">
@@ -303,29 +334,61 @@
     }, delai);
   }
 
-  let minuterieResultat = null;
-  function montrerResultat(classe, duree) {
-    const el = document.getElementById("resultat");
-    el.className = classe;
-    el.style.display = "block";
-    clearTimeout(minuterieResultat);
-    minuterieResultat = setTimeout(() => { el.style.display = "none"; }, duree);
+  // ---------- Popup de résultat ----------
+  // Chaque scan ouvre un popup centré ; aucun autre badge n'est accepté tant
+  // qu'il n'est pas fermé (bouton « Fermer », touche Entrée ou Échap).
+  let popupOuvert = false;
+  let dernierMatricule = null;
+  let fermeLe = 0;
+
+  function element(tag, classe, texte) {
+    const e = document.createElement(tag);
+    if (classe) e.className = classe;
+    if (texte !== undefined) e.textContent = texte;
+    return e;
   }
 
-  function afficherResultat(texte, succes) {
-    document.getElementById("resultat").textContent = texte;
-    montrerResultat(succes ? "succes" : "erreur", 3500);
+  function ouvrirPopup(classe, icone, etat, contenu) {
+    const el = document.getElementById("resultat");
+    el.textContent = "";
+    el.className = classe + " ouvert";
+    const carte = element("div", "carte");
+    carte.append(element("div", "icone", icone), element("div", "etat", etat), ...contenu);
+    const bouton = element("button", "fermer", "Fermer · scan suivant");
+    bouton.type = "button";
+    bouton.addEventListener("click", fermerPopup);
+    carte.appendChild(bouton);
+    el.appendChild(carte);
+    popupOuvert = true;
+    document.getElementById("statut").textContent = "Fermez le popup pour scanner le badge suivant.";
+    setTimeout(() => bouton.focus({ preventScroll: true }), 50);
+  }
+
+  function fermerPopup() {
+    if (!popupOuvert) return;
+    const el = document.getElementById("resultat");
+    el.className = "";
+    el.textContent = "";
+    popupOuvert = false;
+    fermeLe = Date.now();
+    enTraitement = false;
+    document.getElementById("statut").textContent = "Prêt pour le prochain scan…";
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (popupOuvert && (e.key === "Enter" || e.key === "Escape")) { e.preventDefault(); fermerPopup(); }
+  });
+
+  function afficherResultat(texte, succes, etat) {
+    ouvrirPopup(succes ? "succes" : "erreur", succes ? "✓" : "!", etat || (succes ? "Succès" : "Badge refusé"), [
+      element("div", "message", texte),
+    ]);
   }
 
   // Badgeage réussi : qui, matricule, temple, départements, heure.
   function afficherPointage(data) {
     const o = data.ouvrier;
-    const el = document.getElementById("resultat");
-    el.textContent = "";
-    const qui = document.createElement("div");
-    qui.className = "qui";
-    qui.textContent = `✓ ${o.prenom} ${o.nom}` + (data.visiteur ? " · visiteur" : "");
-    el.appendChild(qui);
+    const qui = element("div", "qui", `${o.prenom} ${o.nom}`);
     const dl = document.createElement("dl");
     const heure = new Date(data.heure || Date.now()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     const departements = (o.departements && o.departements.length ? o.departements.join(", ") : o.departement) || "—";
@@ -341,14 +404,21 @@
       dd.textContent = valeur;
       dl.append(dt, dd);
     });
-    el.appendChild(dl);
-    montrerResultat(data.visiteur ? "visiteur" : "succes", 4500);
+    ouvrirPopup(
+      data.visiteur ? "visiteur" : "succes",
+      "✓",
+      data.visiteur ? `Présence enregistrée · visiteur à ${(data.lieu && data.lieu.nom) || (temple && temple.nom) || "ce temple"}` : "Présence enregistrée",
+      [qui, dl]
+    );
   }
 
   async function envoyerScan(matricule) {
-    if (enTraitement) return;
+    if (enTraitement || popupOuvert) return;
+    // Le badge qu'on vient de fermer est souvent encore devant la caméra.
+    if (matricule === dernierMatricule && Date.now() - fermeLe < 3000) return;
     if (!temple) { ouvrirChoixTemple(); return; }
     enTraitement = true;
+    dernierMatricule = matricule;
     document.getElementById("statut").textContent = "Envoi du badge " + matricule + "…";
     try {
       const res = await fetch(API_BASE + "/api/badgeage", {
@@ -362,31 +432,35 @@
         jouerSon("succes");
         jouerSon("annonceSucces", 300);
       } else if (data.code === "DEJA_BADGE_AUJOURDHUI") {
-        afficherResultat(`⚠ ${data.message || data.code}`, false);
+        afficherResultat(data.message || data.code, false, "Déjà badgé aujourd'hui");
         jouerSon("deja");
         jouerSon("annonceDeja", 600);
       } else if (data.code === "TEMPLE_INCONNU") {
-        afficherResultat(`✗ ${data.message}`, false);
+        afficherResultat(data.message, false, "Temple inconnu");
+        fermerPopup(); // le choix du temple s'ouvre à la place
         jouerSon("erreur");
         temple = null;
         afficherLieu();
         ouvrirChoixTemple();
       } else if (data.code === "BADGE_INCONNU") {
-        afficherResultat("✗ Ouvrier inconnu", false);
+        afficherResultat("Ce badge ne correspond à aucun ouvrier.", false, "Ouvrier inconnu");
         jouerSon("erreur");
         jouerSon("annonceInconnu", 150);
       } else {
-        afficherResultat(`✗ ${data.message || data.code}`, false);
+        afficherResultat(data.message || data.code, false);
         jouerSon("erreur");
         jouerSon("annonceErreur", 150);
       }
     } catch (e) {
-      afficherResultat("✗ Impossible de contacter le serveur : " + e.message, false);
+      afficherResultat("Impossible de contacter le serveur : " + e.message, false, "Erreur réseau");
       jouerSon("erreur");
       jouerSon("annonceErreur", 150);
     } finally {
-      document.getElementById("statut").textContent = "Prêt pour le prochain scan…";
-      setTimeout(() => { enTraitement = false; }, 2000);
+      // Popup ouvert : le scan suivant attend sa fermeture (fermerPopup).
+      if (!popupOuvert) {
+        document.getElementById("statut").textContent = "Prêt pour le prochain scan…";
+        enTraitement = false;
+      }
     }
   }
 
