@@ -404,8 +404,9 @@
       dd.textContent = valeur;
       dl.append(dt, dd);
     });
+    // Badge valide = toujours vert, quel que soit le temple (visiteur signalé dans le texte).
     ouvrirPopup(
-      data.visiteur ? "visiteur" : "succes",
+      "succes",
       "✓",
       data.visiteur ? `Présence enregistrée · visiteur à ${(data.lieu && data.lieu.nom) || (temple && temple.nom) || "ce temple"}` : "Présence enregistrée",
       [qui, dl]
