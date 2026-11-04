@@ -80,6 +80,31 @@ sont conservés. Réponse : `{ ok, ouvrier, departementsRetires: ["CHORALE", …
 
 ---
 
+## 0 bis. Cartes de badge (PROTÉGÉ)
+
+Lecture : tout rôle connecté. Écriture : **ADMIN/SUPER_ADMIN**. La carte se dessine dans le navigateur (gabarit `frontend/dashboard/src/features/badges/carte/`) ; le serveur fournit les données, stocke la photo et suit les cartes faites. Le téléphone n'apparaît jamais.
+
+### `GET /api/badges/carte/:ouvrierId`
+`{ ok, carte: { ouvrier: { id, matricule, nom, prenom, actif }, eglise, district, aPhoto, photoMaj, departements: [{ id, nom, couleur, role, fonctionCarte, fonction, confectionneLe }] } }`. `district` = `Eglise.libelleCarte` ; `fonction` = `fonctionCarte` ou, à défaut, le rôle (`RESPONSABLE`, `RESPONSABLE ADJOINT`, `SECRÉTAIRE`, `MEMBRE`).
+
+### `GET /api/badges/photo/:ouvrierId` · `POST /api/badges/photo/:ouvrierId` · `DELETE /api/badges/photo/:ouvrierId`
+Le POST reçoit l'image brute (`Content-Type: image/jpeg|png|webp`, 1 Mo max) ; le type est vérifié sur les premiers octets (`400 PHOTO_INVALIDE` sinon). Le GET renvoie l'image (`404 AUCUNE_PHOTO`).
+
+### `PATCH /api/badges/fonction/:ouvrierId/:departementId`
+Body `{ "fonctionCarte": "RESPONSABLE ADJOINTE" }` ; vide = revenir au rôle. `404 LIEN_INCONNU` si l'ouvrier n'est pas dans ce département.
+
+### `POST /api/badges/confectionnes`
+Body `{ ouvrierId, departementId }` → `201`. `409 COULEUR_MANQUANTE` tant que le département n'a pas de couleur.
+
+### `GET /api/badges/a-confectionner?egliseId=&departementId=`
+Ouvriers actifs sans aucune carte faite : `{ ok, total, ouvriers: [{ id, matricule, nom, prenom, departements: [nom] }] }` (500 au plus).
+
+### Champs ajoutés
+- `PATCH /api/departements/:id` accepte `couleur` (`#RRGGBB`, `null` pour effacer ; `400 COULEUR_INVALIDE`).
+- `PATCH /api/eglises/:id` (SUPER_ADMIN) accepte `libelleCarte` (district imprimé, ex. `DISTRICT-SIÈGE`).
+
+---
+
 ## 1. Badgeage (PUBLIC — utilisé par le terminal)
 
 ### `POST /api/badgeage`
@@ -736,6 +761,7 @@ CRON_SECRET=secret-partage-pour-la-route-cron
 
 | Date | Changement |
 |---|---|
+| 2026-11-04 | **Cartes de badge** : `Departement.couleur`, `Eglise.libelleCarte`, `OuvrierDepartement.fonctionCarte`, tables `PhotoOuvrier` et `BadgeConfectionne`. Routes `/api/badges/*` (données de carte, photo, fonction, confection, à confectionner). HUISSIER reçoit la couleur de la carte d'origine `#BD175C` ; les autres départements restent sans couleur. Voir la section 0 bis |
 | 2026-11-04 | **Temples** : table `Eglise` (SHALOM siège, ADJAHUI, 4 CROIX) ; `egliseId` sur `Departement`, `Ouvrier` et `Pointage` (lieu du badgeage). Toutes les données existantes sont rattachées au siège SHALOM. Le nom d'un département devient unique **par temple**. Nouvelles routes `GET /api/eglises/public`, `GET/POST/PATCH /api/eglises`, `PATCH /api/ouvriers/:id/transferer`. `POST /api/badgeage` accepte `temple` (code du terminal, siège si absent ; `400 TEMPLE_INCONNU` si inconnu) et renvoie `ouvrier.eglise`, `ouvrier.departements[]` (tous), `lieu`, `visiteur`, `heure`. Filtres `egliseId` (et `lieuId` pour les pointages) sur ouvriers, départements, pointages, stats, export et rapport ; colonne « Temple » à l'import. Voir la section 0 |
 | 2026-10-29 | **Corrections de l'audit (lot 2)** : nouvelles routes `GET /api/pointages/stats` (indicateurs du tableau de bord calculés en base) et `GET /api/pointages/export` (CSV de toute la période, ADMIN/SUPER_ADMIN) ; `GET /api/pointages` accepte `jourSemaine` et `ordre=date` ; `limit` max passe de 200 à **2000** sur `GET /api/ouvriers` et `GET /api/pointages`. `recap` du rapport journalier = personnes distinctes. En-têtes de sécurité sur toutes les réponses (`nosniff`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy`), `X-Powered-By` retiré. Une adresse inconnue du dashboard renvoie la page « introuvable » avec un statut **404** (et non 200) |
 | 2026-10-24 | **Inscription en attente de validation** : `POST /api/auth/register` crée désormais le compte **inactif** (`actif: false`). Un `SUPER_ADMIN` doit l'activer (`PATCH /api/admins/:id/activer`) avant toute connexion ; avant activation, le login renvoie `403 COMPTE_DESACTIVE`. Un inscrit anonyme ne peut donc plus lire les données personnelles des ouvriers |

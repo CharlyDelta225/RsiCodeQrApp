@@ -43,7 +43,7 @@ function nomsDepartements(ouvrier) {
  * fonction/poste, egliseOrigine, egliseActuelle, verificationUrl.
  *
  * @param {object} ouvrier
- * @returns {import("./badgeTypes").BadgeMember}
+ * @returns {object} membre affichable (nom, prénom, matricule, département…)
  */
 export function mapOuvrierToBadgeMember(ouvrier = {}) {
   return {

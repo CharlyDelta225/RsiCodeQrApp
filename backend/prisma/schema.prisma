@@ -55,6 +55,8 @@ model Eglise {
   nom       String   @unique // « Temple SHALOM »
   estSiege  Boolean  @default(false)
   actif     Boolean  @default(true)
+  // Ligne « district » imprimée sur la carte de badge (« DISTRICT-SIÈGE »).
+  libelleCarte String?
   createdAt DateTime @default(now())
 
   departements Departement[]
@@ -70,11 +72,14 @@ model Departement {
   id          String  @id @default(uuid())
   nom         String
   description String?
+  // Couleur de la carte de badge (#RRGGBB), fixée par un admin. Vide = carte non imprimable.
+  couleur     String?
   egliseId    String  @default("eglise-shalom")
   createdAt   DateTime @default(now())
 
   eglise  Eglise @relation(fields: [egliseId], references: [id])
   membres OuvrierDepartement[]
+  badges  BadgeConfectionne[]
 
   @@unique([egliseId, nom])
   @@index([egliseId])
@@ -87,6 +92,8 @@ model OuvrierDepartement {
   ouvrierId         String
   departementId     String
   roleDansDepartement RoleDepartement @default(MEMBRE)
+  // Fonction imprimée sur la carte (« RESPONSABLE ADJOINTE ») ; vide = déduite du rôle.
+  fonctionCarte     String?
   createdAt         DateTime        @default(now())
 
   ouvrier     Ouvrier     @relation(fields: [ouvrierId], references: [id], onDelete: Cascade)
@@ -112,6 +119,8 @@ model Ouvrier {
   eglise       Eglise @relation(fields: [egliseId], references: [id])
   pointages    Pointage[]
   departements OuvrierDepartement[]
+  photo        PhotoOuvrier?
+  badges       BadgeConfectionne[]
 
   @@index([egliseId])
   @@map("Ouvrier")
@@ -156,4 +165,31 @@ model Admin {
   createdAt        DateTime  @default(now())
 
   @@map("Admin")
+}
+// Photo d'identité de la carte de badge (JPEG/PNG/WebP compressé côté navigateur).
+model PhotoOuvrier {
+  ouvrierId String   @id
+  type      String // image/jpeg | image/png | image/webp
+  donnees   Bytes
+  updatedAt DateTime @updatedAt
+
+  ouvrier Ouvrier @relation(fields: [ouvrierId], references: [id], onDelete: Cascade)
+
+  @@map("PhotoOuvrier")
+}
+
+// Carte de badge confectionnée (imprimée ou téléchargée) pour un ouvrier et un département.
+model BadgeConfectionne {
+  id            String   @id @default(uuid())
+  ouvrierId     String
+  departementId String
+  adminEmail    String?
+  createdAt     DateTime @default(now())
+
+  ouvrier     Ouvrier     @relation(fields: [ouvrierId], references: [id], onDelete: Cascade)
+  departement Departement @relation(fields: [departementId], references: [id], onDelete: Cascade)
+
+  @@index([ouvrierId])
+  @@index([departementId])
+  @@map("BadgeConfectionne")
 }
