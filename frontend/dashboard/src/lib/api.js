@@ -188,6 +188,7 @@ export const api = {
     }),
   marquerBadgeConfectionne: (ouvrierId, departementId) =>
     request("/api/badges/confectionnes", { method: "POST", body: JSON.stringify({ ouvrierId, departementId }) }),
+  getBadgesDepartement: (departementId) => request(`/api/badges/departement/${departementId}`),
   getBadgesAConfectionner: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/api/badges/a-confectionner${qs ? `?${qs}` : ""}`);

@@ -151,6 +151,129 @@ function Recherche({ onChoisir, egliseId }) {
   );
 }
 
+// ---------- Liste des ouvriers d'un département ----------
+
+function ListeDepartement({ egliseId, ouvrierId, onChoisir, onListe, version }) {
+  const toast = useToast();
+  const [departements, setDepartements] = useState([]);
+  const [departementId, setDepartementId] = useState("");
+  const [liste, setListe] = useState(null); // { departement, ouvriers }
+  const [chargement, setChargement] = useState(false);
+
+  // Départements du temple sélectionné ; on repart de zéro si le temple change.
+  useEffect(() => {
+    let actif = true;
+    setDepartementId("");
+    setListe(null);
+    api
+      .getDepartements({ limit: 100, ...paramTemple(egliseId) })
+      .then((d) => actif && setDepartements(d.departements || []))
+      .catch(() => actif && toast.error("Atelier badges", "La liste des départements n'a pas pu être chargée."));
+    return () => {
+      actif = false;
+    };
+  }, [egliseId, toast]);
+
+  useEffect(() => {
+    if (!departementId) {
+      setListe(null);
+      return undefined;
+    }
+    let actif = true;
+    setChargement(true);
+    api
+      .getBadgesDepartement(departementId)
+      .then((d) => actif && setListe({ departement: d.departement, ouvriers: d.ouvriers }))
+      .catch((err) => actif && toast.error("Atelier badges", message(err, "Les ouvriers du département n'ont pas pu être chargés.")))
+      .finally(() => actif && setChargement(false));
+    return () => {
+      actif = false;
+    };
+  }, [departementId, version, toast]);
+
+  useEffect(() => {
+    onListe(liste);
+  }, [liste, onListe]);
+
+  const faites = liste ? liste.ouvriers.filter((o) => o.confectionneLe).length : 0;
+
+  return (
+    <Card title="Ouvriers par département" description="Choisissez un département du temple sélectionné, puis un ouvrier.">
+      <div className="space-y-3">
+        <Select value={departementId} onChange={(e) => setDepartementId(e.target.value)} aria-label="Département">
+          <option value="">— Choisir un département —</option>
+          {departements.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.nom}
+              {!egliseId && d.eglise ? ` · ${d.eglise.nom}` : ""}
+              {d._count ? ` (${d._count.membres})` : ""}
+              {d.couleur ? "" : " · couleur à définir"}
+            </option>
+          ))}
+        </Select>
+
+        {chargement && !liste && <p className="text-xs text-slate-500">Chargement…</p>}
+        {liste && (
+          <>
+            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-3 w-3 rounded-full border border-black/10"
+                  style={{ background: liste.departement.couleur || "#8F8585" }}
+                  aria-hidden="true"
+                />
+                {liste.departement.couleur || "Couleur à définir"}
+              </span>
+              <span className="tabular-nums">
+                {faites} / {liste.ouvriers.length} cartes faites
+              </span>
+            </div>
+            {liste.ouvriers.length === 0 ? (
+              <p className="text-sm text-slate-500 py-4 text-center">Aucun ouvrier actif dans ce département.</p>
+            ) : (
+              <ul className="max-h-[420px] overflow-y-auto -mx-1 divide-y divide-slate-100">
+                {liste.ouvriers.map((o) => {
+                  const choisi = o.id === ouvrierId;
+                  return (
+                    <li key={o.id}>
+                      <button
+                        type="button"
+                        onClick={() => onChoisir(o.id, liste.departement.id)}
+                        aria-current={choisi ? "true" : undefined}
+                        className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition ${
+                          choisi ? "bg-bordeaux-50 ring-1 ring-bordeaux-200" : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-slate-800 truncate">
+                            {o.nom} {o.prenom}
+                          </span>
+                          <span className="block text-[11px] text-slate-500 truncate">
+                            {o.matricule} · {o.fonction}
+                            {o.aPhoto ? "" : " · sans photo"}
+                          </span>
+                        </span>
+                        {o.confectionneLe ? (
+                          <Pill tonalite="vert">
+                            <Check size={12} aria-hidden="true" />
+                            {dateCourte(o.confectionneLe)}
+                          </Pill>
+                        ) : (
+                          <Pill>À faire</Pill>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 // ---------- Onglet Confectionner ----------
 
 function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, allerAuxCouleurs }) {
@@ -167,6 +290,8 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
   const [apercus, setApercus] = useState(null); // { recto, verso } data URLs
   const [enCours, setEnCours] = useState("");
   const [glisser, setGlisser] = useState(false);
+  const [versionListe, setVersionListe] = useState(0);
+  const [listeDep, setListeDep] = useState(null); // liste du département ouvert dans « Ouvriers par département »
   const champPhoto = useRef(null);
 
   const charger = useCallback(async (id) => {
@@ -284,6 +409,7 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
     try {
       await api.marquerBadgeConfectionne(carte.ouvrier.id, dep.id);
       await Promise.all([charger(carte.ouvrier.id), rechargerAFaire()]);
+      setVersionListe((v) => v + 1);
     } catch (err) {
       toast.error("Atelier badges", message(err, "La carte n'a pas pu être marquée comme faite."));
     }
@@ -300,7 +426,9 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
   }
 
   const imprimable = Boolean(rendu && couleur && ecriture);
-  const suivant = aFaire.find((o) => o.id !== ouvrierId);
+  // Suivant : d'abord le prochain « à faire » du département parcouru, sinon la liste générale.
+  const suivantDep = listeDep?.ouvriers.find((o) => !o.confectionneLe && o.id !== ouvrierId);
+  const suivant = suivantDep || aFaire.find((o) => o.id !== ouvrierId);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
@@ -459,13 +587,27 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
                 </p>
               )}
               {suivant && (
-                <Btn variant="primary" className="w-full" icon={<ArrowRight size={16} />} onClick={() => setOuvrierId(suivant.id)}>
+                <Btn variant="primary" className="w-full" icon={<ArrowRight size={16} />} onClick={() => {
+                    if (suivantDep) setDepartementId(listeDep.departement.id);
+                    setOuvrierId(suivant.id);
+                  }}>
                   Ouvrier suivant : {suivant.nom} {suivant.prenom}
                 </Btn>
               )}
             </div>
           </Card>
         )}
+
+        <ListeDepartement
+          egliseId={egliseId}
+          ouvrierId={ouvrierId}
+          version={versionListe}
+          onListe={setListeDep}
+          onChoisir={(id, depId) => {
+            setDepartementId(depId);
+            setOuvrierId(id);
+          }}
+        />
       </div>
 
       <Card title="Aperçu" description="Recto et verso, tels qu'ils seront imprimés." bodyClassName="p-0">
