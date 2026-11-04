@@ -2,6 +2,7 @@ import logger from "../lib/logger.js";
 import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { requireRole } from "../middleware/auth.middleware.js";
+import { SELECT_EGLISE, listerEglises } from "../lib/eglises.js";
 
 const router = Router();
 
@@ -17,15 +18,31 @@ const SELECT_OUVRIER = {
   matricule: true,
   nom: true,
   prenom: true,
+  egliseId: true,
+  eglise: { select: SELECT_EGLISE },
   departements: {
     select: { departement: { select: { id: true, nom: true } } },
   },
 };
 
-// Filtres communs (liste, export) : ?du, ?au (inclus jusqu'à 23:59:59), ?ouvrierId
+// Chaque pointage renvoie l'ouvrier (avec son temple) et le LIEU du badgeage
+// (`eglise` du pointage = temple du terminal). visiteur = lieu ≠ temple de l'ouvrier.
+const INCLUDE_POINTAGE = Object.freeze({
+  ouvrier: { select: SELECT_OUVRIER },
+  eglise: { select: SELECT_EGLISE },
+});
+
+function avecVisiteur(p) {
+  return { ...p, visiteur: Boolean(p.egliseId && p.ouvrier?.egliseId && p.egliseId !== p.ouvrier.egliseId) };
+}
+
+// Filtres communs (liste, export) : ?du, ?au (inclus jusqu'à 23:59:59), ?ouvrierId,
+// ?egliseId (temple de l'ouvrier), ?lieuId (temple où le badgeage a été fait)
 function filtresPointages(query) {
   const where = {};
   if (query.ouvrierId) where.ouvrierId = String(query.ouvrierId);
+  if (query.egliseId) where.ouvrier = { egliseId: String(query.egliseId) };
+  if (query.lieuId) where.egliseId = String(query.lieuId);
 
   const du = query.du ? new Date(String(query.du)) : null;
   const au = query.au ? new Date(String(query.au)) : null;
@@ -65,10 +82,13 @@ function triPointages(ordre) {
  * Historique des badgeages pour le dashboard. Query optionnels :
  *   ?du=YYYY-MM-DD&au=YYYY-MM-DD   filtre par plage de dates
  *   ?ouvrierId=uuid                 filtre par ouvrier
+ *   ?egliseId=uuid                  ouvriers de ce temple
+ *   ?lieuId=uuid                    badgeages faits dans ce temple
  *   ?jourSemaine=0..6               seulement ce jour de la semaine (0 = dimanche ; avec du et au)
  *   ?ordre=date                     tri du plus récent au plus ancien (défaut : par nom)
  *   ?page=1&limit=50                pagination (défauts : page 1, limit 50, max 2000)
- * Réponse : { ok: true, total, page, limit, pointages: [ { id, dateHeure, type, ouvrier: { id, matricule, nom, prenom, departements: [...] } } ] }
+ * Réponse : { ok: true, total, page, limit, pointages: [ { id, dateHeure, type, egliseId, eglise (lieu), visiteur,
+ *              ouvrier: { id, matricule, nom, prenom, egliseId, eglise, departements: [...] } } ] }
  */
 router.get("/", async (req, res) => {
   try {
@@ -83,11 +103,11 @@ router.get("/", async (req, res) => {
         orderBy: triPointages(req.query.ordre),
         skip: (page - 1) * limit,
         take: limit,
-        include: { ouvrier: { select: SELECT_OUVRIER } },
+        include: INCLUDE_POINTAGE,
       }),
     ]);
 
-    return res.json({ ok: true, total, page, limit, pointages });
+    return res.json({ ok: true, total, page, limit, pointages: pointages.map(avecVisiteur) });
   } catch (err) {
     logger.error("[POINTAGES/LISTE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
@@ -95,15 +115,18 @@ router.get("/", async (req, res) => {
 });
 
 /**
- * GET /api/pointages/stats?jours=7
- * Indicateurs du tableau de bord, calculés en base (aucune troncature) :
+ * GET /api/pointages/stats?jours=7[&egliseId=uuid]
+ * Indicateurs du tableau de bord, calculés en base (aucune troncature).
+ * Avec egliseId, tous les chiffres portent sur les ouvriers de ce temple.
  * {
  *   ok, jour,                                   // jour courant (UTC, AAAA-MM-JJ)
  *   ouvriers: { total, actifs, desactives },
  *   departements,                               // nombre de départements
  *   presentsAuj,                                // ouvriers ayant badgé aujourd'hui
  *   parJour: [{ date: "AAAA-MM-JJ", presents }],// `jours` derniers jours (1 à 90)
- *   pointagesAuj: [...]                         // pointages du jour (1 max par ouvrier)
+ *   pointagesAuj: [...],                        // pointages du jour (1 max par ouvrier)
+ *   visiteursAuj,                               // pointages du jour faits hors du temple de l'ouvrier
+ *   parEglise: [{ id, code, nom, estSiege, ouvriersActifs, departements, presentsAuj }]
  * }
  */
 router.get("/stats", async (req, res) => {
@@ -116,21 +139,42 @@ router.get("/stats", async (req, res) => {
     const debut = new Date(auj);
     debut.setUTCDate(debut.getUTCDate() - (jours - 1));
 
-    const [total, actifs, departements, groupes, pointagesAuj] = await Promise.all([
-      prisma.ouvrier.count(),
-      prisma.ouvrier.count({ where: { actif: true } }),
-      prisma.departement.count(),
+    const egliseId = req.query.egliseId ? String(req.query.egliseId) : null;
+    const filtreOuvrier = egliseId ? { egliseId } : {};
+    const filtrePointage = egliseId ? { ouvrier: { egliseId } } : {};
+
+    const [total, actifs, departements, groupes, pointagesAujBruts, eglises] = await Promise.all([
+      prisma.ouvrier.count({ where: filtreOuvrier }),
+      prisma.ouvrier.count({ where: { ...filtreOuvrier, actif: true } }),
+      prisma.departement.count({ where: filtreOuvrier }),
       prisma.pointage.groupBy({
         by: ["jour"],
-        where: { jour: { gte: debut, lte: auj } },
+        where: { ...filtrePointage, jour: { gte: debut, lte: auj } },
         _count: { _all: true },
       }),
       prisma.pointage.findMany({
-        where: { jour: auj },
+        where: { ...filtrePointage, jour: auj },
         orderBy: { dateHeure: "asc" },
-        include: { ouvrier: { select: SELECT_OUVRIER } },
+        include: INCLUDE_POINTAGE,
       }),
+      listerEglises(),
     ]);
+    const pointagesAuj = pointagesAujBruts.map(avecVisiteur);
+
+    // Une ligne par temple actif (le filtre egliseId ne s'applique pas ici :
+    // les cartes du tableau de bord montrent toujours les trois temples).
+    const parEglise = await Promise.all(
+      eglises
+        .filter((e) => e.actif)
+        .map(async (e) => {
+          const [ouvriersActifs, nbDepartements, presentsAuj] = await Promise.all([
+            prisma.ouvrier.count({ where: { egliseId: e.id, actif: true } }),
+            prisma.departement.count({ where: { egliseId: e.id } }),
+            prisma.pointage.count({ where: { jour: auj, ouvrier: { egliseId: e.id } } }),
+          ]);
+          return { id: e.id, code: e.code, nom: e.nom, estSiege: e.estSiege, ouvriersActifs, departements: nbDepartements, presentsAuj };
+        })
+    );
 
     const parDate = new Map(
       groupes.map((g) => [g.jour.toISOString().slice(0, 10), g._count._all])
@@ -149,8 +193,10 @@ router.get("/stats", async (req, res) => {
       ouvriers: { total, actifs, desactives: total - actifs },
       departements,
       presentsAuj: pointagesAuj.length,
+      visiteursAuj: pointagesAuj.filter((p) => p.visiteur).length,
       parJour,
       pointagesAuj,
+      parEglise,
     });
   } catch (err) {
     logger.error("[POINTAGES/STATS]", err);
@@ -164,7 +210,7 @@ function csvValeur(v) {
 }
 
 /**
- * GET /api/pointages/export?du=YYYY-MM-DD&au=YYYY-MM-DD[&ouvrierId=uuid]
+ * GET /api/pointages/export?du=YYYY-MM-DD&au=YYYY-MM-DD[&ouvrierId=uuid][&egliseId=uuid][&lieuId=uuid]
  * PROTÉGÉ : ADMIN ou SUPER_ADMIN (un LECTEUR consulte, il n'extrait pas).
  * CSV (séparateur « ; », UTF-8 avec BOM pour Excel) de TOUTE la période
  * filtrée, du plus récent au plus ancien — pas seulement la page affichée.
@@ -185,10 +231,10 @@ router.get("/export", requireRole("ADMIN", "SUPER_ADMIN"), async (req, res) => {
     const pointages = await prisma.pointage.findMany({
       where,
       orderBy: [{ dateHeure: "desc" }],
-      include: { ouvrier: { select: SELECT_OUVRIER } },
+      include: INCLUDE_POINTAGE,
     });
 
-    const entete = ["Date", "Heure", "Matricule", "Nom", "Prénom", "Département(s)"];
+    const entete = ["Date", "Heure", "Matricule", "Nom", "Prénom", "Temple", "Département(s)", "Lieu du pointage"];
     const lignes = pointages.map((p) => {
       const d = new Date(p.dateHeure);
       return [
@@ -197,7 +243,9 @@ router.get("/export", requireRole("ADMIN", "SUPER_ADMIN"), async (req, res) => {
         p.ouvrier?.matricule,
         p.ouvrier?.nom,
         p.ouvrier?.prenom,
+        p.ouvrier?.eglise?.nom,
         (p.ouvrier?.departements ?? []).map((l) => l.departement?.nom).filter(Boolean).join(", "),
+        p.eglise?.nom,
       ]
         .map(csvValeur)
         .join(";");

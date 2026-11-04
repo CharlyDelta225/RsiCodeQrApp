@@ -6,6 +6,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { pageTitles } from "../theme";
 import { usePageMeta } from "../hooks/usePageMeta";
 import { getAdmin, logout, startInactivityWatcher, stopInactivityWatcher } from "../lib/auth";
+import { TempleProvider } from "../lib/temple";
 
 export default function DashboardLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -40,6 +41,7 @@ export default function DashboardLayout() {
 
   return (
     // 100svh : évite que la barre d'adresse mobile ne pousse le contenu.
+    <TempleProvider>
     <div className="flex overflow-hidden" style={{ height: "100svh" }}>
       <Sidebar admin={admin} onDeconnexion={() => setConfirmerDeconnexion(true)} />
       {drawerOpen && (
@@ -75,5 +77,6 @@ export default function DashboardLayout() {
         }}
       />
     </div>
+    </TempleProvider>
   );
 }

@@ -7,6 +7,7 @@ import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Btn from "../ui/Btn";
 import { Field, Input, Select } from "../ui/inputs";
+import { useTemple, paramTemple } from "../lib/temple";
 import { usePagination } from "../lib/pagination";
 
 const POSTES = [
@@ -21,6 +22,7 @@ function libellePoste(valeur) {
 }
 
 export default function MigrationOuvrierPage() {
+  const { egliseId } = useTemple();
   const toast = useToast();
   const [ouvriers, setOuvriers] = useState([]);
   const [departements, setDepartements] = useState([]);
@@ -42,8 +44,8 @@ export default function MigrationOuvrierPage() {
     setErreur(null);
     try {
       const [dataOuvriers, dataDepartements] = await Promise.all([
-        api.getOuvriers({ limit: 2000 }),
-        api.getDepartements({ limit: 100 }),
+        api.getOuvriers({ limit: 2000, ...paramTemple(egliseId) }),
+        api.getDepartements({ limit: 100, ...paramTemple(egliseId) }),
       ]);
       setOuvriers(dataOuvriers.ouvriers || []);
       setDepartements(dataDepartements.departements || []);
@@ -52,7 +54,7 @@ export default function MigrationOuvrierPage() {
     } finally {
       setChargement(false);
     }
-  }, []);
+  }, [egliseId]);
 
   useEffect(() => {
     charger();
@@ -296,7 +298,8 @@ export default function MigrationOuvrierPage() {
                   onChange={(e) => setFormMigration({ ...formMigration, departementId: e.target.value })}
                 >
                   <option value="">Choisir un département…</option>
-                  {departements.map((d) => (
+                  {/* Seulement les départements du temple de l'ouvrier. */}
+                  {departements.filter((d) => d.egliseId === migration.egliseId).map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.nom}
                     </option>

@@ -22,9 +22,69 @@ versionnant la date de changement.
 
 ---
 
+## 0. Temples (églises locales)
+
+Trois temples : **Temple SHALOM** (siège, code `SHALOM`), **Temple ADJAHUI**
+(`ADJAHUI`) et **Temple de 4 CROIX** (`QUATRE_CROIX`). Identifiants fixes
+`eglise-shalom`, `eglise-adjahui`, `eglise-quatre-croix` (migration
+`20261104120000_temples`).
+
+Règles :
+- un **département** appartient à un seul temple ; son nom est unique **par temple**
+  (« CHORALE » peut exister à SHALOM et à ADJAHUI) ;
+- un **ouvrier** appartient à un seul temple et ne rejoint que les départements
+  de ce temple (sinon `409 EGLISE_DIFFERENTE`) ;
+- un **pointage** garde le temple où il a été fait (`egliseId` = lieu du terminal).
+  Lieu ≠ temple de l'ouvrier → `visiteur: true` ;
+- toute écriture sans temple précisé (ouvrier, département, import, ancien
+  terminal) va au **siège**.
+
+Partout où l'on attend un temple (`egliseId`, `temple`, colonne « Temple »),
+l'id, le code ou le nom sont acceptés, sans tenir compte de la casse ni des
+accents (« 4 croix », « QUATRE_CROIX » et « Temple de 4 CROIX » désignent le même temple).
+
+### `GET /api/eglises/public` (PUBLIC)
+`{ ok, eglises: [{ code, nom, estSiege }] }` — temples actifs, pour le terminal.
+
+### `GET /api/eglises` (tout rôle authentifié)
+`{ ok, eglises: [{ id, code, nom, estSiege, actif, createdAt, ouvriers, ouvriersActifs, departements, presentsAuj }] }`
+
+### `POST /api/eglises` (**SUPER_ADMIN**)
+Body `{ nom, code? }` (code déduit du nom si absent). `409 EGLISE_EXISTANTE` si le nom ou le code est déjà pris.
+
+### `PATCH /api/eglises/:id` (**SUPER_ADMIN**)
+Body `{ nom?, actif?, estSiege? }`. Le code ne change pas (il figure dans le lien
+des terminaux). Un seul siège ; le siège ne peut pas être désactivé
+(`400 SIEGE_INDESACTIVABLE`).
+
+### `PATCH /api/ouvriers/:id/transferer` (**ADMIN/SUPER_ADMIN**)
+Body `{ egliseId }`. Change le temple de l'ouvrier et retire, dans la même
+transaction, ses affectations aux départements de l'ancien temple. Les pointages
+sont conservés. Réponse : `{ ok, ouvrier, departementsRetires: ["CHORALE", …] }`.
+
+### Filtres et champs ajoutés
+- `GET /api/ouvriers`, `GET /api/ouvriers/badges/zip`, `GET /api/departements` : `?egliseId=` ;
+  chaque élément renvoie `egliseId` et `eglise { id, code, nom, estSiege }`.
+- `POST /api/ouvriers`, `POST /api/departements` : `egliseId` facultatif (siège par défaut).
+- `GET /api/pointages`, `/export` : `?egliseId=` (temple de l'ouvrier), `?lieuId=` (lieu du
+  badgeage) ; chaque pointage renvoie `eglise` (lieu) et `visiteur`. Le CSV ajoute
+  les colonnes « Temple » et « Lieu du pointage ».
+- `GET /api/pointages/stats` : `?egliseId=` restreint tous les chiffres à ce temple ;
+  ajoute `visiteursAuj` et `parEglise: [{ id, code, nom, estSiege, ouvriersActifs, departements, presentsAuj }]`.
+- `GET /api/rapports/journalier` : `?egliseId=` ; chaque département porte `eglise`,
+  chaque ligne `lieu` et `visiteur`, et `recapParEglise` donne les totaux
+  (personnes distinctes) par temple. Les PDF indiquent le temple.
+- `POST /api/ouvriers/import` : colonne facultative **Temple** ; sinon champ de
+  formulaire `egliseId` ; sinon siège. Le département est cherché dans le temple de
+  la ligne (`DEPARTEMENT_INCONNU` sinon) ; temple inconnu → `400 TEMPLE_INCONNU`.
+
+---
+
 ## 1. Badgeage (PUBLIC — utilisé par le terminal)
 
 ### `POST /api/badgeage`
+
+> Depuis le 2026-11-04 : body `{ "matricule": "…", "temple": "ADJAHUI" }` — voir la section 0 (Temples) pour la réponse enrichie.
 
 Appelé à chaque scan du QR par le terminal.
 
@@ -676,6 +736,7 @@ CRON_SECRET=secret-partage-pour-la-route-cron
 
 | Date | Changement |
 |---|---|
+| 2026-11-04 | **Temples** : table `Eglise` (SHALOM siège, ADJAHUI, 4 CROIX) ; `egliseId` sur `Departement`, `Ouvrier` et `Pointage` (lieu du badgeage). Toutes les données existantes sont rattachées au siège SHALOM. Le nom d'un département devient unique **par temple**. Nouvelles routes `GET /api/eglises/public`, `GET/POST/PATCH /api/eglises`, `PATCH /api/ouvriers/:id/transferer`. `POST /api/badgeage` accepte `temple` (code du terminal, siège si absent ; `400 TEMPLE_INCONNU` si inconnu) et renvoie `ouvrier.eglise`, `ouvrier.departements[]` (tous), `lieu`, `visiteur`, `heure`. Filtres `egliseId` (et `lieuId` pour les pointages) sur ouvriers, départements, pointages, stats, export et rapport ; colonne « Temple » à l'import. Voir la section 0 |
 | 2026-10-29 | **Corrections de l'audit (lot 2)** : nouvelles routes `GET /api/pointages/stats` (indicateurs du tableau de bord calculés en base) et `GET /api/pointages/export` (CSV de toute la période, ADMIN/SUPER_ADMIN) ; `GET /api/pointages` accepte `jourSemaine` et `ordre=date` ; `limit` max passe de 200 à **2000** sur `GET /api/ouvriers` et `GET /api/pointages`. `recap` du rapport journalier = personnes distinctes. En-têtes de sécurité sur toutes les réponses (`nosniff`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy`), `X-Powered-By` retiré. Une adresse inconnue du dashboard renvoie la page « introuvable » avec un statut **404** (et non 200) |
 | 2026-10-24 | **Inscription en attente de validation** : `POST /api/auth/register` crée désormais le compte **inactif** (`actif: false`). Un `SUPER_ADMIN` doit l'activer (`PATCH /api/admins/:id/activer`) avant toute connexion ; avant activation, le login renvoie `403 COMPTE_DESACTIVE`. Un inscrit anonyme ne peut donc plus lire les données personnelles des ouvriers |
 | 2026-09-15 | **Message « déjà badgé » simplifié** : `409 DEJA_BADGE_AUJOURDHUI` ne renvoie plus l'heure UTC du premier badgeage ; message fixe **« Vous avez déjà badgé »** (terminal plus simple à lire) |

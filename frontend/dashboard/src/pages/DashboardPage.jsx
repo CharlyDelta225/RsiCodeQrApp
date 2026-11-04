@@ -29,6 +29,49 @@ import { getAdmin } from "../lib/auth";
 import KpiCard from "../components/KpiCard";
 import Btn from "../ui/Btn";
 import Spinner from "../ui/Spinner";
+import Pill from "../ui/Pill";
+import { useTemple, TemplePill } from "../lib/temple";
+
+const COULEUR_TEMPLE = { SHALOM: "#7B1515", ADJAHUI: "#0369a1", QUATRE_CROIX: "#047857" };
+
+/** Une carte par temple : présents du jour / badges actifs. Cliquer filtre le tableau de bord. */
+function CartesTemples({ temples, egliseId, onChoisir }) {
+  if (!temples || temples.length < 2) return null;
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {temples.map((t) => {
+        const pct = t.ouvriersActifs > 0 ? Math.round((t.presentsAuj / t.ouvriersActifs) * 100) : 0;
+        const actif = egliseId === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onChoisir(actif ? "" : t.id)}
+            aria-pressed={actif}
+            className={`text-left bg-white border rounded-xl p-3 space-y-2 transition ${
+              actif ? "border-gold-400 ring-2 ring-gold-200" : "border-slate-200 hover:border-bordeaux-200"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <TemplePill eglise={t} />
+              {t.estSiege && <Pill tonalite="or">siège</Pill>}
+            </div>
+            <div className="flex items-baseline justify-between text-xs text-slate-500">
+              <span>Présents aujourd'hui</span>
+              <span className="text-sm font-semibold text-slate-800 tabular-nums">
+                {t.presentsAuj} / {t.ouvriersActifs}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: COULEUR_TEMPLE[t.code] || "#B08612" }} />
+            </div>
+            <p className="text-[11px] text-slate-500">{t.departements} département(s)</p>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 const JOURS_COURTS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 // Palette harmonisée sur l'identité RSI (bordeaux → or → ambre, neutres chauds)
@@ -106,6 +149,8 @@ function EchelleSelector({ echelle, onEchelle }) {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { egliseId, setEgliseId } = useTemple();
+  const [parEglise, setParEglise] = useState([]);
 
   const [stats, setStats] = useState(null);
   const [parJourBrut, setParJourBrut] = useState([]);
@@ -141,7 +186,7 @@ export default function DashboardPage() {
           // Une seule requête : les compteurs et les séries sont calculés en
           // base, sans la troncature des listes paginées.
           api
-            .getStatsTableauDeBord(echelle === "30" ? 30 : 7)
+            .getStatsTableauDeBord(echelle === "30" ? 30 : 7, egliseId)
             .then((vals) => {
               clearTimeout(timer);
               resolve(vals);
@@ -156,12 +201,14 @@ export default function DashboardPage() {
 
         setParJourBrut(data.parJour || []);
         setPointagesAuj(data.pointagesAuj || []);
+        setParEglise(data.parEglise || []);
         const nouvellesStats = {
           total: data.ouvriers.total,
           actifs: data.ouvriers.actifs,
           desactives: data.ouvriers.desactives,
           departements: data.departements,
           presentsAuj: data.presentsAuj,
+          visiteursAuj: data.visiteursAuj ?? 0,
         };
         statsRef.current = nouvellesStats;
         setStats(nouvellesStats);
@@ -178,7 +225,7 @@ export default function DashboardPage() {
         if (statsRef.current !== null && !calme) setChargement(false);
       }
     },
-    [echelle]
+    [echelle, egliseId]
   );
 
   useEffect(() => {
@@ -351,6 +398,13 @@ export default function DashboardPage() {
           onClick={() => navigate("/departements")}
         />
       </div>
+
+      <CartesTemples temples={parEglise} egliseId={egliseId} onChoisir={setEgliseId} />
+      {stats?.visiteursAuj > 0 && (
+        <p className="text-xs text-amber-800">
+          {stats.visiteursAuj} ouvrier(s) ont badgé aujourd'hui dans un autre temple que le leur.
+        </p>
+      )}
 
       {chargement && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

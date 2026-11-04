@@ -7,6 +7,7 @@ import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Btn from "../ui/Btn";
 import { Field, Input, Select } from "../ui/inputs";
+import { useTemple, TemplePill, LieuPill, paramTemple } from "../lib/temple";
 
 const INTERVALLE_ACTUALISATION_MS = 15000;
 
@@ -33,6 +34,7 @@ export default function PointagesJourPage() {
   const [erreur, setErreur] = useState(null);
   const [derniereMaj, setDerniereMaj] = useState(null);
   const premierChargement = useRef(true);
+  const { egliseId } = useTemple();
 
   const [du, setDu] = useState(dateDuJour(0));
   const [au, setAu] = useState(dateDuJour(0));
@@ -43,18 +45,18 @@ export default function PointagesJourPage() {
 
   useEffect(() => {
     api
-      .getOuvriers({ limit: 2000 })
+      .getOuvriers({ limit: 2000, ...paramTemple(egliseId) })
       .then((data) => setOuvriers(data.ouvriers))
       .catch(() =>
         setErreur("La liste des ouvriers du filtre n'a pas pu être chargée. Actualisez la page.")
       );
-  }, []);
+  }, [egliseId]);
 
   const charger = useCallback(async () => {
     if (premierChargement.current) setChargement(true);
     setErreur(null);
     try {
-      const params = { du, au, limit: 2000 };
+      const params = { du, au, limit: 2000, ...paramTemple(egliseId) };
       if (ouvrierId) params.ouvrierId = ouvrierId;
       const data = await api.getPointages(params);
       setPointages(data.pointages);
@@ -66,7 +68,7 @@ export default function PointagesJourPage() {
       setChargement(false);
       premierChargement.current = false;
     }
-  }, [du, au, ouvrierId]);
+  }, [du, au, ouvrierId, egliseId]);
 
   useEffect(() => {
     charger();
@@ -127,7 +129,7 @@ export default function PointagesJourPage() {
       </form>
 
       <TableShell
-        colonnes={["Heure", "Matricule", "Nom", "Prénom", "Département"]}
+        colonnes={["Heure", "Matricule", "Nom", "Prénom", "Temple", "Département", "Lieu du pointage"]}
         chargement={chargement}
         vide="Aucun pointage sur cette période"
       >
@@ -137,7 +139,9 @@ export default function PointagesJourPage() {
             <td className="px-3 py-2 font-mono text-xs">{p.ouvrier?.matricule}</td>
             <td className="px-3 py-2">{p.ouvrier?.nom}</td>
             <td className="px-3 py-2">{p.ouvrier?.prenom}</td>
+            <td className="px-3 py-2"><TemplePill eglise={p.ouvrier?.eglise} /></td>
             <td className="px-3 py-2">{libelleDepartement(p.ouvrier)}</td>
+            <td className="px-3 py-2 text-right"><LieuPill lieu={p.eglise} visiteur={p.visiteur} /></td>
           </tr>
         ))}
       </TableShell>

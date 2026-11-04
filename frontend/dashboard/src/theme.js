@@ -10,6 +10,7 @@ import {
   ArrowRightLeft,
   FileText,
   ShieldCheck,
+  Church,
 } from "lucide-react";
 
 // ─── IDENTITÉ VISUELLE ────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ export const navItems = [
   { path: "/gestion-departements", label: "Gestion départements", icon: Settings2, short: "Gest. dép.", minRole: "ADMIN" },
   { path: "/migration-ouvrier", label: "Migration ouvrier", icon: ArrowRightLeft, short: "Migration", minRole: "ADMIN" },
   { path: "/rapports", label: "Rapport de pointage", icon: FileText, short: "Rapport" },
+  { path: "/temples", label: "Temples", icon: Church, short: "Temples", minRole: "SUPER_ADMIN" },
   { path: "/gestion-admins", label: "Gestion admins", icon: ShieldCheck, short: "Comptes", minRole: "SUPER_ADMIN" },
 ];
 
@@ -56,4 +58,5 @@ export const pageTitles = {
   "/migration-ouvrier": { title: "Migration ouvrier", subtitle: "Affecter aux départements" },
   "/rapports": { title: "Rapport de pointage", subtitle: "Filtrer · Exporter · Envoyer" },
   "/gestion-admins": { title: "Gestion des comptes", subtitle: "Créer · Rôles · Accès" },
+  "/temples": { title: "Temples", subtitle: "SHALOM · ADJAHUI · 4 CROIX · terminaux" },
 };

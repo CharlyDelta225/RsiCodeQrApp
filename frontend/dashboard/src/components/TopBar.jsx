@@ -1,5 +1,6 @@
 import { Calendar, LogOut } from "lucide-react";
 import { C } from "../theme";
+import { TempleSelector } from "../lib/temple";
 
 function initials(admin) {
   const complet = [admin?.prenom, admin?.nom].filter(Boolean).join(" ").trim();
@@ -39,6 +40,9 @@ export default function TopBar({ title, subtitle, onMenuToggle, onDeconnexion, a
         </h1>
         {subtitle && <p className="text-[10px] text-slate-500 hidden sm:block truncate">{subtitle}</p>}
       </div>
+
+      {/* Temple affiché : filtre toutes les pages. */}
+      <TempleSelector className="flex-shrink-0" />
 
       {/* Date : affichée une seule fois, ici (la page ne la répète plus). */}
       <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 flex-shrink-0">

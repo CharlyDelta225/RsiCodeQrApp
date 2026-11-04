@@ -3,6 +3,7 @@ import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
 import prisma from "../lib/prisma.js";
 import { ipReelle } from "../lib/ip.js";
+import { listerEglises, trouverEglise, EGLISE_SIEGE_ID, SELECT_EGLISE } from "../lib/eglises.js";
 
 const router = Router();
 
@@ -33,13 +34,30 @@ router.post("/", limiterBadgeage, async (req, res) => {
       });
     }
 
+    // 0. Temple du terminal (lieu du badgeage). Le terminal envoie son code
+    //    (« temple »). Absent → siège : un terminal non mis à jour continue
+    //    de badger au siège. Code inconnu ou temple désactivé → refus.
+    const eglises = await listerEglises();
+    const codeTemple = String(req.body?.temple ?? "").trim();
+    const lieu = codeTemple
+      ? trouverEglise(codeTemple, eglises)
+      : eglises.find((e) => e.id === EGLISE_SIEGE_ID) ?? eglises.find((e) => e.estSiege);
+    if (!lieu || !lieu.actif) {
+      return res.status(400).json({
+        ok: false,
+        code: "TEMPLE_INCONNU",
+        message: "Temple du terminal inconnu. Choisissez à nouveau le temple de ce terminal.",
+      });
+    }
+
     // 1. Recherche de l'ouvrier par son matricule (unique en base)
     const ouvrier = await prisma.ouvrier.findUnique({
       where: { matricule },
       include: {
+        eglise: { select: SELECT_EGLISE },
         departements: {
           include: { departement: { select: { id: true, nom: true } } },
-          take: 1,
+          orderBy: { departement: { nom: "asc" } },
         },
       },
     });
@@ -89,6 +107,7 @@ router.post("/", limiterBadgeage, async (req, res) => {
           ouvrierId: ouvrier.id,
           dateHeure: new Date(),
           jour,
+          egliseId: lieu.id,
         },
       });
     } catch (err) {
@@ -102,7 +121,10 @@ router.post("/", limiterBadgeage, async (req, res) => {
       throw err;
     }
 
-    // 5. Réponse au terminal : uniquement les infos nécessaires à l'affichage
+    // 5. Réponse au terminal : uniquement les infos nécessaires à l'affichage.
+    //    `departement` (texte) reste pour les terminaux pas encore mis à jour.
+    const departements = ouvrier.departements.map((l) => l.departement?.nom).filter(Boolean);
+    const libelle = (e) => (e ? { code: e.code, nom: e.nom, estSiege: e.estSiege } : null);
     return res.status(200).json({
       ok: true,
       ouvrier: {
@@ -110,8 +132,13 @@ router.post("/", limiterBadgeage, async (req, res) => {
         matricule: ouvrier.matricule,
         nom: ouvrier.nom,
         prenom: ouvrier.prenom,
-        departement: ouvrier.departements[0]?.departement?.nom ?? null,
+        departement: departements.join(", ") || null,
+        departements,
+        eglise: libelle(ouvrier.eglise),
       },
+      lieu: libelle(lieu),
+      visiteur: ouvrier.egliseId !== lieu.id,
+      heure: new Date().toISOString(),
     });
   } catch (err) {
     logger.error("[BADGEAGE]", err);

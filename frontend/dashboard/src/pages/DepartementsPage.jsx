@@ -15,6 +15,7 @@ import Modal from "../ui/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { Field, Select, Input } from "../ui/inputs";
 import { C } from "../theme";
+import { useTemple, paramTemple } from "../lib/temple";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -89,6 +90,7 @@ function csvValeur(v) {
 }
 
 export default function DepartementsPage() {
+  const { egliseId } = useTemple();
   const toast = useToast();
   const [departements, setDepartements] = useState([]);
   const [total, setTotal] = useState(0);
@@ -122,16 +124,19 @@ export default function DepartementsPage() {
     setChargement(true);
     setErreur(null);
     try {
-      const data = await api.getDepartements({ limit: 100 });
+      const data = await api.getDepartements({ limit: 100, ...paramTemple(egliseId) });
       setDepartements(data.departements || []);
       setTotal(data.total);
-      setSelectedId((prev) => prev || data.departements?.[0]?.id || "");
+      // Le département sélectionné doit appartenir au temple affiché.
+      setSelectedId((prev) =>
+        data.departements?.some((d) => d.id === prev) ? prev : data.departements?.[0]?.id || ""
+      );
     } catch (err) {
       setErreur(err instanceof ApiError ? err.message : "Erreur de chargement");
     } finally {
       setChargement(false);
     }
-  }, []);
+  }, [egliseId]);
 
   useEffect(() => {
     chargerDepartements();
