@@ -1,6 +1,7 @@
 import logger from "../lib/logger.js";
 import { Router } from "express";
 import prisma from "../lib/prisma.js";
+import { normaliserCouleur } from "./badges.routes.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 import {
@@ -212,6 +213,13 @@ router.patch("/:id", ECRITURE, async (req, res) => {
     const donnees = {};
     if (req.body.nom !== undefined) donnees.nom = normaliserNom(req.body.nom);
     if (req.body.description !== undefined) donnees.description = String(req.body.description).trim() || null;
+    if (req.body.couleur !== undefined) {
+      const couleur = normaliserCouleur(req.body.couleur);
+      if (couleur === undefined) {
+        return res.status(400).json({ ok: false, code: "COULEUR_INVALIDE", message: "Couleur attendue au format #RRGGBB" });
+      }
+      donnees.couleur = couleur;
+    }
 
     if (Object.keys(donnees).length === 0) {
       return res.status(400).json({ ok: false, code: "AUCUNE_DONNEE", message: "Aucune donnée à mettre à jour" });

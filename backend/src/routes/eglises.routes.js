@@ -110,7 +110,7 @@ router.post("/", SUPER, async (req, res) => {
 
 /**
  * PATCH /api/eglises/:id (SUPER_ADMIN)
- * Body : { nom?, actif?, estSiege? }. Le code ne change pas (il est imprimé
+ * Body : { nom?, actif?, estSiege?, libelleCarte? } (libelleCarte = district imprimé sur les cartes). Le code ne change pas (il est imprimé
  * dans l'URL des terminaux). Un seul siège : en désigner un retire l'autre.
  * Le siège ne peut pas être désactivé.
  */
@@ -130,6 +130,9 @@ router.patch("/:id", SUPER, async (req, res) => {
       donnees.nom = nom;
     }
     if (req.body?.actif !== undefined) donnees.actif = Boolean(req.body.actif);
+    if (req.body?.libelleCarte !== undefined) {
+      donnees.libelleCarte = String(req.body.libelleCarte ?? "").trim().toUpperCase().slice(0, 40) || null;
+    }
     const devientSiege = req.body?.estSiege === true && !eglise.estSiege;
     const siegeFinal = devientSiege || (eglise.estSiege && req.body?.estSiege !== false);
     if (donnees.actif === false && siegeFinal) {

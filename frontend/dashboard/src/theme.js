@@ -50,7 +50,7 @@ export const pageTitles = {
   "/": { title: "Tableau de bord", subtitle: "RsiCodeQrApp · Présence" },
   "/ouvriers": { title: "Ouvriers", subtitle: "Gestion du personnel" },
   "/badges": { title: "Badges QR", subtitle: "Génération et impression" },
-  "/badges/atelier": { title: "Atelier badges", subtitle: "Recto · Verso · Impression ID-1" },
+  "/badges/atelier": { title: "Atelier badges", subtitle: "Carte du département · recto et verso" },
   "/pointages": { title: "Pointages du jour", subtitle: "Suivi en temps réel" },
   "/historique": { title: "Historique", subtitle: "Filtrable · Exportable" },
   "/departements": { title: "Départements", subtitle: "Membres et postes" },

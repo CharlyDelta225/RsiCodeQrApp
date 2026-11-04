@@ -15,6 +15,7 @@ import departementsRoutes from "./routes/departements.routes.js";
 import rapportsRoutes from "./routes/rapports.routes.js";
 import cronRoutes from "./routes/cron.routes.js";
 import eglisesRoutes, { routeurPublic as eglisesPublicRoutes } from "./routes/eglises.routes.js";
+import badgesRoutes from "./routes/badges.routes.js";
 import logger from "./lib/logger.js";
 
 dotenv.config();
@@ -182,6 +183,9 @@ app.use("/api/departements", requireAuth, departementsRoutes);
 // Temples : liste publique (terminal) puis gestion — PROTÉGÉ (écriture SUPER_ADMIN)
 app.use("/api/eglises/public", eglisesPublicRoutes);
 app.use("/api/eglises", requireAuth, eglisesRoutes);
+
+// Atelier des cartes de badge (données de carte, photos, suivi)
+app.use("/api/badges", requireAuth, badgesRoutes);
 
 // Rapports de pointage + envoi programmé — PROTÉGÉ (ADMIN/SUPER_ADMIN)
 app.use("/api/rapports", requireAuth, rapportsRoutes);

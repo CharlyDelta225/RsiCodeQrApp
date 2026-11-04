@@ -175,6 +175,24 @@ export const api = {
   deleteDepartement: (id) => request(`/api/departements/${id}`, { method: "DELETE" }),
 
   // Temples : liste avec compteurs (tous rôles) ; écriture SUPER_ADMIN.
+  // Atelier des cartes de badge
+  getBadgeCarte: (ouvrierId) => request(`/api/badges/carte/${ouvrierId}`),
+  getBadgePhotoBlob: (ouvrierId) => request(`/api/badges/photo/${ouvrierId}`),
+  envoyerBadgePhoto: (ouvrierId, blob) =>
+    request(`/api/badges/photo/${ouvrierId}`, { method: "POST", body: blob, headers: { "Content-Type": blob.type } }),
+  supprimerBadgePhoto: (ouvrierId) => request(`/api/badges/photo/${ouvrierId}`, { method: "DELETE" }),
+  majFonctionCarte: (ouvrierId, departementId, fonctionCarte) =>
+    request(`/api/badges/fonction/${ouvrierId}/${departementId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ fonctionCarte }),
+    }),
+  marquerBadgeConfectionne: (ouvrierId, departementId) =>
+    request("/api/badges/confectionnes", { method: "POST", body: JSON.stringify({ ouvrierId, departementId }) }),
+  getBadgesAConfectionner: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/badges/a-confectionner${qs ? `?${qs}` : ""}`);
+  },
+
   getEglises: () => request("/api/eglises"),
   createEglise: (data) => request("/api/eglises", { method: "POST", body: JSON.stringify(data) }),
   updateEglise: (id, data) => request(`/api/eglises/${id}`, { method: "PATCH", body: JSON.stringify(data) }),

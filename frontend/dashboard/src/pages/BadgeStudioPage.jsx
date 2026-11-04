@@ -1,549 +1,728 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Pencil, Printer } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, ArrowRight, Camera, Check, Download, Palette, Printer, Search, Trash2 } from "lucide-react";
+import { api, ApiError } from "../lib/api";
+import { getAdmin } from "../lib/auth";
+import { useTemple, paramTemple, TemplePill } from "../lib/temple";
+import { useToast } from "../components/Toast";
 import Card from "../ui/Card";
 import Btn from "../ui/Btn";
 import Pill from "../ui/Pill";
 import { Field, Input, Select } from "../ui/inputs";
-import BadgePreview from "../features/badges/components/BadgePreview";
-import BadgeCapture from "../features/badges/components/BadgeCapture";
-import BadgePrintSheet, {
-  BADGE_PRINT_MODES,
-} from "../features/badges/components/BadgePrintSheet";
-import { useBadgeQr } from "../features/badges/useBadgeQr";
-import { chargerMembres } from "../features/badges/badgeService";
-import {
-  initiales,
-  nomComplet,
-  valeurQr,
-} from "../features/badges/badgeAdapter";
-import { telechargerBadgePng } from "../features/badges/downloadUtils";
+import { genererCarte, couleurValide, nomCarte, COULEUR_MODELE } from "../features/badges/carte";
+import { preparerPhoto } from "../features/badges/carte/photo";
+import "../features/badges/carte/carte.css";
 
-async function attendreImages() {
-  const images = Array.from(
-    document.querySelectorAll("#badge-print-root img")
+// ==============================
+// Atelier des cartes de badge
+//
+// On tape le nom de l'ouvrier : sa carte s'affiche remplie (nom, fonction,
+// matricule, district, département et sa couleur). On ajoute la photo, puis
+// on imprime ou on télécharge. Les couleurs des départements se fixent dans
+// l'onglet « Couleurs ».
+// ==============================
+
+const peutEcrire = () => ["ADMIN", "SUPER_ADMIN"].includes(getAdmin()?.role);
+const message = (err, defaut) => (err instanceof ApiError ? err.message : err?.message || defaut);
+
+function telecharger(canvas, nom) {
+  return new Promise((ok) =>
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nom;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      ok();
+    }, "image/png")
   );
-
-  await Promise.all(
-    images.map((image) => {
-      if (image.complete) return Promise.resolve();
-      return new Promise((resolve) => {
-        image.onload = resolve;
-        image.onerror = resolve;
-      });
-    })
-  );
-
-  if (document.fonts?.ready) {
-    await document.fonts.ready;
-  }
 }
 
-/** Ligne de la fiche en lecture seule (aucune donnée inventée). */
-function LigneInfo({ label, valeur }) {
+const nomFichier = (o, dep, face) =>
+  `${o.matricule}_${o.nom}_${dep}_${face}`.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "_") + ".png";
+
+function dateCourte(d) {
+  return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// ---------- Recherche ----------
+
+function Recherche({ onChoisir, egliseId }) {
+  const [texte, setTexte] = useState("");
+  const [resultats, setResultats] = useState([]);
+  const [chargement, setChargement] = useState(false);
+  const [ouvert, setOuvert] = useState(false);
+  const [actif, setActif] = useState(0);
+
+  useEffect(() => {
+    const t = texte.trim();
+    if (t.length < 2) {
+      setResultats([]);
+      return undefined;
+    }
+    setChargement(true);
+    const minuterie = setTimeout(() => {
+      api
+        .getOuvriers({ recherche: t, limit: 12, ...paramTemple(egliseId) })
+        .then((d) => {
+          setResultats(d.ouvriers || []);
+          setActif(0);
+        })
+        .catch(() => setResultats([]))
+        .finally(() => setChargement(false));
+    }, 220);
+    return () => clearTimeout(minuterie);
+  }, [texte, egliseId]);
+
+  function choisir(o) {
+    onChoisir(o.id);
+    setTexte("");
+    setOuvert(false);
+  }
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </dt>
-      <dd className="mt-0.5 truncate text-sm text-slate-800" title={valeur || undefined}>
-        {valeur || "—"}
-      </dd>
+    <div className="relative">
+      <label htmlFor="recherche-ouvrier" className="sr-only">Rechercher un ouvrier</label>
+      <div className="flex items-center gap-2 rounded-xl border-2 border-bordeaux-600 bg-white px-3 py-2.5 focus-within:ring-2 focus-within:ring-bordeaux-200">
+        <Search size={18} className="text-bordeaux-700 shrink-0" aria-hidden="true" />
+        <input
+          id="recherche-ouvrier"
+          value={texte}
+          onChange={(e) => {
+            setTexte(e.target.value);
+            setOuvert(true);
+          }}
+          onFocus={() => setOuvert(true)}
+          onBlur={() => setTimeout(() => setOuvert(false), 150)}
+          onKeyDown={(e) => {
+            if (!resultats.length) return;
+            if (e.key === "ArrowDown") { e.preventDefault(); setActif((i) => Math.min(i + 1, resultats.length - 1)); }
+            if (e.key === "ArrowUp") { e.preventDefault(); setActif((i) => Math.max(i - 1, 0)); }
+            if (e.key === "Enter") { e.preventDefault(); choisir(resultats[actif]); }
+          }}
+          placeholder="Tapez le nom, le prénom ou le matricule de l'ouvrier…"
+          autoComplete="off"
+          className="w-full bg-transparent text-[15px] text-slate-800 placeholder:text-slate-500 focus:outline-none"
+          role="combobox"
+          aria-expanded={ouvert && resultats.length > 0}
+          aria-controls="suggestions-ouvriers"
+        />
+      </div>
+      {ouvert && texte.trim().length >= 2 && (
+        <ul
+          id="suggestions-ouvriers"
+          role="listbox"
+          className="absolute z-20 mt-1 w-full max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg"
+        >
+          {chargement && resultats.length === 0 && <li className="px-3 py-3 text-xs text-slate-500">Recherche…</li>}
+          {!chargement && resultats.length === 0 && (
+            <li className="px-3 py-3 text-xs text-slate-500">Aucun ouvrier ne correspond à « {texte.trim()} ».</li>
+          )}
+          {resultats.map((o, i) => (
+            <li
+              key={o.id}
+              role="option"
+              aria-selected={i === actif}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                choisir(o);
+              }}
+              onMouseEnter={() => setActif(i)}
+              className={`flex items-center gap-3 px-3 py-2 cursor-pointer border-t border-slate-100 first:border-t-0 ${i === actif ? "bg-bordeaux-50" : ""}`}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-bordeaux-700 to-gold-600 text-[11px] font-bold text-white">
+                {`${(o.prenom || "")[0] || ""}${(o.nom || "")[0] || ""}`.toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-slate-800">{o.nom} {o.prenom}</span>
+                <span className="block truncate text-[11px] text-slate-500">
+                  {o.matricule} · {(o.departements || []).map((d) => d.departement?.nom || d.nom).filter(Boolean).join(", ") || "sans département"}
+                </span>
+              </span>
+              <TemplePill eglise={o.eglise} />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-export default function BadgeStudioPage() {
-  const navigate = useNavigate();
+// ---------- Onglet Confectionner ----------
 
-  const [membres, setMembres] = useState([]);
-  const [chargement, setChargement] = useState(true);
-  const [erreur, setErreur] = useState(null);
-  const [rechargement, setRechargement] = useState(0);
-  const [recherche, setRecherche] = useState("");
-  const [selectionId, setSelectionId] = useState(null);
-  const [face, setFace] = useState("recto");
-  const [modeImpression, setModeImpression] = useState(
-    BADGE_PRINT_MODES.PLANCHE
-  );
-  const [impression, setImpression] = useState(false);
-  const [telechargement, setTelechargement] = useState({ recto: false, verso: false });
-  const [message, setMessage] = useState(null);
-  const refCaptureRecto = useRef(null);
-  const refCaptureVerso = useRef(null);
+function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, allerAuxCouleurs }) {
+  const toast = useToast();
+  const { egliseId } = useTemple();
+  const ecriture = peutEcrire();
+  const [carte, setCarte] = useState(null);
+  const [chargement, setChargement] = useState(false);
+  const [departementId, setDepartementId] = useState("");
+  const [fonction, setFonction] = useState("");
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const [envoiPhoto, setEnvoiPhoto] = useState(false);
+  const [rendu, setRendu] = useState(null); // { recto, verso } canvases
+  const [apercus, setApercus] = useState(null); // { recto, verso } data URLs
+  const [enCours, setEnCours] = useState("");
+  const [glisser, setGlisser] = useState(false);
+  const champPhoto = useRef(null);
 
-  // L'atelier travaille uniquement sur les ouvriers réels de l'API.
-  useEffect(() => {
-    let actif = true;
-
+  const charger = useCallback(async (id) => {
     setChargement(true);
-    setErreur(null);
-    setMembres([]);
-    setSelectionId(null);
-
-    chargerMembres()
-      .then((liste) => {
-        if (!actif) return;
-        setMembres(liste);
-        setSelectionId((precedent) => {
-          if (precedent && liste.some((m) => m.id === precedent)) {
-            return precedent;
-          }
-          return liste[0]?.id ?? null;
-        });
-      })
-      .catch((err) => {
-        if (!actif) return;
-        setErreur(
-          err?.message || "Impossible de charger la liste des ouvriers."
-        );
-      })
-      .finally(() => {
-        if (actif) setChargement(false);
+    try {
+      const { carte: c } = await api.getBadgeCarte(id);
+      setCarte(c);
+      setDepartementId((prec) => (c.departements.some((d) => d.id === prec) ? prec : c.departements[0]?.id || ""));
+      let url = null;
+      if (c.aPhoto) {
+        try {
+          url = URL.createObjectURL(await api.getBadgePhotoBlob(id));
+        } catch {
+          url = null;
+        }
+      }
+      setPhotoUrl((ancienne) => {
+        if (ancienne) URL.revokeObjectURL(ancienne);
+        return url;
       });
-
-    return () => {
-      actif = false;
-    };
-  }, [rechargement]);
+    } catch (err) {
+      toast.error("Atelier badges", message(err, "La carte n'a pas pu être chargée."));
+      setCarte(null);
+    } finally {
+      setChargement(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    if (!message) return undefined;
-    const minuteur = setTimeout(() => setMessage(null), 5000);
-    return () => clearTimeout(minuteur);
-  }, [message]);
+    if (ouvrierId) charger(ouvrierId);
+    else setCarte(null);
+  }, [ouvrierId, charger]);
 
+  useEffect(() => () => photoUrl && URL.revokeObjectURL(photoUrl), [photoUrl]);
+
+  const dep = carte?.departements.find((d) => d.id === departementId) || null;
+  useEffect(() => setFonction(dep?.fonction || ""), [dep?.id, dep?.fonction]);
+
+  const couleur = couleurValide(dep?.couleur);
   const membre = useMemo(
-    () => membres.find((m) => m.id === selectionId) ?? null,
-    [membres, selectionId]
+    () =>
+      carte && dep
+        ? {
+            nom: carte.ouvrier.nom,
+            prenom: carte.ouvrier.prenom,
+            matricule: carte.ouvrier.matricule,
+            fonction,
+            district: carte.district,
+            departement: dep.nom,
+            // Sans couleur : carte grise (aperçu seulement, impression bloquée).
+            couleur: couleur || "#8F8585",
+            photo: photoUrl,
+          }
+        : null,
+    [carte, dep, fonction, photoUrl, couleur]
   );
 
-  const { dataUrl: qrDataUrl, erreur: qrErreur } = useBadgeQr(
-    membre ? valeurQr(membre) : ""
-  );
-
-  const membresFiltres = useMemo(() => {
-    const requete = recherche.trim().toLowerCase();
-    if (!requete) return membres;
-
-    return membres.filter((m) =>
-      [m.nom, m.prenom, m.matricule, m.departement, m.fonction]
-        .filter(Boolean)
-        .some((valeur) => String(valeur).toLowerCase().includes(requete))
-    );
-  }, [membres, recherche]);
-
-  function choisirMembre(id) {
-    if (!id || id === selectionId) return;
-    setSelectionId(id);
-    setFace("recto");
-  }
-
-  async function handleImprimer() {
-    setMessage(null);
-
-    if (!membre) return;
-
-    if (!valeurQr(membre)) {
-      setMessage({
-        type: "erreur",
-        texte:
-          "Cet ouvrier n'a pas de matricule : le QR code ne peut pas être généré.",
-      });
-      return;
+  useEffect(() => {
+    let annule = false;
+    if (!membre) {
+      setRendu(null);
+      setApercus(null);
+      return undefined;
     }
+    genererCarte(membre)
+      .then((r) => {
+        if (annule) return;
+        setRendu(r);
+        setApercus({ recto: r.recto.toDataURL("image/png"), verso: r.verso.toDataURL("image/png") });
+      })
+      .catch(() => !annule && toast.error("Atelier badges", "La carte n'a pas pu être dessinée."));
+    return () => {
+      annule = true;
+    };
+  }, [membre, toast]);
 
-    if (!qrDataUrl) {
-      setMessage({
-        type: "erreur",
-        texte:
-          "Le QR code est encore en préparation. Réessayez dans un instant.",
-      });
-      return;
-    }
-
-    setImpression(true);
+  async function enregistrerFonction() {
+    if (!dep || !ecriture) return;
+    const texte = fonction.trim().toUpperCase();
+    if (texte === dep.fonction) return;
     try {
-      await attendreImages();
-      window.print();
-    } finally {
-      setImpression(false);
+      await api.majFonctionCarte(carte.ouvrier.id, dep.id, texte === "" ? "" : texte);
+      await charger(carte.ouvrier.id);
+    } catch (err) {
+      toast.error("Fonction", message(err, "La fonction n'a pas pu être enregistrée."));
     }
   }
 
-  async function handleTelechargerFace(cible) {
-    setMessage(null);
-
-    if (!membre) return;
-
-    if (!valeurQr(membre)) {
-      setMessage({
-        type: "erreur",
-        texte:
-          "Cet ouvrier n'a pas de matricule : le QR code ne peut pas être généré.",
-      });
-      return;
-    }
-
-    if (!qrDataUrl) {
-      setMessage({
-        type: "erreur",
-        texte:
-          "Le QR code est encore en préparation. Réessayez dans un instant.",
-      });
-      return;
-    }
-
-    const ref =
-      cible === "verso" ? refCaptureVerso.current : refCaptureRecto.current;
-
-    if (!ref) {
-      setMessage({
-        type: "erreur",
-        texte: "Élément à capturer introuvable.",
-      });
-      return;
-    }
-
-    setTelechargement((precedent) => ({ ...precedent, [cible]: true }));
+  async function envoyerPhoto(fichier) {
+    if (!fichier || !carte) return;
+    setEnvoiPhoto(true);
     try {
-      await telechargerBadgePng(ref, membre, cible);
-      setMessage({
-        type: "succes",
-        texte: `Badge ${cible} téléchargé en PNG.`,
-      });
-    } catch {
-      setMessage({
-        type: "erreur",
-        texte: "Échec du téléchargement. Réessayez.",
-      });
+      const blob = await preparerPhoto(fichier);
+      await api.envoyerBadgePhoto(carte.ouvrier.id, blob);
+      await charger(carte.ouvrier.id);
+      toast.success("Photo", "Photo enregistrée sur la fiche de l'ouvrier.");
+    } catch (err) {
+      toast.error("Photo", message(err, "La photo n'a pas pu être envoyée."));
     } finally {
-      setTelechargement((precedent) => ({ ...precedent, [cible]: false }));
+      setEnvoiPhoto(false);
+      if (champPhoto.current) champPhoto.current.value = "";
     }
+  }
+
+  async function retirerPhoto() {
+    try {
+      await api.supprimerBadgePhoto(carte.ouvrier.id);
+      await charger(carte.ouvrier.id);
+    } catch (err) {
+      toast.error("Photo", message(err, "La photo n'a pas pu être retirée."));
+    }
+  }
+
+  async function marquer() {
+    try {
+      await api.marquerBadgeConfectionne(carte.ouvrier.id, dep.id);
+      await Promise.all([charger(carte.ouvrier.id), rechargerAFaire()]);
+    } catch (err) {
+      toast.error("Atelier badges", message(err, "La carte n'a pas pu être marquée comme faite."));
+    }
+  }
+
+  async function action(nom, fn) {
+    setEnCours(nom);
+    try {
+      await fn();
+      await marquer();
+    } finally {
+      setEnCours("");
+    }
+  }
+
+  const imprimable = Boolean(rendu && couleur && ecriture);
+  const suivant = aFaire.find((o) => o.id !== ouvrierId);
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+      <div className="space-y-4 min-w-0">
+        <Card title="Ouvrier" description="La carte se remplit avec les informations enregistrées.">
+          <div className="space-y-3">
+            <Recherche onChoisir={setOuvrierId} egliseId={egliseId} />
+            {chargement && <p className="text-xs text-slate-500">Chargement de la carte…</p>}
+            {carte && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{nomCarte(carte.ouvrier)}</p>
+                    <p className="text-[11px] text-slate-500 font-mono">{carte.ouvrier.matricule}</p>
+                  </div>
+                  <TemplePill eglise={carte.eglise} />
+                </div>
+
+                {carte.departements.length === 0 ? (
+                  <p className="text-xs text-bordeaux-700 bg-bordeaux-50 border border-bordeaux-200 rounded-lg px-3 py-2">
+                    Cet ouvrier n'est dans aucun département : ajoutez-le à un département pour faire sa carte.
+                  </p>
+                ) : (
+                  <>
+                    <Field label="Département de la carte">
+                      <Select value={departementId} onChange={(e) => setDepartementId(e.target.value)} disabled={carte.departements.length < 2}>
+                        {carte.departements.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.nom}
+                            {d.confectionneLe ? ` · faite le ${dateCourte(d.confectionneLe)}` : ""}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Fonction affichée" hint="Déduite du rôle dans le département. Modifiable, par exemple « RESPONSABLE ADJOINTE ». Videz le champ pour revenir au rôle.">
+                      <Input
+                        value={fonction}
+                        onChange={(e) => setFonction(e.target.value.toUpperCase())}
+                        onBlur={enregistrerFonction}
+                        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                        disabled={!ecriture}
+                        maxLength={60}
+                      />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-lg border border-slate-200 px-3 py-2">
+                        <p className="text-slate-500">District</p>
+                        <p className="font-semibold text-slate-800">{carte.district}</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 px-3 py-2">
+                        <p className="text-slate-500">Couleur</p>
+                        {couleur ? (
+                          <p className="font-semibold text-slate-800 flex items-center gap-1.5">
+                            <span className="inline-block h-3.5 w-3.5 rounded-full border border-black/10" style={{ background: couleur }} />
+                            {couleur}
+                          </p>
+                        ) : (
+                          <button type="button" onClick={allerAuxCouleurs} className="font-semibold text-amber-700 underline underline-offset-2">
+                            À définir
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {ecriture && (
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setGlisser(true); }}
+                    onDragLeave={() => setGlisser(false)}
+                    onDrop={(e) => { e.preventDefault(); setGlisser(false); envoyerPhoto(e.dataTransfer.files?.[0]); }}
+                    className={`flex items-center gap-3 rounded-xl border-2 border-dashed px-3 py-3 transition ${glisser ? "border-bordeaux-400 bg-bordeaux-50" : "border-slate-300"}`}
+                  >
+                    <Camera size={22} className="text-bordeaux-700 shrink-0" aria-hidden="true" />
+                    <div className="flex-1 min-w-0 text-xs text-slate-600">
+                      <p className="font-medium text-slate-800">{carte.aPhoto ? "Photo enregistrée" : "Ajoutez la photo"}</p>
+                      <p>Glissez une photo ici, ou choisissez un fichier. Elle est recadrée au format du cadre.</p>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Btn size="xs" variant="secondary" loading={envoiPhoto} onClick={() => champPhoto.current?.click()}>
+                        {carte.aPhoto ? "Changer" : "Choisir"}
+                      </Btn>
+                      {carte.aPhoto && (
+                        <Btn size="xs" variant="ghost" icon={<Trash2 size={12} />} onClick={retirerPhoto}>
+                          Retirer
+                        </Btn>
+                      )}
+                    </div>
+                    <input
+                      ref={champPhoto}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="user"
+                      className="hidden"
+                      onChange={(e) => envoyerPhoto(e.target.files?.[0])}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {carte && dep && ecriture && (
+          <Card title="Imprimer ou télécharger" description="Une face par page, au format carte 54 × 85,6 mm.">
+            <div className="space-y-3">
+              {!couleur && (
+                <p className="flex items-start gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    La couleur de {dep.nom} n'est pas encore définie : la carte est grise et ne peut pas être imprimée.{" "}
+                    <button type="button" onClick={allerAuxCouleurs} className="font-semibold underline underline-offset-2">
+                      Définir la couleur
+                    </button>
+                  </span>
+                </p>
+              )}
+              <Btn
+                variant="gold"
+                className="w-full"
+                icon={<Printer size={16} />}
+                disabled={!imprimable}
+                loading={enCours === "impression"}
+                onClick={() => action("impression", () => new Promise((ok) => setTimeout(() => { window.print(); ok(); }, 150)))}
+              >
+                Imprimer recto + verso
+              </Btn>
+              <div className="grid grid-cols-2 gap-2">
+                <Btn
+                  variant="secondary"
+                  size="sm"
+                  icon={<Download size={14} />}
+                  disabled={!imprimable}
+                  loading={enCours === "recto"}
+                  onClick={() => action("recto", () => telecharger(rendu.recto, nomFichier(carte.ouvrier, dep.nom, "recto")))}
+                >
+                  Recto PNG
+                </Btn>
+                <Btn
+                  variant="secondary"
+                  size="sm"
+                  icon={<Download size={14} />}
+                  disabled={!imprimable}
+                  loading={enCours === "verso"}
+                  onClick={() => action("verso", () => telecharger(rendu.verso, nomFichier(carte.ouvrier, dep.nom, "verso")))}
+                >
+                  Verso PNG
+                </Btn>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                À l'impression, choisissez l'échelle <strong>100 %</strong> et désactivez « Ajuster à la page ».
+              </p>
+              {dep.confectionneLe && (
+                <p className="flex items-center gap-1.5 text-xs text-emerald-700">
+                  <Check size={14} aria-hidden="true" /> Carte {dep.nom} faite le {dateCourte(dep.confectionneLe)}
+                </p>
+              )}
+              {suivant && (
+                <Btn variant="primary" className="w-full" icon={<ArrowRight size={16} />} onClick={() => setOuvrierId(suivant.id)}>
+                  Ouvrier suivant : {suivant.nom} {suivant.prenom}
+                </Btn>
+              )}
+            </div>
+          </Card>
+        )}
+      </div>
+
+      <Card title="Aperçu" description="Recto et verso, tels qu'ils seront imprimés." bodyClassName="p-0">
+        <div className="carte-scene rounded-b-xl px-4 py-6">
+          {apercus ? (
+            <div className="flex flex-wrap justify-center gap-6">
+              <figure className="flex flex-col items-center gap-2 w-[min(280px,100%)]">
+                <img src={apercus.recto} alt={`Recto de la carte de ${nomCarte(carte.ouvrier)}`} className="carte-apercu" />
+                <figcaption className="text-[11px] text-slate-500">Recto</figcaption>
+              </figure>
+              <figure className="flex flex-col items-center gap-2 w-[min(280px,100%)]">
+                <img src={apercus.verso} alt="Verso de la carte" className="carte-apercu" />
+                <figcaption className="text-[11px] text-slate-500">Verso</figcaption>
+              </figure>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 py-20 text-center">
+              <Search size={26} className="text-slate-300" aria-hidden="true" />
+              <p className="text-sm font-medium text-slate-700">Cherchez un ouvrier</p>
+              <p className="text-xs text-slate-500 max-w-xs">
+                Sa carte s'affichera ici, déjà remplie avec son nom, sa fonction, son matricule, son district et son département.
+              </p>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {apercus &&
+        createPortal(
+          <div id="carte-impression" aria-hidden="true">
+            <img src={apercus.recto} alt="" />
+            <img src={apercus.verso} alt="" />
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
+// ---------- Onglet À confectionner ----------
+
+function AConfectionner({ aFaire, total, chargement, choisir }) {
+  return (
+    <Card title={`À confectionner · ${total}`} description="Ouvriers actifs qui n'ont encore aucune carte, dans le temple sélectionné.">
+      {chargement ? (
+        <p className="text-xs text-slate-500 py-6 text-center">Chargement…</p>
+      ) : aFaire.length === 0 ? (
+        <p className="text-sm text-slate-500 py-6 text-center">Toutes les cartes sont faites.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {aFaire.map((o) => (
+            <li key={o.id} className="flex items-center gap-3 py-2">
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-slate-800 truncate">{o.nom} {o.prenom}</span>
+                <span className="block text-[11px] text-slate-500 truncate">
+                  {o.matricule} · {o.departements.join(", ") || "sans département"}
+                </span>
+              </span>
+              <Btn size="xs" variant="secondary" onClick={() => choisir(o.id)}>
+                Faire la carte
+              </Btn>
+            </li>
+          ))}
+        </ul>
+      )}
+      {total > aFaire.length && <p className="text-[11px] text-slate-500 mt-2">Les {aFaire.length} premiers sont affichés.</p>}
+    </Card>
+  );
+}
+
+// ---------- Onglet Couleurs ----------
+
+function Couleurs() {
+  const toast = useToast();
+  const { egliseId, actives } = useTemple();
+  const ecriture = peutEcrire();
+  const [departements, setDepartements] = useState([]);
+  const [saisies, setSaisies] = useState({});
+  const [chargement, setChargement] = useState(true);
+  const [enCours, setEnCours] = useState(null);
+
+  const charger = useCallback(() => {
+    setChargement(true);
+    return api
+      .getDepartements({ limit: 200, ...paramTemple(egliseId) })
+      .then((d) => {
+        const liste = d.departements || [];
+        setDepartements(liste);
+        setSaisies(Object.fromEntries(liste.map((x) => [x.id, x.couleur || ""])));
+      })
+      .catch(() => toast.error("Couleurs", "La liste des départements n'a pas pu être chargée."))
+      .finally(() => setChargement(false));
+  }, [egliseId, toast]);
+
+  useEffect(() => {
+    charger();
+  }, [charger]);
+
+  async function enregistrer(d, valeur) {
+    const couleur = valeur === "" ? null : couleurValide(valeur);
+    if (valeur !== "" && !couleur) {
+      toast.error("Couleurs", "Saisissez une couleur au format #RRGGBB, par exemple #BD175C.");
+      return;
+    }
+    setEnCours(d.id);
+    try {
+      await api.updateDepartement(d.id, { couleur });
+      await charger();
+      toast.success("Couleurs", couleur ? `${d.nom} : ${couleur}` : `Couleur de ${d.nom} retirée.`);
+    } catch (err) {
+      toast.error("Couleurs", message(err, "La couleur n'a pas pu être enregistrée."));
+    } finally {
+      setEnCours(null);
+    }
+  }
+
+  const nomTemple = (id) => actives.find((e) => e.id === id)?.nom?.replace(/^temple\s+(de\s+)?/i, "") || "";
+
+  return (
+    <Card
+      title="Couleurs des départements"
+      description="La couleur teinte le fond et la bande de la carte. Tant qu'elle n'est pas définie, la carte du département ne s'imprime pas."
+    >
+      {chargement ? (
+        <p className="text-xs text-slate-500 py-6 text-center">Chargement…</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {departements.map((d) => {
+            const saisie = saisies[d.id] ?? "";
+            const valide = couleurValide(saisie);
+            const modifie = (valide || "") !== (d.couleur || "") || (saisie === "" && d.couleur);
+            return (
+              <li key={d.id} className="flex flex-wrap items-center gap-3 py-2.5">
+                <span
+                  className={`h-7 w-7 shrink-0 rounded-full ${d.couleur ? "border border-black/10" : "border-2 border-dashed border-slate-300"}`}
+                  style={d.couleur ? { background: d.couleur } : undefined}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-slate-800">{d.nom}</span>
+                  <span className="block text-[11px] text-slate-500">
+                    {!egliseId && nomTemple(d.egliseId) ? `${nomTemple(d.egliseId)} · ` : ""}
+                    {d.couleur ? d.couleur : "à définir"}
+                  </span>
+                </span>
+                {ecriture ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      aria-label={`Couleur de ${d.nom}`}
+                      value={valide || "#8F8585"}
+                      onChange={(e) => setSaisies((s) => ({ ...s, [d.id]: e.target.value.toUpperCase() }))}
+                      className="h-9 w-11 cursor-pointer rounded-md border border-slate-300 bg-white p-0.5"
+                    />
+                    <Input
+                      value={saisie}
+                      onChange={(e) => setSaisies((s) => ({ ...s, [d.id]: e.target.value.toUpperCase() }))}
+                      placeholder="#RRGGBB"
+                      aria-label={`Code couleur de ${d.nom}`}
+                      className="w-28 font-mono"
+                      maxLength={7}
+                    />
+                    <Btn size="sm" disabled={!modifie} loading={enCours === d.id} onClick={() => enregistrer(d, saisie)}>
+                      Enregistrer
+                    </Btn>
+                  </div>
+                ) : (
+                  <Pill tonalite={d.couleur ? "vert" : "or"}>{d.couleur ? "définie" : "à définir"}</Pill>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p className="text-[11px] text-slate-500 mt-3">
+        Couleur de la carte d'origine (HUISSIER) : <span className="font-mono">{COULEUR_MODELE}</span>.
+      </p>
+    </Card>
+  );
+}
+
+// ---------- Page ----------
+
+const ONGLETS = [
+  { id: "confectionner", libelle: "Confectionner", icone: Printer },
+  { id: "a-faire", libelle: "À confectionner", icone: Check },
+  { id: "couleurs", libelle: "Couleurs des départements", icone: Palette },
+];
+
+export default function BadgeStudioPage() {
+  const { egliseId } = useTemple();
+  const [onglet, setOnglet] = useState("confectionner");
+  const [ouvrierId, setOuvrierId] = useState(null);
+  const [aFaire, setAFaire] = useState({ ouvriers: [], total: 0, chargement: true });
+
+  const rechargerAFaire = useCallback(
+    () =>
+      api
+        .getBadgesAConfectionner(paramTemple(egliseId))
+        .then((d) => setAFaire({ ouvriers: d.ouvriers, total: d.total, chargement: false }))
+        .catch(() => setAFaire((a) => ({ ...a, chargement: false }))),
+    [egliseId]
+  );
+
+  useEffect(() => {
+    rechargerAFaire();
+  }, [rechargerAFaire]);
+
+  function choisir(id) {
+    setOuvrierId(id);
+    setOnglet("confectionner");
   }
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-[1400px] mx-auto">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-bordeaux-900" style={{ fontFamily: "Poppins,sans-serif" }}>
-              Atelier badges
-            </h1>
-            <Pill tonalite="or">Recto / verso</Pill>
-          </div>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-            Sélectionnez un ouvrier puis imprimez les deux faces au format carte
-            ID-1. Les informations affichées proviennent directement de sa fiche.
-          </p>
+          <h1 className="text-lg font-semibold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
+            Atelier badges
+          </h1>
+          <p className="text-xs text-slate-500">Confectionnez la carte de badge d'un ouvrier pour son département.</p>
         </div>
-        <Btn
-          variant="secondary"
-          size="sm"
-          icon={<ArrowLeft size={14} />}
-          onClick={() => navigate("/badges")}
-        >
-          Retour aux badges
-        </Btn>
-      </div>
-
-      {message && (
-        <p
-          role="status"
-          className={`rounded-lg border px-3 py-2 text-xs ${
-            message.type === "succes"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-bordeaux-200 bg-bordeaux-50 text-bordeaux-800"
-          }`}
-        >
-          {message.texte}
-        </p>
-      )}
-
-      {erreur && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bordeaux-200 bg-bordeaux-50 px-3 py-2">
-          <p className="text-xs text-bordeaux-800" title={erreur}>
-            Impossible de charger les ouvriers. Vérifiez la connexion puis
-            réessayez.
-          </p>
-          <Btn
-            variant="secondary"
-            size="xs"
-            onClick={() => setRechargement((n) => n + 1)}
-          >
-            Réessayer
-          </Btn>
-        </div>
-      )}
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)]">
-        <div className="space-y-4">
-          <Card
-            title="1. Ouvrier"
-            description="Choisissez le titulaire du badge."
-          >
-            <div className="space-y-3">
-              <Input
-                placeholder="Rechercher un nom, un matricule, un département…"
-                value={recherche}
-                onChange={(e) => setRecherche(e.target.value)}
-                autoComplete="off"
-              />
-
-              {chargement ? (
-                <p className="py-6 text-center text-xs text-slate-500">
-                  Chargement des ouvriers…
-                </p>
-              ) : membresFiltres.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-xs text-slate-500">
-                  {membres.length === 0
-                    ? "Aucun ouvrier disponible."
-                    : "Aucun ouvrier ne correspond à la recherche."}
-                </p>
-              ) : (
-                <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                  {membresFiltres.map((m) => {
-                    const actif = m.id === selectionId;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => choisirMembre(m.id)}
-                        aria-pressed={actif}
-                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
-                          actif
-                            ? "border-bordeaux-300 bg-bordeaux-50 ring-1 ring-bordeaux-200"
-                            : "border-slate-200 bg-white hover:bg-slate-50"
-                        }`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-bordeaux-700 to-gold-600 text-xs font-bold text-white">
-                            {initiales(m)}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold text-slate-800">
-                              {nomComplet(m)}
-                            </span>
-                            <span className="block truncate text-[11px] text-slate-500">
-                              {m.matricule || "Sans matricule"}
-                              {m.departement ? ` · ${m.departement}` : ""}
-                            </span>
-                          </span>
-                          {m.actif === false && (
-                            <Pill tonalite="neutre">Inactif</Pill>
-                          )}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+        <div role="tablist" aria-label="Sections de l'atelier" className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+          {ONGLETS.map(({ id, libelle, icone: Icone }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={onglet === id}
+              onClick={() => setOnglet(id)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                onglet === id ? "bg-white text-bordeaux-700 shadow-sm" : "text-slate-600 hover:text-slate-800"
+              }`}
+            >
+              <Icone size={14} aria-hidden="true" />
+              {libelle}
+              {id === "a-faire" && !aFaire.chargement && (
+                <span className="rounded-full bg-bordeaux-700 px-1.5 text-[10px] text-white tabular-nums">{aFaire.total}</span>
               )}
-
-              <p className="text-[11px] text-slate-500">
-                {membresFiltres.length} ouvrier(s) affiché(s) sur{" "}
-                {membres.length}.
-              </p>
-            </div>
-          </Card>
-
-          <Card
-            title="2. Fiche de l'ouvrier"
-            description="Données réelles enregistrées dans l'application."
-            actions={
-              <Btn
-                variant="ghost"
-                size="xs"
-                icon={<Pencil size={13} />}
-                onClick={() => navigate("/ouvriers")}
-              >
-                Modifier la fiche
-              </Btn>
-            }
-          >
-            {membre ? (
-              <div className="space-y-3">
-                <dl className="grid gap-2 sm:grid-cols-2">
-                  <LigneInfo label="Prénom" valeur={membre.prenom} />
-                  <LigneInfo label="Nom" valeur={membre.nom} />
-                  <LigneInfo label="Matricule" valeur={membre.matricule} />
-                  <LigneInfo label="Département" valeur={membre.departement} />
-                  <LigneInfo
-                    label="Photo"
-                    valeur={
-                      membre.photoUrl
-                        ? "Photo enregistrée"
-                        : "Aucune photo — initiales affichées"
-                    }
-                  />
-                  <LigneInfo
-                    label="Statut"
-                    valeur={membre.actif === false ? "Inactif" : "Actif"}
-                  />
-                </dl>
-
-                <p className="text-[11px] leading-relaxed text-slate-500">
-                  Le badge reprend uniquement ces données : nom, prénom,
-                  matricule, département et photo. Le téléphone n'est jamais
-                  affiché ni encodé dans le QR code.
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">
-                Sélectionnez un ouvrier pour afficher sa fiche.
-              </p>
-            )}
-          </Card>
-        </div>
-
-        <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-          <Card
-            title="Aperçu"
-            description="Recto et verso, au format carte ID-1."
-          >
-            {membre ? (
-              <BadgePreview
-                membre={membre}
-                face={face}
-                onFaceChange={setFace}
-                qrDataUrl={qrDataUrl}
-                qrErreur={qrErreur}
-              />
-            ) : (
-              <div className="rds-flip-stage">
-                <div className="flex aspect-[856/540] items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center text-xs text-slate-500">
-                  Sélectionnez un ouvrier pour afficher l'aperçu.
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card
-            title="Télécharger / Imprimer"
-            description="Télécharge recto ou verso en PNG, ou imprime les deux faces."
-          >
-            <div className="space-y-3">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Btn
-                  variant="secondary"
-                  size="sm"
-                  icon={<Download size={14} />}
-                  onClick={() => handleTelechargerFace("recto")}
-                  loading={telechargement.recto}
-                  disabled={!membre || !valeurQr(membre) || !qrDataUrl}
-                >
-                  Télécharger recto (PNG)
-                </Btn>
-                <Btn
-                  variant="secondary"
-                  size="sm"
-                  icon={<Download size={14} />}
-                  onClick={() => handleTelechargerFace("verso")}
-                  loading={telechargement.verso}
-                  disabled={!membre || !valeurQr(membre) || !qrDataUrl}
-                >
-                  Télécharger verso (PNG)
-                </Btn>
-              </div>
-
-              <Field
-                label="Disposition d'impression"
-                hint="Planche : les deux faces côte à côte sur une page A4. Deux pages : chaque face à l'échelle réelle."
-              >
-                <Select
-                  value={modeImpression}
-                  onChange={(e) => setModeImpression(e.target.value)}
-                >
-                  <option value={BADGE_PRINT_MODES.PLANCHE}>
-                    Planche A4 — recto + verso
-                  </option>
-                  <option value={BADGE_PRINT_MODES.CARTE}>
-                    Deux pages — échelle réelle
-                  </option>
-                </Select>
-              </Field>
-
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
-                <strong className="font-semibold">Réglage important :</strong>{" "}
-                dans la boîte d'impression, choisissez{" "}
-                <strong>100 %</strong> (ou « Taille réelle »), désactivez
-                « Ajuster à la page » et les en-têtes/pieds de page. Le format
-                ID-1 (85,6 × 54 mm) est respecté.
-              </div>
-
-              <Btn
-                variant="gold"
-                size="md"
-                icon={<Printer size={16} />}
-                onClick={handleImprimer}
-                loading={impression}
-                disabled={!membre || !valeurQr(membre)}
-              >
-                Imprimer recto + verso
-              </Btn>
-
-              {membre && !valeurQr(membre) && (
-                <p className="text-[11px] text-bordeaux-700">
-                  Cet ouvrier n'a pas de matricule : le QR code ne peut pas être
-                  généré.
-                </p>
-              )}
-              {membre && valeurQr(membre) && !qrDataUrl && !qrErreur && (
-                <p className="text-[11px] text-slate-500">
-                  Préparation du QR code…
-                </p>
-              )}
-              {qrErreur && (
-                <p className="text-[11px] text-bordeaux-700">
-                  Erreur lors de la génération du QR code.
-                </p>
-              )}
-
-              <p className="text-[11px] leading-relaxed text-slate-500">
-                Le QR est généré dans le navigateur. Il encode toujours le
-                matricule (format lu par le terminal de badgeage), jamais le
-                téléphone.
-              </p>
-            </div>
-          </Card>
+            </button>
+          ))}
         </div>
       </div>
 
-      {membre && (
-        <BadgePrintSheet
-          membre={membre}
-          mode={modeImpression}
-          qrDataUrl={qrDataUrl}
-          qrErreur={qrErreur}
+      {onglet === "confectionner" && (
+        <Confectionner
+          ouvrierId={ouvrierId}
+          setOuvrierId={setOuvrierId}
+          aFaire={aFaire.ouvriers}
+          rechargerAFaire={rechargerAFaire}
+          allerAuxCouleurs={() => setOnglet("couleurs")}
         />
       )}
-
-      {membre && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: "fixed",
-            left: "-20000px",
-            top: 0,
-            pointerEvents: "none",
-            opacity: 0,
-          }}
-        >
-          <BadgeCapture
-            ref={refCaptureRecto}
-            membre={membre}
-            face="recto"
-            qrDataUrl={qrDataUrl}
-            qrErreur={qrErreur}
-          />
-          <BadgeCapture
-            ref={refCaptureVerso}
-            membre={membre}
-            face="verso"
-            qrDataUrl={qrDataUrl}
-            qrErreur={qrErreur}
-          />
-        </div>
+      {onglet === "a-faire" && (
+        <AConfectionner aFaire={aFaire.ouvriers} total={aFaire.total} chargement={aFaire.chargement} choisir={choisir} />
       )}
+      {onglet === "couleurs" && <Couleurs />}
     </div>
   );
 }
