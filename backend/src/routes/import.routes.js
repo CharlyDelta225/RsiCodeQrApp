@@ -9,6 +9,7 @@ import { creerAvecMatricule } from "../lib/matricule.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 import { genererBadgePng } from "../lib/badge.js";
 import { requireRole } from "../middleware/auth.middleware.js";
+import { listerEglises, trouverEglise, resoudreEgliseEcriture } from "../lib/eglises.js";
 
 const router = Router();
 
@@ -34,6 +35,10 @@ const BADGES_DIR = path.resolve(process.cwd(), "public/badges");
 
 // Colonnes obligatoires attendues dans le fichier (ordre flexible : on cherche par nom)
 const COLONNES_ATTENDUES = ["Nom", "Prénom", "Département", "Téléphone"];
+// Colonne facultative du temple (SHALOM, ADJAHUI, 4 CROIX…). Sans elle, toutes
+// les lignes vont au temple choisi dans l'écran d'import (champ egliseId),
+// à défaut au siège.
+const COLONNES_TEMPLE = ["Temple", "Église", "Eglise"];
 
 // Générer le fichier QR badge PNG pour un ouvrier.
 // Cache disque BEST-EFFORT : les badges sont toujours servis à la volée par
@@ -65,8 +70,10 @@ async function genererBadge(ouvrier) {
  *   - Lignes vides ignorées
  *   - Le département doit exister dans le référentiel : sinon tout l'import est
  *     refusé (code DEPARTEMENT_INCONNU) — aucun département n'est créé
+ *   - Colonne facultative « Temple » ; sinon champ de formulaire egliseId ; sinon siège
+ *   - Le département est cherché DANS le temple de la ligne
  *   - Doublons (nom+prénom+département) : ligne ignorée
- *   - Si l'ouvrier existe déjà (nom+prénom), on ajoute juste la liaison au département
+ *   - Si l'ouvrier existe déjà dans ce temple (nom+prénom), on ajoute juste la liaison au département
  *
  * Réponse : compteur + détail par ligne (créé / ignoré / erreur)
  */
@@ -177,35 +184,70 @@ router.post(
       prenom: entete.indexOf("Prénom"),
       departement: entete.indexOf("Département"),
       telephone: entete.indexOf("Téléphone"),
+      temple: entete.findIndex((c) => COLONNES_TEMPLE.includes(c)),
     };
-    const ligneVersObjet = (l) => ({
-      nom: String(l[idx.nom] ?? "").trim().toUpperCase(),
-      prenom: String(l[idx.prenom] ?? "").trim(),
-      departementNom: String(l[idx.departement] ?? "").trim().toUpperCase(),
-      telephone: String(l[idx.telephone] ?? "").trim(),
-    });
+
+    // Temple par défaut des lignes (champ du formulaire, sinon siège).
+    const egliseDefaut = await resoudreEgliseEcriture(req.body?.egliseId);
+    if (!egliseDefaut) {
+      throw new AppError("EGLISE_INCONNUE", "Le temple choisi pour l'import n'existe pas ou est désactivé.");
+    }
+    const eglises = await listerEglises();
+    const egliseDeLigne = (texte) => {
+      if (!texte) return egliseDefaut;
+      const e = trouverEglise(texte, eglises);
+      return e && e.actif ? e : null;
+    };
+
+    const ligneVersObjet = (l) => {
+      const templeTexte = idx.temple >= 0 ? String(l[idx.temple] ?? "").trim() : "";
+      return {
+        nom: String(l[idx.nom] ?? "").trim().toUpperCase(),
+        prenom: String(l[idx.prenom] ?? "").trim(),
+        departementNom: String(l[idx.departement] ?? "").trim().toUpperCase(),
+        telephone: String(l[idx.telephone] ?? "").trim(),
+        templeTexte,
+        eglise: egliseDeLigne(templeTexte),
+      };
+    };
+
+    // Temples inconnus : tout l'import est refusé (comme pour les départements).
+    const templesInconnus = [
+      ...new Set(lignes.map(ligneVersObjet).filter((o) => !o.eglise).map((o) => o.templeTexte)),
+    ];
+    if (templesInconnus.length > 0) {
+      throw new AppError(
+        "TEMPLE_INCONNU",
+        `Temple(s) inconnu(s) : ${templesInconnus.join(", ")}. Valeurs acceptées : ${eglises
+          .filter((e) => e.actif)
+          .map((e) => e.nom)
+          .join(", ")}.`
+      );
+    }
 
     // --- 5-bis. Vérifier que tous les départements du fichier existent dans
     // le référentiel (table Departement). Aucun département n'est créé : si le
     // fichier en contient d'inconnus, tout l'import est refusé.
     // La correspondance est insensible à la casse ET aux accents ("media",
     // "MEDIA", "Média" → tous rattachés au département "MÉDIA"). ---
+    // Les départements sont propres à chaque temple : clé = temple + nom normalisé.
+    const cleDep = (egliseId, nom) => `${egliseId}|${normaliserNomDepartement(nom)}`;
     const departementsEnBase = await prisma.departement.findMany();
     const departementParCle = new Map(
-      departementsEnBase.map((d) => [normaliserNomDepartement(d.nom), d])
+      departementsEnBase.map((d) => [cleDep(d.egliseId, d.nom), d])
     );
-    const nomsDepartementsFichier = [
+    const introuvables = [
       ...new Set(
-        lignes.map((l) => ligneVersObjet(l).departementNom).filter((n) => n !== "")
+        lignes
+          .map(ligneVersObjet)
+          .filter((o) => o.departementNom !== "" && !departementParCle.has(cleDep(o.eglise.id, o.departementNom)))
+          .map((o) => `${o.departementNom} (${o.eglise.nom})`)
       ),
     ];
-    const introuvables = nomsDepartementsFichier.filter(
-      (n) => !departementParCle.has(normaliserNomDepartement(n))
-    );
     if (introuvables.length > 0) {
       throw new AppError(
         "DEPARTEMENT_INCONNU",
-        `Département(s) introuvable(s) dans la base : ${introuvables.join(", ")}. Veuillez choisir des départements de la liste existante.`
+        `Département(s) introuvable(s) dans la base : ${introuvables.join(", ")}. Veuillez choisir des départements existants de ce temple.`
       );
     }
 
@@ -216,6 +258,12 @@ router.post(
 
     for (const ligneBrute of lignes) {
       const donnees = ligneVersObjet(ligneBrute);
+      const eglise = donnees.eglise;
+      const departementCible = departementParCle.get(cleDep(eglise.id, donnees.departementNom));
+      // Les champs internes ne vont pas dans le rapport d'import.
+      delete donnees.eglise;
+      delete donnees.templeTexte;
+      donnees.temple = eglise.nom;
 
       // Validation : tous les champs requis présents
       if (!donnees.nom || !donnees.prenom || !donnees.departementNom || !donnees.telephone) {
@@ -234,9 +282,10 @@ router.post(
         continue;
       }
 
-      // Vérifier si l'ouvrier (nom+prénom) existe déjà
+      // Vérifier si l'ouvrier (nom+prénom) existe déjà DANS CE TEMPLE
       const ouvrierExistant = await prisma.ouvrier.findFirst({
         where: {
+          egliseId: eglise.id,
           nom: { equals: donnees.nom, mode: "insensitive" },
           prenom: { equals: donnees.prenom, mode: "insensitive" },
         },
@@ -244,7 +293,7 @@ router.post(
 
       // Si l'ouvrier existe, vérifier s'il est déjà dans ce département
       if (ouvrierExistant) {
-        const deptExistant = departementParCle.get(normaliserNomDepartement(donnees.departementNom));
+        const deptExistant = departementCible;
         if (deptExistant) {
           const liaisonExistante = await prisma.ouvrierDepartement.findUnique({
             where: {
@@ -304,6 +353,7 @@ router.post(
           nom: donnees.nom,
           prenom: donnees.prenom,
           departement: donnees.departementNom,
+          temple: eglise.nom,
           matricule: ouvrierExistant.matricule,
           statut: "cree",
         });
@@ -311,7 +361,7 @@ router.post(
       }
 
       // Le département existe (validé en 5-bis) => on ne le crée jamais
-      const departement = departementParCle.get(normaliserNomDepartement(donnees.departementNom));
+      const departement = departementCible;
 
       // Créer l'ouvrier (matricule auto-généré avec retry sur collision P2002,
       // actif par défaut). Le téléphone est optionnel et normalisé (null si vide).
@@ -319,6 +369,7 @@ router.post(
         nom: donnees.nom,
         prenom: donnees.prenom,
         telephone: donnees.telephone || undefined,
+        egliseId: eglise.id,
       });
 
       // Créer la liaison OuvrierDepartement
@@ -338,6 +389,7 @@ router.post(
         nom: donnees.nom,
         prenom: donnees.prenom,
         departement: donnees.departementNom,
+        temple: eglise.nom,
         matricule: ouvrier.matricule,
         statut: "cree",
       });

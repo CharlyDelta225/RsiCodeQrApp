@@ -35,7 +35,32 @@
     display: none;
   }
   .succes { background: #eaf3de; color: #27500a; }
+  .visiteur { background: #fdf0cf; color: #5a3d00; }
   .erreur { background: #fde2e2; color: #7a1a1a; }
+  #resultat .qui { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
+  #resultat dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; text-align: left; font-size: 14px; }
+  #resultat dt { opacity: 0.75; }
+  #resultat dd { margin: 0; font-weight: 600; }
+  #lieu {
+    display: none; align-items: center; gap: 6px;
+    background: rgba(212,160,23,0.18); border: 1px solid rgba(212,160,23,0.6);
+    color: #F3E3B3; border-radius: 999px; padding: 5px 14px; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-bottom: 4px;
+  }
+  #choixTemple {
+    position: fixed; inset: 0; z-index: 30; display: none;
+    background: rgba(30,4,4,0.94); padding: 24px 16px; box-sizing: border-box;
+    flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  }
+  #choixTemple h2 { color: #F3E3B3; font-size: 20px; font-weight: 600; margin: 0 0 4px; text-align: center; }
+  #choixTemple p { color: #F3E3B3; opacity: 0.8; font-size: 13px; margin: 0; text-align: center; max-width: 340px; }
+  #listeTemples { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 340px; }
+  #listeTemples button, #annulerTemple {
+    border-radius: 12px; border: 1px solid rgba(212,160,23,0.6); padding: 14px; font-size: 16px; font-weight: 600;
+    background: rgba(255,255,255,0.1); color: #fff; cursor: pointer;
+  }
+  #listeTemples button[aria-current="true"] { background: #D4A017; color: #3a0606; }
+  #annulerTemple { background: transparent; font-weight: 500; font-size: 14px; }
   #statut { font-size: 12px; color: #D4A017; margin-top: 12px; }
   #sonBtn {
     position: fixed; top: 10px; right: 10px;
@@ -62,17 +87,101 @@
 </head>
 <body>
   <img id="logo" src="/terminal/rsi-logo.png" alt="RSI" />
+  <button id="lieu" type="button" title="Changer le temple de ce terminal">📍 <span id="lieuNom"></span></button>
   <h1>Présentez le QR code du badge devant la caméra</h1>
   <div id="reader"></div>
   <div id="resultat"></div>
   <div id="statut">Initialisation de la caméra…</div>
   <button id="sonBtn" title="Couper / activer le son">🔊</button>
+  <div id="choixTemple" role="dialog" aria-modal="true" aria-labelledby="choixTitre">
+    <h2 id="choixTitre">Où se trouve ce terminal ?</h2>
+    <p>Les badges scannés ici seront enregistrés dans ce temple. Le choix est mémorisé sur cet appareil.</p>
+    <div id="listeTemples"><p>Chargement des temples…</p></div>
+    <button id="annulerTemple" type="button">Annuler</button>
+  </div>
   <div id="sonBandeau">🔇 Touchez l'écran pour activer le son<button class="boutAction" type="button">Activer le son</button></div>
 
 <script data-audio-son="v2">
   const API_BASE = window.location.origin;
 
   let enTraitement = false;
+
+  // ---------- Temple du terminal ----------
+  // Lien d'installation : /terminal/?temple=CODE (copié depuis la page
+  // « Temples » du dashboard). Le code est mémorisé sur l'appareil ; sans
+  // code, le terminal demande son temple avant d'accepter des badges.
+  const CLE_TEMPLE = "terminal-temple";
+  let temples = [];
+  let temple = null; // { code, nom }
+
+  function lireTempleMemorise() {
+    try { return JSON.parse(localStorage.getItem(CLE_TEMPLE) || "null"); } catch (e) { return null; }
+  }
+  function memoriserTemple(t) {
+    temple = t;
+    try { localStorage.setItem(CLE_TEMPLE, JSON.stringify(t)); } catch (e) {}
+    afficherLieu();
+  }
+  function afficherLieu() {
+    const el = document.getElementById("lieu");
+    if (!temple) { el.style.display = "none"; return; }
+    document.getElementById("lieuNom").textContent = temple.nom;
+    el.style.display = "inline-flex";
+  }
+  function ouvrirChoixTemple() {
+    const liste = document.getElementById("listeTemples");
+    liste.innerHTML = "";
+    if (temples.length === 0) {
+      const p = document.createElement("p");
+      p.textContent = "Liste des temples indisponible. Vérifiez la connexion puis rechargez la page.";
+      liste.appendChild(p);
+    }
+    temples.forEach((t) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = t.nom + (t.estSiege ? " · siège" : "");
+      if (temple && temple.code === t.code) b.setAttribute("aria-current", "true");
+      b.addEventListener("click", () => {
+        memoriserTemple({ code: t.code, nom: t.nom });
+        fermerChoixTemple();
+      });
+      liste.appendChild(b);
+    });
+    document.getElementById("annulerTemple").style.display = temple ? "block" : "none";
+    document.getElementById("choixTemple").style.display = "flex";
+  }
+  function fermerChoixTemple() {
+    document.getElementById("choixTemple").style.display = "none";
+  }
+  document.getElementById("lieu").addEventListener("click", ouvrirChoixTemple);
+  document.getElementById("annulerTemple").addEventListener("click", fermerChoixTemple);
+
+  async function initialiserTemple() {
+    const codeUrl = new URLSearchParams(location.search).get("temple");
+    temple = lireTempleMemorise();
+    afficherLieu();
+    try {
+      const rep = await fetch(API_BASE + "/api/eglises/public");
+      temples = (await rep.json()).eglises || [];
+    } catch (e) {
+      temples = [];
+    }
+    const trouver = (code) => temples.find((t) => t.code.toUpperCase() === String(code || "").trim().toUpperCase());
+    if (codeUrl && trouver(codeUrl)) {
+      const t = trouver(codeUrl);
+      memoriserTemple({ code: t.code, nom: t.nom });
+      // Retire le paramètre de l'adresse : le choix vaut désormais pour l'appareil.
+      history.replaceState(null, "", location.pathname);
+    } else if (temple && temples.length > 0 && !trouver(temple.code)) {
+      temple = null; // temple désactivé ou renommé : on redemande
+      afficherLieu();
+    } else if (temple && trouver(temple.code)) {
+      const t = trouver(temple.code);
+      memoriserTemple({ code: t.code, nom: t.nom }); // nom à jour
+    }
+    if (!temple) ouvrirChoixTemple();
+  }
+  initialiserTemple();
 
   // ---------- Sons du terminal ----------
   // v2 : déblocage audio UNIQUE et PERSISTANT via Web Audio. Le navigateur ne
@@ -194,34 +303,74 @@
     }, delai);
   }
 
-  function afficherResultat(texte, succes) {
+  let minuterieResultat = null;
+  function montrerResultat(classe, duree) {
     const el = document.getElementById("resultat");
-    el.textContent = texte;
-    el.className = succes ? "succes" : "erreur";
+    el.className = classe;
     el.style.display = "block";
-    setTimeout(() => { el.style.display = "none"; }, 3500);
+    clearTimeout(minuterieResultat);
+    minuterieResultat = setTimeout(() => { el.style.display = "none"; }, duree);
+  }
+
+  function afficherResultat(texte, succes) {
+    document.getElementById("resultat").textContent = texte;
+    montrerResultat(succes ? "succes" : "erreur", 3500);
+  }
+
+  // Badgeage réussi : qui, matricule, temple, départements, heure.
+  function afficherPointage(data) {
+    const o = data.ouvrier;
+    const el = document.getElementById("resultat");
+    el.textContent = "";
+    const qui = document.createElement("div");
+    qui.className = "qui";
+    qui.textContent = `✓ ${o.prenom} ${o.nom}` + (data.visiteur ? " · visiteur" : "");
+    el.appendChild(qui);
+    const dl = document.createElement("dl");
+    const heure = new Date(data.heure || Date.now()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const departements = (o.departements && o.departements.length ? o.departements.join(", ") : o.departement) || "—";
+    [
+      ["Matricule", o.matricule],
+      ["Temple", o.eglise ? o.eglise.nom + (o.eglise.estSiege ? " (siège)" : "") : "—"],
+      ["Départements", departements],
+      ["Heure", heure],
+    ].forEach(([cle, valeur]) => {
+      const dt = document.createElement("dt");
+      dt.textContent = cle;
+      const dd = document.createElement("dd");
+      dd.textContent = valeur;
+      dl.append(dt, dd);
+    });
+    el.appendChild(dl);
+    montrerResultat(data.visiteur ? "visiteur" : "succes", 4500);
   }
 
   async function envoyerScan(matricule) {
     if (enTraitement) return;
+    if (!temple) { ouvrirChoixTemple(); return; }
     enTraitement = true;
     document.getElementById("statut").textContent = "Envoi du badge " + matricule + "…";
     try {
       const res = await fetch(API_BASE + "/api/badgeage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matricule }),
+        body: JSON.stringify({ matricule, temple: temple.code }),
       });
       const data = await res.json();
       if (data.ok) {
-        const o = data.ouvrier;
-        afficherResultat(`✓ Pointage enregistré : ${o.prenom} ${o.nom} (${o.departement})`, true);
+        afficherPointage(data);
         jouerSon("succes");
         jouerSon("annonceSucces", 300);
       } else if (data.code === "DEJA_BADGE_AUJOURDHUI") {
         afficherResultat(`⚠ ${data.message || data.code}`, false);
         jouerSon("deja");
         jouerSon("annonceDeja", 600);
+      } else if (data.code === "TEMPLE_INCONNU") {
+        afficherResultat(`✗ ${data.message}`, false);
+        jouerSon("erreur");
+        temple = null;
+        afficherLieu();
+        ouvrirChoixTemple();
       } else if (data.code === "BADGE_INCONNU") {
         afficherResultat("✗ Ouvrier inconnu", false);
         jouerSon("erreur");

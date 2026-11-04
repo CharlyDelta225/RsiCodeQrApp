@@ -13,6 +13,7 @@ import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
 import Modal from "../ui/Modal";
 import { Input, Select } from "../ui/inputs";
+import { useTemple, paramTemple } from "../lib/temple";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -61,6 +62,7 @@ function CarteBadgeImpression({ ouvrier }) {
 }
 
 export default function BadgesPage() {
+  const { egliseId } = useTemple();
   const navigate = useNavigate();
   const [ouvriers, setOuvriers] = useState([]);
   const [departements, setDepartements] = useState([]);
@@ -86,7 +88,7 @@ export default function BadgesPage() {
     setChargement(true);
     setErreur(null);
     try {
-      const params = { limit: 2000 };
+      const params = { limit: 2000, ...paramTemple(egliseId) };
       if (recherche) params.recherche = recherche;
       if (filtreActif === "actifs") params.actif = "true";
       if (filtreActif === "desactives") params.actif = "false";
@@ -99,16 +101,16 @@ export default function BadgesPage() {
     } finally {
       setChargement(false);
     }
-  }, [recherche, filtreActif, filtreDepartement]);
+  }, [recherche, filtreActif, filtreDepartement, egliseId]);
 
   useEffect(() => {
     api
-      .getDepartements({ limit: 100 })
+      .getDepartements({ limit: 100, ...paramTemple(egliseId) })
       .then((d) => setDepartements(d.departements || []))
       .catch(() =>
         setErreur("La liste des départements du filtre n'a pas pu être chargée. Actualisez la page.")
       );
-  }, []);
+  }, [egliseId]);
 
   useEffect(() => {
     charger();

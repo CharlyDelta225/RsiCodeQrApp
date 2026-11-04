@@ -28,6 +28,7 @@ function dateDepuisParam(nonRenseigne) {
  *
  * Query :
  *   ?date=2026-09-09     date (défaut : aujourd'hui)
+ *   ?egliseId=<id>       filtre sur un temple (défaut : tous)
  *   ?departementId=<id>  filtre sur un département (défaut : tous) — le
  *                        récapitulatif est recalculé sur la sélection.
  *
@@ -54,7 +55,8 @@ router.get("/journalier", async (req, res) => {
       });
     }
 
-    const structure = await construireRapport(date);
+    const egliseId = String(req.query?.egliseId ?? "").trim() || null;
+    const structure = await construireRapport(date, { egliseId });
 
     const departementId = String(req.query?.departementId ?? "").trim();
     if (departementId !== "") {
@@ -72,6 +74,7 @@ router.get("/journalier", async (req, res) => {
         absents: dep.absents,
         effectif: dep.effectif,
       };
+      structure.recapParEglise = dep.eglise ? [{ ...dep.eglise, ...structure.recap }] : [];
     }
 
     return res.json({ ok: true, rapport: structure });

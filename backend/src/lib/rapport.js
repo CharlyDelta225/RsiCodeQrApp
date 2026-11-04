@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import prisma from "./prisma.js";
+import { SELECT_EGLISE } from "./eglises.js";
 
 // ==============================
 // Rapports de pointage hebdomadaires
@@ -69,14 +70,17 @@ function heureFormat(mm) {
  * Retour :
  * {
  *   date, dateISO, dateLongueur, jourLabel, seuilTexte, notePresence,
- *   departements: [{ nom, lignes: [{ matricule, nom, prenom, present, heure }],
- *                    presents, absents, effectif }],
- *   recap: { presents, absents, effectif }   // personnes distinctes
+ *   departements: [{ id, nom, eglise: { id, code, nom, estSiege },
+ *                    lignes: [{ matricule, nom, prenom, present, heure, lieu, visiteur }],
+ *                    presents, absents, effectif }],   // triés temple (siège d'abord) puis nom
+ *   recap: { presents, absents, effectif },   // personnes distinctes
+ *   recapParEglise: [{ id, code, nom, estSiege, presents, absents, effectif }]
  * }
+ * options.egliseId : limite le rapport aux départements de ce temple.
  * `dateLongueur` contient déjà le jour (« Mercredi 21 octobre 2026 ») :
  * ne pas le préfixer par `jourLabel` à l'affichage.
  */
-export async function construireRapport(date) {
+export async function construireRapport(date, { egliseId = null } = {}) {
   const seuil = seuilPourJour(date); // null = hors programme → badgé = présent
   const jour = JOURS_PROGRAMME[date.getDay()];
 
@@ -87,8 +91,10 @@ export async function construireRapport(date) {
 
   const [departements, pointages] = await Promise.all([
     prisma.departement.findMany({
-      orderBy: { nom: "asc" },
+      where: egliseId ? { egliseId } : undefined,
+      orderBy: [{ eglise: { estSiege: "desc" } }, { eglise: { nom: "asc" } }, { nom: "asc" }],
       include: {
+        eglise: { select: SELECT_EGLISE },
         membres: {
           include: { ouvrier: true },
           orderBy: [{ ouvrier: { nom: "asc" } }, { ouvrier: { prenom: "asc" } }],
@@ -97,13 +103,11 @@ export async function construireRapport(date) {
     }),
     prisma.pointage.findMany({
       where: { dateHeure: { gte: debutJour, lte: finJour } },
-      select: { ouvrierId: true, dateHeure: true },
+      select: { ouvrierId: true, dateHeure: true, eglise: { select: SELECT_EGLISE } },
     }),
   ]);
 
-  const pointageParOuvrier = new Map(
-    pointages.map((p) => [p.ouvrierId, p.dateHeure])
-  );
+  const pointageParOuvrier = new Map(pointages.map((p) => [p.ouvrierId, p]));
 
   // Récap global = PERSONNES distinctes : un ouvrier membre de plusieurs
   // départements apparaît dans chacun d'eux, mais ne compte qu'une fois au total
@@ -111,32 +115,51 @@ export async function construireRapport(date) {
   // ouvriers). Les chiffres par département restent inchangés.
   const ouvriersComptes = new Set();
   const ouvriersPresents = new Set();
+  // Même logique, par temple (clé = egliseId du département).
+  const parEglise = new Map();
 
   const rapportDepartements = departements.map((dep) => {
     const lignes = dep.membres
       .filter((m) => m.ouvrier.actif)
       .map((m) => {
-        const dateHeure = pointageParOuvrier.get(m.ouvrier.id);
+        const pointage = pointageParOuvrier.get(m.ouvrier.id);
+        const dateHeure = pointage?.dateHeure;
         // Jour de programme : badge ≤ seuil. Hors programme : tout badge compte.
         const present =
           dateHeure !== undefined &&
           (seuil === null || heureEnMinutes(dateHeure) <= seuil);
         ouvriersComptes.add(m.ouvrier.id);
         if (present) ouvriersPresents.add(m.ouvrier.id);
+        if (!parEglise.has(dep.egliseId)) {
+          parEglise.set(dep.egliseId, { eglise: dep.eglise, comptes: new Set(), presents: new Set() });
+        }
+        const compteur = parEglise.get(dep.egliseId);
+        compteur.comptes.add(m.ouvrier.id);
+        if (present) compteur.presents.add(m.ouvrier.id);
+        const lieu = pointage?.eglise ?? null;
         return {
           matricule: m.ouvrier.matricule,
           nom: m.ouvrier.nom,
           prenom: m.ouvrier.prenom,
           present,
           heure: dateHeure ? heureFormat(heureEnMinutes(dateHeure)) : null,
+          lieu: lieu ? { code: lieu.code, nom: lieu.nom } : null,
+          visiteur: Boolean(lieu && lieu.id !== m.ouvrier.egliseId),
         };
       });
 
     const presents = lignes.filter((l) => l.present).length;
     const absents = lignes.length - presents;
 
-    return { id: dep.id, nom: dep.nom, lignes, presents, absents, effectif: lignes.length };
+    return { id: dep.id, nom: dep.nom, eglise: dep.eglise, lignes, presents, absents, effectif: lignes.length };
   });
+
+  const recapParEglise = [...parEglise.values()].map(({ eglise, comptes, presents }) => ({
+    ...eglise,
+    presents: presents.size,
+    absents: comptes.size - presents.size,
+    effectif: comptes.size,
+  }));
 
   const recap = {
     presents: ouvriersPresents.size,
@@ -156,6 +179,7 @@ export async function construireRapport(date) {
       : "Statut : présent si un badge a été effectué",
     departements: rapportDepartements,
     recap,
+    recapParEglise,
   };
 }
 
@@ -226,16 +250,17 @@ function pdfDepartement(departement, rapport) {
   titrePdf(
     doc,
     "Rapport de pointage",
-    `Département ${departement.nom} — ${rapport.dateLongueur}`,
+    `${departement.eglise?.nom ? `${departement.eglise.nom} — ` : ""}Département ${departement.nom} — ${rapport.dateLongueur}`,
     rapport.notePresence
   );
 
   const colonnes = [
-    { titre: "Matricule", largeur: 90 },
-    { titre: "Nom", largeur: 125 },
-    { titre: "Prénom", largeur: 125 },
-    { titre: "Statut", largeur: 85 },
-    { titre: "Heure", largeur: 70 },
+    { titre: "Matricule", largeur: 80 },
+    { titre: "Nom", largeur: 110 },
+    { titre: "Prénom", largeur: 110 },
+    { titre: "Statut", largeur: 70 },
+    { titre: "Heure", largeur: 50 },
+    { titre: "Lieu", largeur: 95 },
   ];
 
   dessinerTableau(
@@ -251,6 +276,12 @@ function pdfDepartement(departement, rapport) {
         };
       }
       if (i === 4) return { texte: ligne.heure ?? "—" };
+      if (i === 5) {
+        if (!ligne.lieu) return { texte: "—" };
+        return ligne.visiteur
+          ? { texte: `${ligne.lieu.code} (visiteur)`, couleur: "#b45309" }
+          : { texte: ligne.lieu.code };
+      }
       return { texte: ligne[i === 0 ? "matricule" : i === 1 ? "nom" : "prenom"] };
     }
   );
@@ -262,7 +293,7 @@ function pdfDepartement(departement, rapport) {
 
   doc.end();
   return fini.then((buffer) => ({
-    nomFichier: `Rapport_${rapport.dateISO}_${departement.nom.replace(/\s+/g, "_")}.pdf`,
+    nomFichier: `Rapport_${rapport.dateISO}_${departement.eglise?.code ? `${departement.eglise.code}_` : ""}${departement.nom.replace(/\s+/g, "_")}.pdf`,
     buffer,
   }));
 }
@@ -282,14 +313,15 @@ function pdfRecap(rapport) {
   );
 
   const colonnes = [
-    { titre: "Département", largeur: 240 },
-    { titre: "Présents", largeur: 95 },
-    { titre: "Absents", largeur: 95 },
-    { titre: "Effectif", largeur: 95 },
+    { titre: "Temple", largeur: 120 },
+    { titre: "Département", largeur: 165 },
+    { titre: "Présents", largeur: 75 },
+    { titre: "Absents", largeur: 75 },
+    { titre: "Effectif", largeur: 80 },
   ];
 
   const lignes = rapport.departements.map((dep) => ({
-    texte: [dep.nom, dep.presents, dep.absents, dep.effectif],
+    texte: [dep.eglise?.nom ?? "—", dep.nom, dep.presents, dep.absents, dep.effectif],
   }));
 
   dessinerTableau(
@@ -299,6 +331,12 @@ function pdfRecap(rapport) {
     (ligne, i) => ({ texte: String(ligne.texte[i]) })
   );
 
+  for (const e of rapport.recapParEglise ?? []) {
+    textePied(
+      doc,
+      `${e.nom} — Présents : ${e.presents}   Absents : ${e.absents}   Effectif : ${e.effectif}`
+    );
+  }
   textePied(
     doc,
     `Total (personnes distinctes) — Présents : ${rapport.recap.presents}   Absents : ${rapport.recap.absents}   Effectif : ${rapport.recap.effectif}`

@@ -9,6 +9,7 @@ import Card from "../ui/Card";
 import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
 import { Field, Input, Select } from "../ui/inputs";
+import { useTemple, TemplePill, LieuPill, paramTemple } from "../lib/temple";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 const LIMIT = 17;
@@ -42,6 +43,7 @@ function messageEchecEnvoi(code, messageApi) {
 }
 
 export default function RapportPage() {
+  const { egliseId, egliseCourante } = useTemple();
   const [date, setDate] = useState(dateDuJour());
   const [departementId, setDepartementId] = useState("");
   const [departements, setDepartements] = useState([]);
@@ -58,20 +60,22 @@ export default function RapportPage() {
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [retourEnvoi, setRetourEnvoi] = useState(null); // { ok, message }
 
+  // Départements proposés : ceux du temple affiché (tous si « Tous les temples »).
   useEffect(() => {
+    setDepartementId("");
     api
-      .getDepartements({ limit: 100 })
+      .getDepartements({ limit: 100, ...paramTemple(egliseId) })
       .then((data) => setDepartements(data.departements))
       .catch(() =>
         setErreur("La liste des départements du filtre n'a pas pu être chargée. Actualisez la page.")
       );
-  }, []);
+  }, [egliseId]);
 
   const charger = useCallback(async () => {
     setChargement(true);
     setErreur(null);
     try {
-      const params = { date };
+      const params = { date, ...paramTemple(egliseId) };
       if (departementId) params.departementId = departementId;
       const data = await api.getRapportJournalier(params);
       setRapport(data.rapport);
@@ -81,7 +85,7 @@ export default function RapportPage() {
     } finally {
       setChargement(false);
     }
-  }, [date, departementId]);
+  }, [date, departementId, egliseId]);
 
   useEffect(() => {
     charger();
@@ -114,18 +118,23 @@ export default function RapportPage() {
   const dejaAffiches = new Set();
   const lignesAffichees = departementsAffiches.flatMap((dep) =>
     dep.lignes.flatMap((ligne) => {
-      if (!tousLesDepartements) return [{ ligne, nomDepartement: dep.nom }];
+      if (!tousLesDepartements) return [{ ligne, nomDepartement: dep.nom, eglise: dep.eglise }];
       if (dejaAffiches.has(ligne.matricule)) return [];
       dejaAffiches.add(ligne.matricule);
       return [
         {
           ligne,
           nomDepartement: departementsParMatricule.get(ligne.matricule).join(", "),
+          eglise: dep.eglise,
         },
       ];
     })
   );
   const totaux = rapport?.recap;
+  // Plusieurs temples dans le rapport : bandeau de temple dans le tableau et
+  // totaux par temple (les départements arrivent triés par temple).
+  const recapTemples = rapport?.recapParEglise ?? [];
+  const plusieursTemples = recapTemples.length > 1;
 
   // Pagination (page éventuellement au-delà de la dernière après un filtre si
   // on ne repassait pas par la page 1 : on la borne au maximum).
@@ -138,16 +147,18 @@ export default function RapportPage() {
 
   function handleExporterCsv() {
     const dateRapport = rapport?.dateISO ?? date;
-    const entete = ["Date", "Matricule", "Nom", "Prénom", "Département", "Statut", "Heure"];
-    const lignes = lignesAffichees.map(({ ligne, nomDepartement }) =>
+    const entete = ["Date", "Matricule", "Nom", "Prénom", "Temple", "Département", "Statut", "Heure", "Lieu du pointage"];
+    const lignes = lignesAffichees.map(({ ligne, nomDepartement, eglise }) =>
       [
         dateRapport,
         ligne.matricule,
         ligne.nom,
         ligne.prenom,
+        eglise?.nom ?? "",
         nomDepartement,
         ligne.present ? "PRÉSENT" : "ABSENT",
         ligne.heure ?? "",
+        ligne.lieu ? `${ligne.lieu.nom}${ligne.visiteur ? " (visiteur)" : ""}` : "",
       ]
         .map(csvValeur)
         .join(";")
@@ -156,7 +167,8 @@ export default function RapportPage() {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const depAbrege =
       departements.find((d) => d.id === departementId)?.nom.replace(/\s+/g, "_") || "tous";
-    telechargerBlob(blob, `rapport-pointage_${dateRapport}_${depAbrege}.csv`);
+    const temple = egliseCourante?.code ? `${egliseCourante.code}_` : "";
+    telechargerBlob(blob, `rapport-pointage_${dateRapport}_${temple}${depAbrege}.csv`);
   }
 
   function handleExporterPdf() {
@@ -246,7 +258,7 @@ export default function RapportPage() {
 
       <Card
         title="Filtrer le rapport"
-        description="Choisissez une date et, si besoin, un département."
+        description={`Choisissez une date et, si besoin, un département. Temple : ${egliseCourante?.nom ?? "tous les temples"} (sélecteur en haut de la page).`}
         className="no-print"
       >
         <form onSubmit={handleFiltrer} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] md:items-end">
@@ -300,6 +312,18 @@ export default function RapportPage() {
               </p>
             </div>
           </div>
+          {plusieursTemples && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {recapTemples.map((t) => (
+                <div key={t.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs">
+                  <TemplePill eglise={t} />
+                  <span className="tabular-nums text-slate-700">
+                    {t.presents} présent(s) sur {t.effectif}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 
@@ -327,7 +351,7 @@ export default function RapportPage() {
         }
       >
         <TableShell
-          colonnes={["Matricule", "Nom", "Prénom", "Département", "Statut", "Heure"]}
+          colonnes={["Matricule", "Nom", "Prénom", "Temple", "Département", "Statut", "Heure", "Lieu"]}
           chargement={chargement}
           vide={
             !chargement && rapport && lignesAffichees.length === 0
@@ -335,11 +359,24 @@ export default function RapportPage() {
               : "Aucune donnée"
           }
         >
-          {lignesPage.map(({ ligne, nomDepartement }, index) => (
+          {lignesPage.flatMap(({ ligne, nomDepartement, eglise }, index) => {
+            const nouveauTemple =
+              plusieursTemples && (index === 0 || lignesPage[index - 1].eglise?.id !== eglise?.id);
+            const recapTemple = recapTemples.find((t) => t.id === eglise?.id);
+            return [
+              nouveauTemple && (
+                <tr key={`temple-${eglise?.id}-${index}`} className="border-t border-slate-200 bg-amber-50/70">
+                  <td colSpan={8} className="px-3 py-1.5 text-xs font-semibold text-bordeaux-900">
+                    {eglise?.nom}
+                    {recapTemple ? ` · ${recapTemple.presents} présent(s) sur ${recapTemple.effectif}` : ""}
+                  </td>
+                </tr>
+              ),
             <tr key={`${nomDepartement}-${ligne.matricule}-${index}`} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
               <td className="px-3 py-2 font-mono text-xs">{ligne.matricule}</td>
               <td className="px-3 py-2">{ligne.nom}</td>
               <td className="px-3 py-2">{ligne.prenom}</td>
+              <td className="px-3 py-2"><TemplePill eglise={eglise} /></td>
               <td className="px-3 py-2">{nomDepartement}</td>
               <td className="px-3 py-2">
                 <Pill tonalite={ligne.present ? "vert" : "rouge"}>
@@ -347,8 +384,10 @@ export default function RapportPage() {
                 </Pill>
               </td>
               <td className="px-3 py-2 text-xs">{ligne.heure ?? "—"}</td>
-            </tr>
-          ))}
+              <td className="px-3 py-2 text-right"><LieuPill lieu={ligne.lieu} visiteur={ligne.visiteur} /></td>
+            </tr>,
+            ].filter(Boolean);
+          })}
         </TableShell>
 
         <div className="no-print">
@@ -369,7 +408,7 @@ export default function RapportPage() {
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-bordeaux-50 text-bordeaux-900">
-              {["Matricule", "Nom", "Prénom", "Département", "Statut", "Heure"].map((c) => (
+              {["Matricule", "Nom", "Prénom", "Temple", "Département", "Statut", "Heure"].map((c) => (
                 <th key={c} className="text-left px-2 py-1.5 border border-slate-300 text-[10px] uppercase tracking-wide">
                   {c}
                 </th>
@@ -377,11 +416,12 @@ export default function RapportPage() {
             </tr>
           </thead>
           <tbody>
-            {lignesAffichees.map(({ ligne, nomDepartement }, index) => (
+            {lignesAffichees.map(({ ligne, nomDepartement, eglise }, index) => (
               <tr key={`print-${nomDepartement}-${ligne.matricule}-${index}`} className="border-b border-slate-200">
                 <td className="px-2 py-1.5 border border-slate-200 font-mono text-[10px]">{ligne.matricule}</td>
                 <td className="px-2 py-1.5 border border-slate-200">{ligne.nom}</td>
                 <td className="px-2 py-1.5 border border-slate-200">{ligne.prenom}</td>
+                <td className="px-2 py-1.5 border border-slate-200">{eglise?.nom ?? "—"}</td>
                 <td className="px-2 py-1.5 border border-slate-200">{nomDepartement}</td>
                 <td className="px-2 py-1.5 border border-slate-200">{ligne.present ? "Présent" : "Absent"}</td>
                 <td className="px-2 py-1.5 border border-slate-200 text-xs">{ligne.heure ?? "—"}</td>

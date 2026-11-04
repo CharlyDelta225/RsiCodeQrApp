@@ -103,6 +103,10 @@ export const api = {
   createOuvrier: (data) => request("/api/ouvriers", { method: "POST", body: JSON.stringify(data) }),
   updateOuvrier: (id, data) => request(`/api/ouvriers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteOuvrier: (id) => request(`/api/ouvriers/${id}`, { method: "DELETE" }),
+  // Change le temple d'un ouvrier ; ses départements de l'ancien temple sont
+  // retirés. Réponse : { ok, ouvrier, departementsRetires: [noms] }
+  transfererOuvrier: (id, egliseId) =>
+    request(`/api/ouvriers/${id}/transferer`, { method: "PATCH", body: JSON.stringify({ egliseId }) }),
   // Route protégée par JWT : impossible d'utiliser <img src="..."> directement
   // (pas d'en-tête Authorization sur une balise <img>). On récupère le PNG en
   // blob authentifié, l'appelant fait URL.createObjectURL(blob) pour l'afficher.
@@ -110,8 +114,10 @@ export const api = {
   // Import en masse depuis un fichier .csv/.xlsx (colonnes Nom/Prénom/Département,
   // Matricule généré automatiquement). Réponse réelle du backend :
   // { ok, creees, ignorees, erreurs, detail: [{nom, prenom, departement, matricule?, statut, raison?}] }
-  importOuvriers: (fichier) => {
+  // egliseId : temple des lignes sans colonne « Temple » (défaut : siège).
+  importOuvriers: (fichier, egliseId) => {
     const formData = new FormData();
+    if (egliseId) formData.append("egliseId", egliseId);
     formData.append("fichier", fichier);
     return request("/api/ouvriers/import", { method: "POST", body: formData });
   },
@@ -129,7 +135,9 @@ export const api = {
   // Indicateurs du tableau de bord calculés en base (aucune troncature) :
   // { ouvriers: { total, actifs, desactives }, departements, presentsAuj,
   //   parJour: [{ date, presents }], pointagesAuj: [...] }
-  getStatsTableauDeBord: (jours = 7) => request(`/api/pointages/stats?jours=${jours}`),
+  //   visiteursAuj, parEglise: [{ id, code, nom, estSiege, ouvriersActifs, departements, presentsAuj }] }
+  getStatsTableauDeBord: (jours = 7, egliseId = "") =>
+    request(`/api/pointages/stats?jours=${jours}${egliseId ? `&egliseId=${encodeURIComponent(egliseId)}` : ""}`),
   // CSV de toute la période filtrée (ADMIN/SUPER_ADMIN) — renvoie un Blob.
   getPointagesExportBlob: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
@@ -165,6 +173,11 @@ export const api = {
   createDepartement: (data) => request("/api/departements", { method: "POST", body: JSON.stringify(data) }),
   updateDepartement: (id, data) => request(`/api/departements/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteDepartement: (id) => request(`/api/departements/${id}`, { method: "DELETE" }),
+
+  // Temples : liste avec compteurs (tous rôles) ; écriture SUPER_ADMIN.
+  getEglises: () => request("/api/eglises"),
+  createEglise: (data) => request("/api/eglises", { method: "POST", body: JSON.stringify(data) }),
+  updateEglise: (id, data) => request(`/api/eglises/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 
   // Santé (public, pas de token nécessaire mais request() n'en ajoute pas si absent)
   health: () => request("/api/health"),

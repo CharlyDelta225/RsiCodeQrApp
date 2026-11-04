@@ -10,7 +10,8 @@ import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Btn from "../ui/Btn";
 import Modal from "../ui/Modal";
-import { Field, Input } from "../ui/inputs";
+import { Field, Input, Select } from "../ui/inputs";
+import { useTemple, TemplePill, paramTemple } from "../lib/temple";
 import { usePagination } from "../lib/pagination";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
@@ -26,6 +27,7 @@ function csvValeur(v) {
 
 export default function GestionDepartementsPage() {
   const toast = useToast();
+  const { egliseId, egliseCourante, actives: temples, siege } = useTemple();
   const [departements, setDepartements] = useState([]);
   const [total, setTotal] = useState(0);
   const [chargement, setChargement] = useState(true);
@@ -35,7 +37,7 @@ export default function GestionDepartementsPage() {
   // Créer / renommer / supprimer
   const [filtre, setFiltre] = useState("");
   const [creationOuvert, setCreationOuvert] = useState(false);
-  const [formCreation, setFormCreation] = useState({ nom: "", description: "" });
+  const [formCreation, setFormCreation] = useState({ nom: "", description: "", egliseId: "" });
   const [creationErreur, setCreationErreur] = useState(null);
   const [renommage, setRenommage] = useState(null);
   const [formRenommage, setFormRenommage] = useState({ nom: "" });
@@ -48,7 +50,7 @@ export default function GestionDepartementsPage() {
     setChargement(true);
     setErreur(null);
     try {
-      const data = await api.getDepartements({ limit: 100 });
+      const data = await api.getDepartements({ limit: 100, ...paramTemple(egliseId) });
       setDepartements(data.departements || []);
       setTotal(data.total);
     } catch (err) {
@@ -56,7 +58,7 @@ export default function GestionDepartementsPage() {
     } finally {
       setChargement(false);
     }
-  }, []);
+  }, [egliseId]);
 
   useEffect(() => {
     charger();
@@ -89,10 +91,10 @@ export default function GestionDepartementsPage() {
       const res = await api.createDepartement({
         nom: formCreation.nom.trim().toUpperCase(),
         description: formCreation.description,
+        egliseId: formCreation.egliseId || undefined,
       });
       setCreationOuvert(false);
-      setFormCreation({ nom: "", description: "" });
-      setSucces(`Département « ${res.departement.nom} » créé.`);
+      setSucces(`Département « ${res.departement.nom} » créé (${res.departement.eglise?.nom ?? "siège"}).`);
       await charger();
     } catch (err) {
       setCreationErreur(err instanceof ApiError ? err.message : "Erreur lors de la création");
@@ -142,8 +144,10 @@ export default function GestionDepartementsPage() {
 
   function handleExporterListe() {
     if (departementsFiltres.length === 0) return;
-    const entete = ["Nom", "Membres"];
-    const lignes = departementsFiltres.map((d) => [d.nom, d._count?.membres ?? 0].map(csvValeur).join(";"));
+    const entete = ["Temple", "Nom", "Membres"];
+    const lignes = departementsFiltres.map((d) =>
+      [d.eglise?.nom ?? "", d.nom, d._count?.membres ?? 0].map(csvValeur).join(";")
+    );
     const csv = "﻿" + [entete.join(";"), ...lignes].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     telechargerBlob(blob, "departements.csv");
@@ -165,6 +169,7 @@ export default function GestionDepartementsPage() {
               Gestion des départements
             </h1>
             <p className="text-sm text-slate-500">
+              {egliseCourante ? `${egliseCourante.nom} · ` : "Tous les temples · "}
               {total} département(s) · {nbMembresTotal} affectation(s) au total (un ouvrier peut appartenir à plusieurs départements).
             </p>
             <Link
@@ -181,6 +186,7 @@ export default function GestionDepartementsPage() {
                 onClick={() => {
                   setGestionErreur(null);
                   setCreationErreur(null);
+                  setFormCreation({ nom: "", description: "", egliseId: egliseId || siege?.id || "" });
                   setCreationOuvert(true);
                 }}
                 icon={<Plus size={16} />}
@@ -222,11 +228,12 @@ export default function GestionDepartementsPage() {
           <div className="text-sm text-slate-500 text-center py-10">Aucun département.</div>
         ) : (
           <TableShell
-            colonnes={["Nom", "Description", "Membres", "Actions"]}
+            colonnes={["Temple", "Nom", "Description", "Membres", "Actions"]}
             className="border-slate-100"
           >
             {pagination.elementsPage.map((d) => (
               <tr key={d.id} className="border-t border-slate-100 hover:bg-bordeaux-50/40 transition-colors">
+                <td className="px-3 py-2.5"><TemplePill eglise={d.eglise} /></td>
                 <td className="px-3 py-2.5 text-slate-700">{d.nom}</td>
                 <td className="px-3 py-2.5 text-slate-500 text-xs">{d.description || "—"}</td>
                 <td className="px-3 py-2.5 text-slate-500">{d._count?.membres ?? 0}</td>
@@ -280,6 +287,19 @@ export default function GestionDepartementsPage() {
         bloquee={enGestion}
       >
         <form onSubmit={handleCreer} className="p-6 space-y-4">
+          <Field label="Temple *" hint="Le département n'accueillera que des ouvriers de ce temple.">
+            <Select
+              required
+              value={formCreation.egliseId}
+              onChange={(e) => setFormCreation({ ...formCreation, egliseId: e.target.value })}
+            >
+              {temples.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nom}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label="Nom *">
             <Input
               required

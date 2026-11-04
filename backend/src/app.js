@@ -14,6 +14,7 @@ import adminsRoutes from "./routes/admins.routes.js";
 import departementsRoutes from "./routes/departements.routes.js";
 import rapportsRoutes from "./routes/rapports.routes.js";
 import cronRoutes from "./routes/cron.routes.js";
+import eglisesRoutes, { routeurPublic as eglisesPublicRoutes } from "./routes/eglises.routes.js";
 import logger from "./lib/logger.js";
 
 dotenv.config();
@@ -178,6 +179,10 @@ app.use("/api/pointages", requireAuth, pointagesRoutes);
 // Gestion des départements + affectation ouvriers — PROTÉGÉ (JWT admin requis)
 app.use("/api/departements", requireAuth, departementsRoutes);
 
+// Temples : liste publique (terminal) puis gestion — PROTÉGÉ (écriture SUPER_ADMIN)
+app.use("/api/eglises/public", eglisesPublicRoutes);
+app.use("/api/eglises", requireAuth, eglisesRoutes);
+
 // Rapports de pointage + envoi programmé — PROTÉGÉ (ADMIN/SUPER_ADMIN)
 app.use("/api/rapports", requireAuth, rapportsRoutes);
 
@@ -196,7 +201,7 @@ const ROUTES_DASHBOARD = new Set([
   "/confidentialite", "/cgv-cgu",
   "/ouvriers", "/badges", "/badges/atelier", "/pointages", "/historique",
   "/departements", "/gestion-departements", "/migration-ouvrier",
-  "/rapports", "/gestion-admins",
+  "/rapports", "/gestion-admins", "/temples",
 ]);
 if (DASHBOARD_DIR) {
   app.use((req, res, next) => {

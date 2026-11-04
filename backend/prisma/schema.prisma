@@ -45,14 +45,39 @@ enum RoleDepartement {
   MEMBRE
 }
 
+// Temple (église locale). SHALOM est le siège. Identifiants fixes posés par la
+// migration 20261104120000_temples ("eglise-shalom", "eglise-adjahui",
+// "eglise-quatre-croix") : le siège sert de valeur par défaut aux colonnes
+// egliseId, ce qui garde valides les écritures qui ne précisent pas de temple.
+model Eglise {
+  id        String   @id @default(uuid())
+  code      String   @unique // SHALOM | ADJAHUI | QUATRE_CROIX (URL du terminal, import)
+  nom       String   @unique // « Temple SHALOM »
+  estSiege  Boolean  @default(false)
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  departements Departement[]
+  ouvriers     Ouvrier[]
+  pointages    Pointage[] // pointages FAITS dans ce temple (lieu du terminal)
+
+  @@map("Eglise")
+}
+
+// Un département appartient à UN temple : « CHORALE » peut exister dans
+// chaque temple (unicité du nom par temple).
 model Departement {
   id          String  @id @default(uuid())
-  nom         String  @unique
+  nom         String
   description String?
+  egliseId    String  @default("eglise-shalom")
   createdAt   DateTime @default(now())
 
+  eglise  Eglise @relation(fields: [egliseId], references: [id])
   membres OuvrierDepartement[]
 
+  @@unique([egliseId, nom])
+  @@index([egliseId])
   @@map("Departement")
 }
 
@@ -80,11 +105,15 @@ model Ouvrier {
   photoUrl    String? // optionnel
   telephone   String? // optionnel (contact de l'ouvrier)
   actif       Boolean @default(true) // badge valide tant qu'actif = true
+  // Temple d'appartenance : l'ouvrier ne rejoint que des départements de ce temple.
+  egliseId    String  @default("eglise-shalom")
   createdAt   DateTime @default(now())
 
-  pointages   Pointage[]
+  eglise       Eglise @relation(fields: [egliseId], references: [id])
+  pointages    Pointage[]
   departements OuvrierDepartement[]
 
+  @@index([egliseId])
   @@map("Ouvrier")
 }
 
@@ -97,10 +126,15 @@ model Pointage {
   // badger qu'UNE fois par jour, même si deux requêtes arrivent en parallèle.
   jour      DateTime @db.Date
   type      TypePointage @default(ENTRER) // non utilisé pour l'instant
+  // Lieu du badgeage : temple du terminal (peut différer du temple de
+  // l'ouvrier → « visiteur »). Null seulement si le temple a été supprimé.
+  egliseId  String?
+  eglise    Eglise?  @relation(fields: [egliseId], references: [id], onDelete: SetNull)
 
   @@unique([ouvrierId, jour])
   @@index([ouvrierId, dateHeure])
   @@index([jour])
+  @@index([egliseId, jour])
   @@map("Pointage")
 }
 

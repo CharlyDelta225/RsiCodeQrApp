@@ -8,6 +8,7 @@ import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Btn from "../ui/Btn";
 import { Field, Input, Select } from "../ui/inputs";
+import { useTemple, TemplePill, LieuPill, paramTemple } from "../lib/temple";
 
 const LIMIT = 25;
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
@@ -51,14 +52,15 @@ export default function HistoriquePage() {
   const [ouvrierId, setOuvrierId] = useState("");
   const [ouvriers, setOuvriers] = useState([]);
   const [jourSemaine, setJourSemaine] = useState("");
+  const { egliseId } = useTemple();
 
   const chargerOuvriers = useCallback(() => {
     setErreurOuvriers(null);
     api
-      .getOuvriers({ limit: 2000 })
+      .getOuvriers({ limit: 2000, ...paramTemple(egliseId) })
       .then((data) => setOuvriers(data.ouvriers))
       .catch(() => setErreurOuvriers("La liste des ouvriers du filtre n'a pas pu être chargée."));
-  }, []);
+  }, [egliseId]);
 
   useEffect(() => {
     chargerOuvriers();
@@ -67,11 +69,11 @@ export default function HistoriquePage() {
   // Filtres communs à l'affichage et à l'export. Le jour de la semaine est
   // appliqué en base : il vaut pour toutes les pages, pas seulement la page affichée.
   const filtres = useCallback(() => {
-    const params = { du, au };
+    const params = { du, au, ...paramTemple(egliseId) };
     if (ouvrierId) params.ouvrierId = ouvrierId;
     if (jourSemaine !== "") params.jourSemaine = jourSemaine;
     return params;
-  }, [du, au, ouvrierId, jourSemaine]);
+  }, [du, au, ouvrierId, jourSemaine, egliseId]);
 
   const charger = useCallback(async () => {
     setChargement(true);
@@ -195,7 +197,7 @@ export default function HistoriquePage() {
       </form>
 
       <TableShell
-        colonnes={["Date / heure", "Matricule", "Nom", "Prénom", "Département"]}
+        colonnes={["Date / heure", "Matricule", "Nom", "Prénom", "Temple", "Département", "Lieu du pointage"]}
         chargement={chargement}
         vide="Aucun pointage sur cette période"
       >
@@ -205,7 +207,9 @@ export default function HistoriquePage() {
             <td className="px-3 py-2 font-mono text-xs">{p.ouvrier?.matricule}</td>
             <td className="px-3 py-2">{p.ouvrier?.nom}</td>
             <td className="px-3 py-2">{p.ouvrier?.prenom}</td>
+            <td className="px-3 py-2"><TemplePill eglise={p.ouvrier?.eglise} /></td>
             <td className="px-3 py-2">{libelleDepartement(p.ouvrier)}</td>
+            <td className="px-3 py-2 text-right"><LieuPill lieu={p.eglise} visiteur={p.visiteur} /></td>
           </tr>
         ))}
       </TableShell>

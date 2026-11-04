@@ -3,6 +3,12 @@ import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 import { requireRole } from "../middleware/auth.middleware.js";
+import {
+  SELECT_EGLISE,
+  resoudreEgliseEcriture,
+  ERREUR_EGLISE_INCONNUE,
+  ERREUR_EGLISE_DIFFERENTE,
+} from "../lib/eglises.js";
 
 const router = Router();
 
@@ -30,21 +36,25 @@ async function verifierUnicitePoste(departementId, role, excludeOuvrierId = null
 /**
  * GET /api/departements
  * Liste les départements. Query optionnels :
+ *   ?egliseId=uuid     départements d'un seul temple
  *   ?page=1&limit=50   pagination (défauts : page 1, limit 50)
- * Réponse : { ok: true, total, page, limit, departements: [{ id, nom, description, createdAt, _count: { membres } }] }
+ * Réponse : { ok: true, total, page, limit, departements: [{ id, nom, description, egliseId, eglise: { id, code, nom, estSiege }, createdAt, _count: { membres } }] }
  */
 router.get("/", async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page ?? "1", 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit ?? "50", 10) || 50));
 
+    // ?egliseId=... : départements d'un seul temple.
+    const where = req.query.egliseId ? { egliseId: String(req.query.egliseId) } : {};
     const [total, departements] = await Promise.all([
-      prisma.departement.count(),
+      prisma.departement.count({ where }),
       prisma.departement.findMany({
-        orderBy: { nom: "asc" },
+        where,
+        orderBy: [{ eglise: { estSiege: "desc" } }, { eglise: { nom: "asc" } }, { nom: "asc" }],
         skip: (page - 1) * limit,
         take: limit,
-        include: { _count: { select: { membres: true } } },
+        include: { _count: { select: { membres: true } }, eglise: { select: SELECT_EGLISE } },
       }),
     ]);
 
@@ -65,6 +75,7 @@ router.get("/:id", async (req, res) => {
     const departement = await prisma.departement.findUnique({
       where: { id: req.params.id },
       include: {
+        eglise: { select: SELECT_EGLISE },
         membres: {
           include: { ouvrier: true },
           orderBy: [{ ouvrier: { nom: "asc" } }, { ouvrier: { prenom: "asc" } }],
@@ -93,6 +104,7 @@ router.get("/:id/membres", async (req, res) => {
     const departement = await prisma.departement.findUnique({
       where: { id: req.params.id },
       include: {
+        eglise: { select: SELECT_EGLISE },
         membres: {
           include: { ouvrier: true },
           orderBy: [{ ouvrier: { nom: "asc" } }, { ouvrier: { prenom: "asc" } }],
@@ -106,7 +118,7 @@ router.get("/:id/membres", async (req, res) => {
 
     return res.json({
       ok: true,
-      departement: { id: departement.id, nom: departement.nom },
+      departement: { id: departement.id, nom: departement.nom, egliseId: departement.egliseId, eglise: departement.eglise },
       membres: departement.membres,
     });
   } catch (err) {
@@ -127,12 +139,13 @@ function normaliserNom(valeur) {
 }
 
 /**
- * Vérifie qu'un nom de département n'existe pas déjà, en ignorant la casse ET
- * les accents ("media" ≈ "MÉDIA"). Renvoie true si le nom est déjà pris.
+ * Vérifie qu'un nom de département n'existe pas déjà DANS CE TEMPLE, en
+ * ignorant la casse ET les accents ("media" ≈ "MÉDIA"). Deux temples peuvent
+ * avoir chacun leur « CHORALE ». Renvoie true si le nom est déjà pris.
  */
-async function nomDejaPris(nom, idExclu = null) {
+async function nomDejaPris(nom, egliseId, idExclu = null) {
   const departements = await prisma.departement.findMany({
-    where: idExclu ? { id: { not: idExclu } } : undefined,
+    where: { egliseId, ...(idExclu && { id: { not: idExclu } }) },
     select: { nom: true },
   });
   const cible = normaliserNomDepartement(nom);
@@ -142,12 +155,12 @@ async function nomDejaPris(nom, idExclu = null) {
 /**
  * POST /api/departements
  * Crée un département. Body :
- *   { "nom": "...", "description": "..."? }
- * Champs requis : nom.
+ *   { "nom": "...", "description": "..."?, "egliseId": "..."? }
+ * Champs requis : nom. Temple : siège si egliseId est absent.
  */
 router.post("/", ECRITURE, async (req, res) => {
   try {
-    const { nom, description } = req.body ?? {};
+    const { nom, description, egliseId } = req.body ?? {};
 
     if (!nom || !String(nom).trim()) {
       return res.status(400).json({
@@ -157,13 +170,16 @@ router.post("/", ECRITURE, async (req, res) => {
       });
     }
 
+    const eglise = await resoudreEgliseEcriture(egliseId);
+    if (!eglise) return res.status(400).json(ERREUR_EGLISE_INCONNUE);
+
     // Anti-doublon insensible à la casse ET aux accents (renvoie 409 avant
     // même que PostgreSQL n'émette P2002, qui reste garde-fou pour la casse).
-    if (await nomDejaPris(nom)) {
+    if (await nomDejaPris(nom, eglise.id)) {
       return res.status(409).json({
         ok: false,
         code: "DEPARTEMENT_EXISTANT",
-        message: "Ce nom de département existe déjà",
+        message: "Ce nom de département existe déjà dans ce temple",
       });
     }
 
@@ -171,7 +187,9 @@ router.post("/", ECRITURE, async (req, res) => {
       data: {
         nom: normaliserNom(nom),
         description: description ? String(description).trim() : null,
+        egliseId: eglise.id,
       },
+      include: { eglise: { select: SELECT_EGLISE } },
     });
 
     return res.status(201).json({ ok: true, departement });
@@ -199,8 +217,14 @@ router.patch("/:id", ECRITURE, async (req, res) => {
       return res.status(400).json({ ok: false, code: "AUCUNE_DONNEE", message: "Aucune donnée à mettre à jour" });
     }
 
+    // Le temple d'un département ne change pas (ses membres en dépendent).
+    const actuel = await prisma.departement.findUnique({ where: { id: req.params.id }, select: { egliseId: true } });
+    if (!actuel) {
+      return res.status(404).json({ ok: false, code: "DEPARTEMENT_INCONNU", message: "Département introuvable" });
+    }
+
     // Anti-doublon insensible à la casse ET aux accents (jamais sur soi-même).
-    if (donnees.nom !== undefined && (await nomDejaPris(donnees.nom, req.params.id))) {
+    if (donnees.nom !== undefined && (await nomDejaPris(donnees.nom, actuel.egliseId, req.params.id))) {
       return res.status(409).json({
         ok: false,
         code: "DEPARTEMENT_EXISTANT",
@@ -282,6 +306,11 @@ router.post("/:id/membres", ECRITURE, async (req, res) => {
     const ouvrier = await prisma.ouvrier.findUnique({ where: { id: ouvrierId } });
     if (!ouvrier) {
       return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
+    }
+
+    // Un ouvrier ne rejoint que les départements de son temple.
+    if (ouvrier.egliseId !== departement.egliseId) {
+      return res.status(409).json(ERREUR_EGLISE_DIFFERENTE);
     }
 
     // Vérifier unicité responsable/adjoint (si applicable)

@@ -37,7 +37,7 @@ function nomAdmin(admin) {
 const GROUPS = [
   { key: "pilotage", label: "Pilotage", paths: ["/", "/pointages", "/historique", "/rapports"] },
   { key: "gestion", label: "Gestion", paths: ["/ouvriers", "/badges", "/badges/atelier", "/departements", "/gestion-departements", "/migration-ouvrier"] },
-  { key: "admin", label: "Administration", paths: ["/gestion-admins"] },
+  { key: "admin", label: "Administration", paths: ["/temples", "/gestion-admins"] },
 ];
 
 function getGroup(path) {
@@ -52,7 +52,7 @@ function getGroup(path) {
   if (path.startsWith("/departements")) return "gestion";
   if (path.startsWith("/ouvriers")) return "gestion";
   if (path.startsWith("/pointages") || path.startsWith("/historique") || path.startsWith("/rapports")) return "pilotage";
-  if (path.startsWith("/gestion-admins")) return "admin";
+  if (path.startsWith("/gestion-admins") || path.startsWith("/temples")) return "admin";
   if (path.startsWith("/migration")) return "gestion";
   return null;
 }

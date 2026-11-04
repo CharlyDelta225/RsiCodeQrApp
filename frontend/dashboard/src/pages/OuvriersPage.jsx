@@ -12,6 +12,7 @@ import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
 import Modal from "../ui/Modal";
 import { Field, Input, Select } from "../ui/inputs";
+import { useTemple, TemplePill, paramTemple } from "../lib/temple";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -32,6 +33,9 @@ function raisonEchec(err, fallback) {
     COLONNES_MANQUANTES: "Colonnes attendues manquantes. Le fichier doit contenir : Nom, Prénom, Département, Téléphone.",
     DEPARTEMENT_INCONNU: "Un ou plusieurs départements ne sont pas dans la liste. Veuillez choisir des départements corrects.",
     DOUBLON_DEPARTEMENT: "Un ouvrier avec ce nom et ce prénom existe déjà dans ce département",
+    EGLISE_DIFFERENTE: "Ce département appartient à un autre temple que l'ouvrier.",
+    EGLISE_INCONNUE: "Ce temple n'existe pas ou est désactivé.",
+    TEMPLE_INCONNU: "Un ou plusieurs temples du fichier sont inconnus (valeurs acceptées : SHALOM, ADJAHUI, 4 CROIX).",
     MATRICULE_EXISTANT: "Ce matricule existe déjà",
     CHAMPS_MANQUANTS: "Des champs obligatoires sont manquants",
     ROLE_INVALIDE: "Poste invalide",
@@ -48,6 +52,9 @@ function raisonEchec(err, fallback) {
 
 export default function OuvriersPage() {
   const toast = useToast();
+  const { egliseId, egliseCourante, actives: temples, siege } = useTemple();
+  // Temple proposé par défaut à la création et à l'import : celui affiché, sinon le siège.
+  const templeParDefaut = egliseId || siege?.id || "";
   const [ouvriers, setOuvriers] = useState([]);
   const [total, setTotal] = useState(0);
   const [recherche, setRecherche] = useState("");
@@ -56,11 +63,11 @@ export default function OuvriersPage() {
   const [succes, setSucces] = useState(null);
 
   const [modalOuvert, setModalOuvert] = useState(false);
-  const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", departement: "", photoUrl: "" });
+  const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", departement: "", photoUrl: "", egliseId: "" });
   const [envoi, setEnvoi] = useState(false);
 
   const [modification, setModification] = useState(null); // ouvrier en cours de modification
-  const [formModification, setFormModification] = useState({ nom: "", prenom: "", telephone: "", departements: [], matricule: "", photoUrl: "" });
+  const [formModification, setFormModification] = useState({ nom: "", prenom: "", telephone: "", departements: [], matricule: "", photoUrl: "", egliseId: "" });
   const [envoiModification, setEnvoiModification] = useState(false);
 
   const [importEnCours, setImportEnCours] = useState(false);
@@ -91,11 +98,11 @@ export default function OuvriersPage() {
     setChargement(true);
     setAlerte(null);
     try {
-      const params = { limit: 2000 };
+      const params = { limit: 2000, ...paramTemple(egliseId) };
       if (recherche) params.recherche = recherche;
       const [data, dataDepts] = await Promise.all([
         api.getOuvriers(params),
-        api.getDepartements({ limit: 200 }),
+        api.getDepartements({ limit: 100 }),
       ]);
       setOuvriers(data.ouvriers);
       setTotal(data.total);
@@ -105,7 +112,15 @@ export default function OuvriersPage() {
     } finally {
       setChargement(false);
     }
-  }, [recherche]);
+  }, [recherche, egliseId]);
+
+  // Départements proposés : uniquement ceux du temple de l'ouvrier.
+  const departementsDuTemple = (id) => departements.filter((d) => d.egliseId === id);
+
+  function ouvrirCreation() {
+    setForm({ nom: "", prenom: "", telephone: "", departement: "", photoUrl: "", egliseId: templeParDefaut });
+    setModalOuvert(true);
+  }
 
   useEffect(() => {
     charger();
@@ -126,9 +141,9 @@ export default function OuvriersPage() {
         telephone: form.telephone,
         departementNom: form.departement,
         photoUrl: form.photoUrl?.trim() || undefined,
+        egliseId: form.egliseId || undefined,
       });
       setModalOuvert(false);
-      setForm({ nom: "", prenom: "", telephone: "", departement: "", photoUrl: "" });
       setSucces({ titre: "Ajout réussi", message: `L'ouvrier ${form.prenom} ${form.nom} a bien été ajouté(e).` });
       charger();
     } catch (err) {
@@ -146,6 +161,7 @@ export default function OuvriersPage() {
       departements: (o.departements || []).map((l) => l.departement?.nom).filter(Boolean),
       matricule: o.matricule || "",
       photoUrl: o.photoUrl || "",
+      egliseId: o.egliseId || "",
     });
     setModification(o);
     setAlerte(null);
@@ -174,12 +190,21 @@ export default function OuvriersPage() {
         photoUrl: formModification.photoUrl?.trim() || null,
       });
 
+      // Changement de temple : transfert d'abord (retire les départements de
+      // l'ancien temple), puis affectation aux départements cochés du nouveau.
+      const changeTemple = formModification.egliseId && formModification.egliseId !== modification.egliseId;
+      if (changeTemple) {
+        await api.transfererOuvrier(modification.id, formModification.egliseId);
+      }
+
       // Départements : on coche/décoche => on affecte (ajout) ou on retire la liaison.
-      const actuels = (modification.departements || []).map((l) => l.departement?.nom).filter(Boolean);
+      const actuels = changeTemple
+        ? []
+        : (modification.departements || []).map((l) => l.departement?.nom).filter(Boolean);
       const cibles = formModification.departements;
       const aAjouter = cibles.filter((n) => !actuels.includes(n));
       const aRetirer = actuels.filter((n) => !cibles.includes(n));
-      const idParNom = new Map(departements.map((d) => [d.nom, d.id]));
+      const idParNom = new Map(departementsDuTemple(formModification.egliseId).map((d) => [d.nom, d.id]));
 
       for (const nom of aAjouter) {
         const id = idParNom.get(nom);
@@ -216,7 +241,7 @@ export default function OuvriersPage() {
     setImportEnCours(true);
     setAlerte(null);
     try {
-      const data = await api.importOuvriers(fichier);
+      const data = await api.importOuvriers(fichier, templeParDefaut);
       await charger();
       const { creees = 0, erreurs = 0 } = data;
       if (creees > 0 && erreurs > 0) {
@@ -312,8 +337,13 @@ export default function OuvriersPage() {
               <input type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImport} disabled={importEnCours} />
             </label>
           )}
+          {peutEcrire() && temples.length > 0 && (
+            <span className="text-[11px] text-slate-500 max-w-[14rem] leading-tight">
+              Import vers {egliseCourante?.nom || siege?.nom || "le siège"} (sauf colonne « Temple » dans le fichier)
+            </span>
+          )}
           {peutEcrire() && (
-            <Btn onClick={() => setModalOuvert(true)} icon={<Plus size={16} />}>
+            <Btn onClick={ouvrirCreation} icon={<Plus size={16} />}>
               Ajouter un ouvrier
             </Btn>
           )}
@@ -357,7 +387,7 @@ export default function OuvriersPage() {
       />
 
       <TableShell
-        colonnes={["Matricule", "Nom", "Prénom", "Téléphone", "Département", "Statut", "Actions"]}
+        colonnes={["Matricule", "Nom", "Prénom", "Téléphone", "Temple", "Département", "Statut", "Actions"]}
         chargement={chargement}
         vide="Aucun ouvrier trouvé"
       >
@@ -367,6 +397,7 @@ export default function OuvriersPage() {
             <td className="px-3 py-2">{o.nom}</td>
             <td className="px-3 py-2">{o.prenom}</td>
             <td className="px-3 py-2 whitespace-nowrap">{o.telephone || "—"}</td>
+            <td className="px-3 py-2"><TemplePill eglise={o.eglise} /></td>
             <td className="px-3 py-2">{libelleDepartement(o)}</td>
             <td className="px-3 py-2">
               <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
@@ -419,7 +450,20 @@ export default function OuvriersPage() {
             <Field label="Téléphone">
               <Input type="tel" required placeholder="Téléphone" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
             </Field>
-            <Field label="Département">
+            <Field label="Temple">
+              <Select
+                required
+                value={form.egliseId}
+                onChange={(e) => setForm({ ...form, egliseId: e.target.value, departement: "" })}
+              >
+                {temples.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nom}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Département" hint="Départements du temple choisi.">
               <Input
                 required
                 list="departements"
@@ -436,7 +480,7 @@ export default function OuvriersPage() {
               />
             </Field>
             <datalist id="departements">
-              {departements.map((d) => (
+              {departementsDuTemple(form.egliseId).map((d) => (
                 <option key={d.id} value={d.nom} />
               ))}
             </datalist>
@@ -499,12 +543,39 @@ export default function OuvriersPage() {
                 onChange={(e) => setFormModification({ ...formModification, photoUrl: e.target.value })}
               />
             </Field>
-            <Field label="Département(s)" hint="Cochez les départements auquels l'ouvrier appartient — appliqué lors de l'enregistrement.">
+            <Field label="Temple d'appartenance">
+              <Select
+                value={formModification.egliseId}
+                onChange={(e) =>
+                  setFormModification({
+                    ...formModification,
+                    egliseId: e.target.value,
+                    // Les départements sont propres à chaque temple : on repart de zéro.
+                    departements:
+                      e.target.value === modification.egliseId
+                        ? (modification.departements || []).map((l) => l.departement?.nom).filter(Boolean)
+                        : [],
+                  })
+                }
+              >
+                {temples.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nom}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {formModification.egliseId !== modification.egliseId && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                Changer de temple retire l'ouvrier de ses départements actuels. Ses pointages passés sont conservés.
+              </p>
+            )}
+            <Field label="Département(s)" hint="Cochez les départements du temple auxquels l'ouvrier appartient. Appliqué à l'enregistrement.">
               <div className="border border-slate-200 rounded-lg p-2 max-h-44 overflow-y-auto space-y-1 bg-white">
-                {departements.length === 0 && (
-                  <p className="text-xs text-slate-500">Aucun département configuré.</p>
+                {departementsDuTemple(formModification.egliseId).length === 0 && (
+                  <p className="text-xs text-slate-500">Aucun département dans ce temple.</p>
                 )}
-                {departements.map((d) => {
+                {departementsDuTemple(formModification.egliseId).map((d) => {
                   const coche = formModification.departements.includes(d.nom);
                   return (
                     <label

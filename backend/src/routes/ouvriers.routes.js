@@ -6,6 +6,12 @@ import { genererMatricule, creerAvecMatricule } from "../lib/matricule.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 import { genererBadgePng } from "../lib/badge.js";
 import { requireRole } from "../middleware/auth.middleware.js";
+import {
+  SELECT_EGLISE,
+  resoudreEgliseEcriture,
+  ERREUR_EGLISE_INCONNUE,
+  ERREUR_EGLISE_DIFFERENTE,
+} from "../lib/eglises.js";
 
 const router = Router();
 
@@ -17,6 +23,24 @@ const LIMITE_MAX = 2000;
 // Seuls ADMIN et SUPER_ADMIN peuvent modifier/supprimer des ouvriers.
 // La lecture (GET) reste ouverte à tous les rôles authentifiés (dont LECTEUR).
 const ECRITURE = requireRole("ADMIN", "SUPER_ADMIN");
+
+// Relations renvoyées avec chaque ouvrier : son temple et ses départements.
+const INCLUDE_OUVRIER = Object.freeze({
+  eglise: { select: SELECT_EGLISE },
+  departements: {
+    include: { departement: { select: { id: true, nom: true, egliseId: true } } },
+  },
+});
+
+/** Département de ce temple dont le nom correspond (casse et accents ignorés). */
+async function departementParNom(nom, egliseId) {
+  const departements = await prisma.departement.findMany({
+    where: { egliseId },
+    select: { id: true, nom: true },
+  });
+  const cible = normaliserNomDepartement(nom);
+  return departements.find((d) => normaliserNomDepartement(d.nom) === cible) ?? null;
+}
 
 // Compare les champs autorisés :
 // - sans champ "matricule" => généré automatiquement (création)
@@ -55,6 +79,7 @@ router.get("/", async (req, res) => {
     if (req.query.departementId) {
       ou.departements = { some: { departementId: req.query.departementId } };
     }
+    if (req.query.egliseId) ou.egliseId = String(req.query.egliseId);
 
     const recherche = String(req.query.recherche ?? "").trim();
     if (recherche) {
@@ -72,11 +97,7 @@ router.get("/", async (req, res) => {
         orderBy: [{ nom: "asc" }, { prenom: "asc" }],
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          departements: {
-            include: { departement: { select: { id: true, nom: true } } },
-          },
-        },
+        include: INCLUDE_OUVRIER,
       }),
     ]);
 
@@ -107,6 +128,7 @@ router.get("/badges/zip", ECRITURE, async (req, res) => {
     if (req.query.departementId) {
       ou.departements = { some: { departementId: req.query.departementId } };
     }
+    if (req.query.egliseId) ou.egliseId = String(req.query.egliseId);
 
     const ouvriers = await prisma.ouvrier.findMany({ where: ou, orderBy: [{ nom: "asc" }, { prenom: "asc" }] });
 
@@ -160,11 +182,7 @@ router.get("/:id", async (req, res) => {
   try {
     const ouvrier = await prisma.ouvrier.findUnique({
       where: { id: req.params.id },
-      include: {
-        departements: {
-          include: { departement: { select: { id: true, nom: true } } },
-        },
-      },
+      include: INCLUDE_OUVRIER,
     });
     if (!ouvrier) {
       return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
@@ -196,23 +214,29 @@ router.post("/", ECRITURE, async (req, res) => {
       });
     }
 
+    // Temple d'appartenance (siège si non précisé).
+    const eglise = await resoudreEgliseEcriture(req.body?.egliseId);
+    if (!eglise) return res.status(400).json(ERREUR_EGLISE_INCONNUE);
+
     const donnees = extraireChamps(req.body);
+    donnees.egliseId = eglise.id;
     if (!donnees.matricule) {
       donnees.matricule = await genererMatricule();
     }
 
-    // Déterminer le département cible (rattachement créé après la création).
-    // La correspondance par nom ignore la casse et les accents ("media" → "MÉDIA").
-    let departementIdFinal = departementId || null;
-    if (!departementIdFinal && departementNom) {
-      const departements = await prisma.departement.findMany({
-        select: { id: true, nom: true },
-      });
-      const cible = departements.find(
-        (d) =>
-          normaliserNomDepartement(d.nom) ===
-          normaliserNomDepartement(departementNom)
-      );
+    // Déterminer le département cible (rattachement créé après la création),
+    // toujours DANS le temple de l'ouvrier. La correspondance par nom ignore
+    // la casse et les accents ("media" → "MÉDIA").
+    let departementIdFinal = null;
+    if (departementId) {
+      const cible = await prisma.departement.findUnique({ where: { id: departementId }, select: { id: true, egliseId: true } });
+      if (!cible) {
+        return res.status(400).json({ ok: false, code: "DEPARTEMENT_INCONNU", message: "Ce département n'existe pas" });
+      }
+      if (cible.egliseId !== eglise.id) return res.status(409).json(ERREUR_EGLISE_DIFFERENTE);
+      departementIdFinal = cible.id;
+    } else if (departementNom) {
+      const cible = await departementParNom(departementNom, eglise.id);
       if (cible) departementIdFinal = cible.id;
     }
 
@@ -240,7 +264,7 @@ router.post("/", ECRITURE, async (req, res) => {
     // puis on crée avec retry (collision P2002 gérée dans creerAvecMatricule).
     const ouvrier = donnees.matricule
       ? await prisma.ouvrier.create({ data: donnees })
-      : await creerAvecMatricule({ nom: donnees.nom, prenom: donnees.prenom, ...(donnees.photoUrl !== undefined && { photoUrl: donnees.photoUrl }), ...(donnees.actif !== undefined && { actif: donnees.actif }) });
+      : await creerAvecMatricule({ nom: donnees.nom, prenom: donnees.prenom, egliseId: donnees.egliseId, ...(donnees.photoUrl !== undefined && { photoUrl: donnees.photoUrl }), ...(donnees.actif !== undefined && { actif: donnees.actif }) });
 
     // Créer la liaison département si fourni
     if (departementIdFinal) {
@@ -256,11 +280,7 @@ router.post("/", ECRITURE, async (req, res) => {
     // Recharger avec les départements
     const ouvrierComplet = await prisma.ouvrier.findUnique({
       where: { id: ouvrier.id },
-      include: {
-        departements: {
-          include: { departement: { select: { id: true, nom: true } } },
-        },
-      },
+      include: INCLUDE_OUVRIER,
     });
 
     return res.status(201).json({ ok: true, ouvrier: ouvrierComplet });
@@ -315,17 +335,17 @@ router.patch("/:id", ECRITURE, async (req, res) => {
     // Résoudre le département cible (id ou nom normalisé).
     let departementIdFinal = null;
     if (aDepartement) {
+      // Le département doit appartenir au temple de l'ouvrier (le temple
+      // change uniquement par PATCH /:id/transferer).
       if (departementIdBrut) {
-        const cible = await prisma.departement.findUnique({ where: { id: departementIdBrut }, select: { id: true } });
+        const cible = await prisma.departement.findUnique({ where: { id: departementIdBrut }, select: { id: true, egliseId: true } });
         if (!cible) {
           return res.status(400).json({ ok: false, code: "DEPARTEMENT_INCONNU", message: "Ce département n'existe pas" });
         }
+        if (cible.egliseId !== avant.egliseId) return res.status(409).json(ERREUR_EGLISE_DIFFERENTE);
         departementIdFinal = cible.id;
       } else {
-        const departements = await prisma.departement.findMany({ select: { id: true, nom: true } });
-        const cible = departements.find(
-          (d) => normaliserNomDepartement(d.nom) === normaliserNomDepartement(departementNomBrut)
-        );
+        const cible = await departementParNom(departementNomBrut, avant.egliseId);
         if (!cible) {
           return res.status(400).json({ ok: false, code: "DEPARTEMENT_INCONNU", message: "Ce département n'existe pas" });
         }
@@ -358,9 +378,7 @@ router.patch("/:id", ECRITURE, async (req, res) => {
     const ouvrier = await prisma.ouvrier.update({
       where: { id: req.params.id },
       data: donnees,
-      include: {
-        departements: { include: { departement: { select: { id: true, nom: true } } } },
-      },
+      include: INCLUDE_OUVRIER,
     });
 
     // Rattachement : on remplace la ou les liaisons par l'unique département
@@ -385,9 +403,7 @@ router.patch("/:id", ECRITURE, async (req, res) => {
     if (departementModifie) {
       const recharge = await prisma.ouvrier.findUnique({
         where: { id: req.params.id },
-        include: {
-          departements: { include: { departement: { select: { id: true, nom: true } } } },
-        },
+        include: INCLUDE_OUVRIER,
       });
       return res.json({ ok: true, ouvrier: recharge });
     }
@@ -401,6 +417,45 @@ router.patch("/:id", ECRITURE, async (req, res) => {
       return res.status(409).json({ ok: false, code: "MATRICULE_EXISTANT", message: "Ce matricule existe déjà" });
     }
     logger.error("[OUVRIERS/MAJ]", err);
+    return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
+  }
+});
+
+/**
+ * PATCH /api/ouvriers/:id/transferer
+ * Change le temple d'appartenance d'un ouvrier. Body : { "egliseId": "..." }
+ * (id, code ou nom du temple). Ses affectations aux départements de l'ancien
+ * temple sont retirées dans la même transaction ; ses pointages sont conservés.
+ * Réponse : { ok, ouvrier, departementsRetires: ["CHORALE", ...] }
+ */
+router.patch("/:id/transferer", ECRITURE, async (req, res) => {
+  try {
+    if (!String(req.body?.egliseId ?? "").trim()) {
+      return res.status(400).json({ ok: false, code: "CHAMPS_MANQUANTS", message: "Le temple de destination est requis" });
+    }
+    const eglise = await resoudreEgliseEcriture(req.body.egliseId);
+    if (!eglise) return res.status(400).json(ERREUR_EGLISE_INCONNUE);
+
+    const avant = await prisma.ouvrier.findUnique({ where: { id: req.params.id }, include: INCLUDE_OUVRIER });
+    if (!avant) {
+      return res.status(404).json({ ok: false, code: "OUVRIER_INCONNU", message: "Ouvrier introuvable" });
+    }
+    if (avant.egliseId === eglise.id) {
+      return res.json({ ok: true, ouvrier: avant, departementsRetires: [] });
+    }
+
+    const aRetirer = avant.departements.filter((l) => l.departement?.egliseId !== eglise.id);
+    const [, ouvrier] = await prisma.$transaction([
+      prisma.ouvrierDepartement.deleteMany({ where: { id: { in: aRetirer.map((l) => l.id) } } }),
+      prisma.ouvrier.update({ where: { id: avant.id }, data: { egliseId: eglise.id }, include: INCLUDE_OUVRIER }),
+    ]);
+    return res.json({
+      ok: true,
+      ouvrier,
+      departementsRetires: aRetirer.map((l) => l.departement?.nom).filter(Boolean),
+    });
+  } catch (err) {
+    logger.error("[OUVRIERS/TRANSFERT]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });
   }
 });

@@ -23,6 +23,7 @@ const GestionDepartementsPage = lazy(() => import("./pages/GestionDepartementsPa
 const MigrationOuvrierPage = lazy(() => import("./pages/MigrationOuvrierPage.jsx"));
 const GestionAdminsPage = lazy(() => import("./pages/GestionAdminsPage.jsx"));
 const RapportPage = lazy(() => import("./pages/RapportPage.jsx"));
+const TemplesPage = lazy(() => import("./pages/TemplesPage.jsx"));
 
 function PageChargement() {
   return (
@@ -84,6 +85,14 @@ export default function App() {
             }
           />
           <Route path="/rapports" element={<RapportPage />} />
+          <Route
+            path="/temples"
+            element={
+              <RequireRole roles={["SUPER_ADMIN"]}>
+                <TemplesPage />
+              </RequireRole>
+            }
+          />
           <Route
             path="/gestion-admins"
             element={

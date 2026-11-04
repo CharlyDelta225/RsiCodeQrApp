@@ -58,7 +58,8 @@ export function mapOuvrierToBadgeMember(ouvrier = {}) {
       ouvrier.egliseOrigine ?? ouvrier.eglise?.origine ?? ouvrier.eglise
     ),
     egliseActuelle: nomEglise(
-      ouvrier.egliseActuelle ?? ouvrier.eglise?.actuelle
+      // Temple d'appartenance en base ({ id, code, nom }).
+      ouvrier.egliseActuelle ?? ouvrier.eglise?.actuelle ?? ouvrier.eglise
     ),
     verificationUrl: texte(ouvrier.verificationUrl),
     actif: ouvrier.actif !== false,
