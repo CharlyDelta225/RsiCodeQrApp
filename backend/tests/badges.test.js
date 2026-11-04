@@ -148,3 +148,45 @@ test("district du temple modifiable par le SUPER_ADMIN", async () => {
     await prisma.eglise.update({ where: { id: "eglise-adjahui" }, data: { libelleCarte: avant.libelleCarte } });
   }
 });
+
+test("liste du département : responsables d'abord, état de la carte par département", async () => {
+  const admin = await session("ADMIN");
+  const { o: membre, dep } = await ouvrierDans("PROTOCOLE TEST", "MEMBRE", "#1F4FA3");
+  const resp = await prisma.ouvrier.create({
+    data: {
+      matricule: `TEST-BDG-${suffixe}-${ouvriers.length}`,
+      nom: "ZORO",
+      prenom: "Chef",
+      departements: { create: { departementId: dep.id, roleDansDepartement: "RESPONSABLE" } },
+    },
+  });
+  ouvriers.push(resp.id);
+  const inactif = await prisma.ouvrier.create({
+    data: {
+      matricule: `TEST-BDG-${suffixe}-${ouvriers.length}`,
+      nom: "AAA",
+      prenom: "Parti",
+      actif: false,
+      departements: { create: { departementId: dep.id } },
+    },
+  });
+  ouvriers.push(inactif.id);
+
+  await fetch(`${baseURL}/api/badges/confectionnes`, {
+    method: "POST",
+    headers: json(admin),
+    body: JSON.stringify({ ouvrierId: membre.id, departementId: dep.id }),
+  });
+  const r = await fetch(`${baseURL}/api/badges/departement/${dep.id}`, { headers: admin });
+  assert.strictEqual(r.status, 200);
+  const corps = await r.json();
+  assert.strictEqual(corps.departement.couleur, "#1F4FA3");
+  assert.deepStrictEqual(
+    corps.ouvriers.map((x) => [x.id, x.fonction, Boolean(x.confectionneLe)]),
+    [
+      [resp.id, "RESPONSABLE", false],
+      [membre.id, "MEMBRE", true],
+    ]
+  );
+  assert.strictEqual((await fetch(`${baseURL}/api/badges/departement/inconnu`, { headers: admin })).status, 404);
+});

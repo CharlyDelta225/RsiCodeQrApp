@@ -99,6 +99,9 @@ Body `{ ouvrierId, departementId }` → `201`. `409 COULEUR_MANQUANTE` tant que 
 ### `GET /api/badges/a-confectionner?egliseId=&departementId=`
 Ouvriers actifs sans aucune carte faite : `{ ok, total, ouvriers: [{ id, matricule, nom, prenom, departements: [nom] }] }` (500 au plus).
 
+### `GET /api/badges/departement/:departementId`
+Ouvriers actifs du département (responsable, adjoint, secrétaire, puis par nom) avec l'état de leur carte pour ce département : `{ ok, departement: { id, nom, couleur }, ouvriers: [{ id, matricule, nom, prenom, role, fonction, aPhoto, confectionneLe }] }`. `404 DEPARTEMENT_INTROUVABLE`.
+
 ### Champs ajoutés
 - `PATCH /api/departements/:id` accepte `couleur` (`#RRGGBB`, `null` pour effacer ; `400 COULEUR_INVALIDE`).
 - `PATCH /api/eglises/:id` (SUPER_ADMIN) accepte `libelleCarte` (district imprimé, ex. `DISTRICT-SIÈGE`).

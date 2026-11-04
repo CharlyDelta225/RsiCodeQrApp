@@ -255,4 +255,65 @@ router.get("/a-confectionner", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/badges/departement/:departementId
+ * Ouvriers actifs du département, responsables d'abord, avec l'état de leur
+ * carte pour ce département.
+ * { ok, departement: { id, nom, couleur }, ouvriers: [{ id, matricule, nom, prenom,
+ *   role, fonction, aPhoto, confectionneLe }] }
+ */
+const ORDRE_ROLE = { RESPONSABLE: 0, ADJOINT: 1, SECRETAIRE: 2 };
+
+router.get("/departement/:departementId", async (req, res) => {
+  try {
+    const departement = await prisma.departement.findUnique({
+      where: { id: req.params.departementId },
+      select: { id: true, nom: true, couleur: true },
+    });
+    if (!departement) {
+      return res.status(404).json({ ok: false, code: "DEPARTEMENT_INTROUVABLE", message: "Département introuvable" });
+    }
+    const liens = await prisma.ouvrierDepartement.findMany({
+      where: { departementId: departement.id, ouvrier: { actif: true } },
+      select: {
+        roleDansDepartement: true,
+        fonctionCarte: true,
+        ouvrier: {
+          select: {
+            id: true, matricule: true, nom: true, prenom: true,
+            photo: { select: { updatedAt: true } },
+            badges: {
+              where: { departementId: departement.id },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { createdAt: true },
+            },
+          },
+        },
+      },
+    });
+    const ouvriers = liens
+      .map(({ roleDansDepartement: role, fonctionCarte, ouvrier: o }) => ({
+        id: o.id,
+        matricule: o.matricule,
+        nom: o.nom,
+        prenom: o.prenom,
+        role,
+        fonction: fonctionCarte || FONCTION_PAR_ROLE[role] || "MEMBRE",
+        aPhoto: Boolean(o.photo),
+        confectionneLe: o.badges[0]?.createdAt ?? null,
+      }))
+      .sort(
+        (a, b) =>
+          (ORDRE_ROLE[a.role] ?? 9) - (ORDRE_ROLE[b.role] ?? 9) ||
+          a.nom.localeCompare(b.nom, "fr") ||
+          (a.prenom || "").localeCompare(b.prenom || "", "fr")
+      );
+    return res.json({ ok: true, departement, ouvriers });
+  } catch (err) {
+    logger.error("[BADGES/DEPARTEMENT]", err);
+    return erreurInterne(res);
+  }
+});
+
 export default router;
