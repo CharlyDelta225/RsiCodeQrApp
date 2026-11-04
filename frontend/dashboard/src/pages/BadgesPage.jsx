@@ -13,7 +13,7 @@ import Pill from "../ui/Pill";
 import Btn from "../ui/Btn";
 import Modal from "../ui/Modal";
 import { Input, Select } from "../ui/inputs";
-import { useTemple, paramTemple } from "../lib/temple";
+import { useTemple, paramTemple, TemplePill, nomCourt } from "../lib/temple";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -62,7 +62,7 @@ function CarteBadgeImpression({ ouvrier }) {
 }
 
 export default function BadgesPage() {
-  const { egliseId } = useTemple();
+  const { egliseId, setEgliseId, actives, egliseCourante } = useTemple();
   const navigate = useNavigate();
   const [ouvriers, setOuvriers] = useState([]);
   const [departements, setDepartements] = useState([]);
@@ -104,6 +104,7 @@ export default function BadgesPage() {
   }, [recherche, filtreActif, filtreDepartement, egliseId]);
 
   useEffect(() => {
+    setFiltreDepartement("tous");
     api
       .getDepartements({ limit: 100, ...paramTemple(egliseId) })
       .then((d) => setDepartements(d.departements || []))
@@ -118,7 +119,7 @@ export default function BadgesPage() {
 
   useEffect(() => {
     setSelection([]);
-  }, [recherche, filtreActif, filtreDepartement]);
+  }, [recherche, filtreActif, filtreDepartement, egliseId]);
 
   function toggleSelection(id) {
     setSelection((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -170,15 +171,16 @@ export default function BadgesPage() {
     setTelechargementZip(true);
     setErreur(null);
     try {
-      const params = {};
+      const params = { ...paramTemple(egliseId) };
       if (filtreActif === "actifs") params.actif = "true";
       if (filtreActif === "desactives") params.actif = "false";
       if (filtreDepartement !== "tous") params.departementId = filtreDepartement;
       const blob = await api.getBadgesZipBlob(params);
       const date = new Date().toISOString().slice(0, 10);
-      const base = departementChoisi
-        ? departementChoisi.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-")
-        : "tous";
+      const slug = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      const base = [egliseCourante ? slug(nomCourt(egliseCourante)) : "", departementChoisi ? slug(departementChoisi) : ""]
+        .filter(Boolean)
+        .join("-") || "tous";
       telechargerBlob(blob, `badges-qr-${base}-${date}.zip`);
     } catch (err) {
       setErreur(
@@ -244,8 +246,8 @@ export default function BadgesPage() {
             <Btn variant="gold" onClick={handleTelechargerZip} loading={telechargementZip} icon={<Download size={16} />}>
               {telechargementZip
                 ? "Préparation du ZIP…"
-                : departementChoisi
-                ? `Télécharger les QR ${departementChoisi} (ZIP)`
+                : departementChoisi || egliseCourante
+                ? `Télécharger les QR ${[egliseCourante && nomCourt(egliseCourante), departementChoisi].filter(Boolean).join(" · ")} (ZIP)`
                 : "Télécharger tous les QR (ZIP)"}
             </Btn>
           </div>
@@ -265,8 +267,20 @@ export default function BadgesPage() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {actives.length > 1 && (
+            <div className="sm:w-52">
+              <Select value={egliseId} onChange={(e) => setEgliseId(e.target.value)} aria-label="Filtrer par temple">
+                <option value="">Tous les temples</option>
+                {actives.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nom}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
           <div className="sm:w-64">
-            <Select value={filtreDepartement} onChange={(e) => setFiltreDepartement(e.target.value)}>
+            <Select value={filtreDepartement} onChange={(e) => setFiltreDepartement(e.target.value)} aria-label="Filtrer par département">
               <option value="tous">Tous les départements</option>
               {departements.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -304,13 +318,13 @@ export default function BadgesPage() {
       </div>
 
       <p className="text-xs text-slate-500">
-        Le ZIP respecte les filtres de département et de statut ci-dessus et nomme chaque fichier
+        Le ZIP respecte les filtres de temple, de département et de statut ci-dessus et nomme chaque fichier
         <span className="font-mono"> matricule_NOM_Prenom.png</span> pour l'attribution précise à chaque ouvrier.
       </p>
 
       {vue === "liste" ? (
         <TableShell
-          colonnes={["", "Matricule", "Nom", "Prénom", "Téléphone", "Département", "Statut", "Actions"]}
+          colonnes={["", "Matricule", "Nom", "Prénom", "Téléphone", "Temple", "Département", "Statut", "Actions"]}
           chargement={chargement}
           vide="Aucun badge trouvé"
         >
@@ -325,6 +339,7 @@ export default function BadgesPage() {
               <td className="px-3 py-2">{o.nom}</td>
               <td className="px-3 py-2">{o.prenom}</td>
               <td className="px-3 py-2 whitespace-nowrap">{o.telephone || "—"}</td>
+              <td className="px-3 py-2"><TemplePill eglise={o.eglise} /></td>
               <td className="px-3 py-2">{libelleDepartement(o)}</td>
               <td className="px-3 py-2">
                 <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
@@ -390,7 +405,10 @@ export default function BadgesPage() {
                 </div>
 
                 <div className="mt-3 flex items-center justify-between gap-2">
-                  <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <TemplePill eglise={o.eglise} />
+                    <Pill tonalite={o.actif ? "vert" : "gris"}>{o.actif ? "Actif" : "Désactivé"}</Pill>
+                  </div>
                   <Btn
                     variant="secondary"
                     size="xs"
