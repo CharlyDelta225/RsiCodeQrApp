@@ -10,6 +10,7 @@ import Card from "../../../ui/Card";
 import Btn from "../../../ui/Btn";
 import Pill from "../../../ui/Pill";
 import { Select } from "../../../ui/inputs";
+import ChoixDepartement from "../ChoixDepartement";
 import { genererCarte, couleurValide } from "../carte";
 import { preparerPhoto } from "../carte/photo";
 import { associerPhotos } from "./associerPhotos";
@@ -337,22 +338,13 @@ export default function CreationEnMasse({ modifier, allerAuxCouleurs }) {
       >
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Select
-              value={departementId}
-              onChange={(e) => setDepartementId(e.target.value)}
-              aria-label="Département"
-              className="min-w-[240px] max-w-full"
-            >
-              <option value="">— Choisir un département —</option>
-              {departements.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.nom}
-                  {!egliseId && d.eglise ? ` · ${d.eglise.nom}` : ""}
-                  {d._count ? ` (${d._count.membres})` : ""}
-                  {d.couleur ? "" : " · couleur à définir"}
-                </option>
-              ))}
-            </Select>
+            <ChoixDepartement
+              departements={departements}
+              valeur={departementId}
+              onChange={setDepartementId}
+              avecTemple={!egliseId}
+              className="w-full sm:w-[360px] max-w-full"
+            />
             {donnees && (
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer les cartes">
                 {FILTRES.map((f) => (
