@@ -100,7 +100,12 @@ Body `{ ouvrierId, departementId }` → `201`. `409 COULEUR_MANQUANTE` tant que 
 Ouvriers actifs sans aucune carte faite : `{ ok, total, ouvriers: [{ id, matricule, nom, prenom, departements: [nom] }] }` (500 au plus).
 
 ### `GET /api/badges/departement/:departementId`
-Ouvriers actifs du département (responsable, adjoint, secrétaire, puis par nom) avec l'état de leur carte pour ce département : `{ ok, departement: { id, nom, couleur }, ouvriers: [{ id, matricule, nom, prenom, role, fonction, aPhoto, confectionneLe }] }`. `404 DEPARTEMENT_INTROUVABLE`.
+Tout ce qu'il faut pour dessiner les cartes d'un département en une fois. Ouvriers actifs (responsable, adjoint, secrétaire, puis par nom) avec l'état de leur carte pour ce département : `{ ok, departement: { id, nom, nomCarte, libelleCarte, couleur, modeleCarte, egliseId, district }, ouvriers: [{ id, matricule, nom, prenom, role, fonction, aPhoto, photoMaj, confectionneLe }] }`. `404 DEPARTEMENT_INTROUVABLE`.
+
+### `POST /api/badges/confectionnes/lot` (ADMIN, SUPER_ADMIN)
+Body `{ departementId, ouvrierIds: [] }` (500 au plus) → `201 { ok, crees, ignores }`. Les ouvriers hors du département sont ignorés. `400 CHAMPS_MANQUANTS`, `404 DEPARTEMENT_INTROUVABLE`, `409 COULEUR_MANQUANTE`.
+
+`GET /api/badges/photo/:id?v=<photoMaj>` : avec `v`, la réponse peut être gardée en cache par le navigateur (`private, max-age=86400`).
 
 ### Champs ajoutés
 - `PATCH /api/departements/:id` accepte `couleur` (`#RRGGBB`, `null` pour effacer ; `400 COULEUR_INVALIDE`) et `libelleCarte` (nom imprimé sur la carte, ex. `CHANTRE` pour TROMPETTE ; vide = le nom). Il accepte aussi `modeleCarte` : `TITRE` (titre seul sur bande en dégradé, carte des pasteurs) ou vide ; `400 MODELE_INVALIDE` sinon. `GET /api/badges/carte/:id` renvoie `nomCarte` et `modeleCarte` par département.

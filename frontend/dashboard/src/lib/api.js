@@ -177,7 +177,9 @@ export const api = {
   // Temples : liste avec compteurs (tous rôles) ; écriture SUPER_ADMIN.
   // Atelier des cartes de badge
   getBadgeCarte: (ouvrierId) => request(`/api/badges/carte/${ouvrierId}`),
-  getBadgePhotoBlob: (ouvrierId) => request(`/api/badges/photo/${ouvrierId}`),
+  // version (date de la photo) : URL stable par photo, que le navigateur peut garder en cache.
+  getBadgePhotoBlob: (ouvrierId, version) =>
+    request(`/api/badges/photo/${ouvrierId}${version ? `?v=${encodeURIComponent(version)}` : ""}`),
   envoyerBadgePhoto: (ouvrierId, blob) =>
     request(`/api/badges/photo/${ouvrierId}`, { method: "POST", body: blob, headers: { "Content-Type": blob.type } }),
   supprimerBadgePhoto: (ouvrierId) => request(`/api/badges/photo/${ouvrierId}`, { method: "DELETE" }),
@@ -188,6 +190,9 @@ export const api = {
     }),
   marquerBadgeConfectionne: (ouvrierId, departementId) =>
     request("/api/badges/confectionnes", { method: "POST", body: JSON.stringify({ ouvrierId, departementId }) }),
+  // POST /api/badges/confectionnes/lot — cartes d'un département sorties en lot → { crees, ignores }
+  marquerBadgesLot: (departementId, ouvrierIds) =>
+    request("/api/badges/confectionnes/lot", { method: "POST", body: JSON.stringify({ departementId, ouvrierIds }) }),
   getBadgesDepartement: (departementId) => request(`/api/badges/departement/${departementId}`),
   getBadgesAConfectionner: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
