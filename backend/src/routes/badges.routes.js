@@ -59,7 +59,7 @@ async function emailAdmin(req) {
  * GET /api/badges/carte/:ouvrierId
  * Tout ce qu'il faut pour dessiner la carte :
  * { ok, carte: { ouvrier: { id, matricule, nom, prenom, actif }, district, eglise,
- *   aPhoto, photoMaj, departements: [{ id, nom, nomCarte, couleur, role, fonction, fonctionCarte,
+ *   aPhoto, photoMaj, departements: [{ id, nom, nomCarte, couleur, modeleCarte, role, fonction, fonctionCarte,
  *   confectionneLe }] } }
  */
 router.get("/carte/:ouvrierId", async (req, res) => {
@@ -74,7 +74,7 @@ router.get("/carte/:ouvrierId", async (req, res) => {
           select: {
             roleDansDepartement: true,
             fonctionCarte: true,
-            departement: { select: { id: true, nom: true, couleur: true, libelleCarte: true } },
+            departement: { select: { id: true, nom: true, couleur: true, libelleCarte: true, modeleCarte: true } },
           },
           orderBy: { departement: { nom: "asc" } },
         },
@@ -101,6 +101,7 @@ router.get("/carte/:ouvrierId", async (req, res) => {
           // Nom imprimé sur la carte (libellé du département, sinon son nom).
           nomCarte: l.departement.libelleCarte || l.departement.nom,
           couleur: l.departement.couleur,
+          modeleCarte: l.departement.modeleCarte,
           role: l.roleDansDepartement,
           fonctionCarte: l.fonctionCarte,
           fonction: l.fonctionCarte || FONCTION_PAR_ROLE[l.roleDansDepartement] || "MEMBRE",

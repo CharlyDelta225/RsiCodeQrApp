@@ -341,6 +341,7 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
             fonction,
             district: carte.district,
             departement: dep.nomCarte || dep.nom,
+            modele: dep.modeleCarte,
             // Sans couleur : carte grise (aperçu seulement, impression bloquée).
             couleur: couleur || "#8F8585",
             photo: photoUrl,
@@ -697,7 +698,7 @@ function Couleurs() {
       .then((d) => {
         const liste = d.departements || [];
         setDepartements(liste);
-        setSaisies(Object.fromEntries(liste.map((x) => [x.id, { couleur: x.couleur || "", libelle: x.libelleCarte || "" }])));
+        setSaisies(Object.fromEntries(liste.map((x) => [x.id, { couleur: x.couleur || "", libelle: x.libelleCarte || "", titre: x.modeleCarte === "TITRE" }])));
       })
       .catch(() => toast.error("Couleurs", "La liste des départements n'a pas pu être chargée."))
       .finally(() => setChargement(false));
@@ -707,7 +708,7 @@ function Couleurs() {
     charger();
   }, [charger]);
 
-  async function enregistrer(d, { couleur: valeur, libelle }) {
+  async function enregistrer(d, { couleur: valeur, libelle, titre }) {
     const couleur = valeur === "" ? null : couleurValide(valeur);
     if (valeur !== "" && !couleur) {
       toast.error("Couleurs", "Saisissez une couleur au format #RRGGBB, par exemple #BD175C.");
@@ -716,7 +717,7 @@ function Couleurs() {
     const libelleCarte = libelle.trim().toUpperCase() || null;
     setEnCours(d.id);
     try {
-      await api.updateDepartement(d.id, { couleur, libelleCarte });
+      await api.updateDepartement(d.id, { couleur, libelleCarte, modeleCarte: titre ? "TITRE" : null });
       await charger();
       toast.success("Couleurs", `${d.nom} : ${couleur || "sans couleur"} · imprimé « ${libelleCarte || d.nom} »`);
     } catch (err) {
@@ -738,13 +739,14 @@ function Couleurs() {
       ) : (
         <ul className="divide-y divide-slate-100">
           {departements.map((d) => {
-            const saisie = saisies[d.id] ?? { couleur: "", libelle: "" };
+            const saisie = saisies[d.id] ?? { couleur: "", libelle: "", titre: false };
             const valide = couleurValide(saisie.couleur);
             const libelle = saisie.libelle.trim().toUpperCase();
             const modifie =
               (valide || "") !== (d.couleur || "") ||
               (saisie.couleur === "" && d.couleur) ||
-              libelle !== (d.libelleCarte || "");
+              libelle !== (d.libelleCarte || "") ||
+              saisie.titre !== (d.modeleCarte === "TITRE");
             const maj = (champ) => (e) =>
               setSaisies((x) => ({ ...x, [d.id]: { ...saisie, [champ]: e.target.value.toUpperCase() } }));
             return (
@@ -760,6 +762,7 @@ function Couleurs() {
                     {!egliseId && nomTemple(d.egliseId) ? `${nomTemple(d.egliseId)} · ` : ""}
                     {d.couleur ? d.couleur : "à définir"}
                     {d.libelleCarte ? ` · imprimé « ${d.libelleCarte} »` : ""}
+                    {d.modeleCarte === "TITRE" ? " · titre seul" : ""}
                   </span>
                 </span>
                 {ecriture ? (
@@ -788,6 +791,18 @@ function Couleurs() {
                       className="w-28 font-mono"
                       maxLength={7}
                     />
+                    <label
+                      className="flex items-center gap-1.5 text-xs text-slate-600"
+                      title="Sans le mot « Département » : le titre seul sur une bande en dégradé, comme la carte des pasteurs."
+                    >
+                      <input
+                        type="checkbox"
+                        checked={saisie.titre}
+                        onChange={(e) => setSaisies((x) => ({ ...x, [d.id]: { ...saisie, titre: e.target.checked } }))}
+                        className="h-4 w-4 accent-bordeaux-700"
+                      />
+                      Titre seul
+                    </label>
                     <Btn size="sm" disabled={!modifie} loading={enCours === d.id} onClick={() => enregistrer(d, saisie)}>
                       Enregistrer
                     </Btn>
