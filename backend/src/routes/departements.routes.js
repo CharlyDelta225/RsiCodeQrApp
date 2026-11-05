@@ -11,6 +11,9 @@ import {
   ERREUR_EGLISE_DIFFERENTE,
 } from "../lib/eglises.js";
 
+
+// Modèles de carte de badge autres que « Département NOM ».
+const MODELES_CARTE = ["TITRE"];
 const router = Router();
 
 const ECRITURE = requireRole("ADMIN", "SUPER_ADMIN");
@@ -208,6 +211,7 @@ router.post("/", ECRITURE, async (req, res) => {
  * Met à jour un département (tous champs optionnels). Body :
  *   { "nom": "...", "description": "...", "couleur": "#RRGGBB"|null, "libelleCarte": "..."|null }
  * libelleCarte = nom imprimé sur la carte de badge (vide = le nom du département).
+ * modeleCarte = "TITRE" (titre seul, modèle PASTEUR) ou vide (« Département NOM »).
  */
 router.patch("/:id", ECRITURE, async (req, res) => {
   try {
@@ -223,6 +227,13 @@ router.patch("/:id", ECRITURE, async (req, res) => {
     }
     if (req.body.libelleCarte !== undefined) {
       donnees.libelleCarte = String(req.body.libelleCarte ?? "").trim().toUpperCase().slice(0, 40) || null;
+    }
+    if (req.body.modeleCarte !== undefined) {
+      const modele = String(req.body.modeleCarte ?? "").trim().toUpperCase();
+      if (modele && !MODELES_CARTE.includes(modele)) {
+        return res.status(400).json({ ok: false, code: "MODELE_INVALIDE", message: "Modèle de carte attendu : TITRE ou vide" });
+      }
+      donnees.modeleCarte = modele || null;
     }
 
     if (Object.keys(donnees).length === 0) {

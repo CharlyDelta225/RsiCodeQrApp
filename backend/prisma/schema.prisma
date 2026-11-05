@@ -76,6 +76,8 @@ model Departement {
   couleur     String?
   // Nom imprimé sur la carte, s'il diffère du nom (ex. TROMPETTE → « CHANTRE »). Vide = le nom.
   libelleCarte String?
+  // Modèle de carte : vide = « Département NOM » ; "TITRE" = titre seul sur bande en dégradé (PASTEUR).
+  modeleCarte String?
   egliseId    String  @default("eglise-shalom")
   createdAt   DateTime @default(now())
 

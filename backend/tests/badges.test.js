@@ -142,6 +142,13 @@ test("confection : couleur obligatoire, puis l'ouvrier sort de « à confectionn
   await fetch(`${baseURL}/api/departements/${dep.id}`, { method: "PATCH", headers: json(admin), body: JSON.stringify({ libelleCarte: "" }) });
   const carte2 = (await (await fetch(`${baseURL}/api/badges/carte/${o.id}`, { headers: admin })).json()).carte;
   assert.strictEqual(carte2.departements[0].nomCarte, carte2.departements[0].nom);
+
+  // Modèle « titre seul » (pasteurs) : seul TITRE est accepté.
+  const mauvais = await fetch(`${baseURL}/api/departements/${dep.id}`, { method: "PATCH", headers: json(admin), body: JSON.stringify({ modeleCarte: "autre" }) });
+  assert.strictEqual(mauvais.status, 400);
+  await fetch(`${baseURL}/api/departements/${dep.id}`, { method: "PATCH", headers: json(admin), body: JSON.stringify({ modeleCarte: "titre" }) });
+  const carte3 = (await (await fetch(`${baseURL}/api/badges/carte/${o.id}`, { headers: admin })).json()).carte;
+  assert.strictEqual(carte3.departements[0].modeleCarte, "TITRE");
 });
 
 test("district du temple modifiable par le SUPER_ADMIN", async () => {

@@ -8,6 +8,7 @@ import {
   PHOTO,
   POLICE,
   TEXTES,
+  TITRE_SEUL,
   VARIANTES_POLICE,
   VERSO,
   ZONES_PROTEGEES,
@@ -240,6 +241,45 @@ function ecrireDepartement(ctx, texte) {
   ctx.restore();
 }
 
+/**
+ * Variante « titre seul » (PASTEUR) : la bande descend un peu, devient un
+ * dégradé de la couleur du département et ne porte que le titre.
+ */
+function dessinerBandeTitreSeul(ctx, couleur) {
+  const { bandeOrigine, ligneFond, lisere, bande, degrade } = TITRE_SEUL;
+  // 1. Le fond descend jusqu'à la nouvelle bande, liseré clair compris.
+  const filet = ctx.getImageData(0, bandeOrigine, LARGEUR, lisere);
+  for (let y = bandeOrigine; y < bande - lisere + 4; y++) {
+    ctx.drawImage(ctx.canvas, 0, ligneFond, LARGEUR, 1, 0, y, LARGEUR, 1);
+  }
+  ctx.putImageData(filet, 0, bande - lisere + 4);
+  // 2. Bande en dégradé (recouvre le mot « Département » du modèle).
+  const rvb = hexVersRvb(couleur) || hexVersRvb("#8F8585");
+  const [t, s, l] = rvbVersTsl(...rvb);
+  const haut = bande + 2;
+  const grad = ctx.createLinearGradient(0, haut, 0, HAUTEUR);
+  for (const [pos, dt, dl] of degrade) {
+    const [r, v, b] = tslVersRvb((t + dt + 360) % 360, s, Math.min(0.92, l + dl));
+    grad.addColorStop(pos, `rgb(${Math.round(r)}, ${Math.round(v)}, ${Math.round(b)})`);
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, haut, LARGEUR, HAUTEUR - haut);
+}
+
+function ecrireTitreSeul(ctx, texte) {
+  if (!texte) return;
+  const spec = TITRE_SEUL.titre;
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 20, 40, 0.5)";
+  ctx.shadowBlur = 7;
+  ctx.shadowOffsetX = 3;
+  ctx.shadowOffsetY = 4;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ecrireLigneDoree(ctx, texte, spec, spec.hauteurCap, spec.base);
+  ctx.restore();
+}
+
 // ---------- Photo ----------
 
 function dessinerPhoto(ctx, img) {
@@ -285,6 +325,8 @@ export async function dessinerRecto({ fond, membre }) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(fond, 0, 0, LARGEUR, HAUTEUR);
   teinterFond(ctx, membre.couleur);
+  const titreSeul = membre.modele === "TITRE";
+  if (titreSeul) dessinerBandeTitreSeul(ctx, membre.couleur);
 
   if (membre.photo) {
     try {
@@ -298,9 +340,12 @@ export async function dessinerRecto({ fond, membre }) {
 
   ecrire(ctx, nomCarte(membre), TEXTES.nom);
   ecrire(ctx, String(membre.fonction || "").toUpperCase(), TEXTES.fonction);
-  ecrire(ctx, String(membre.matricule || "").toUpperCase(), TEXTES.matricule);
-  ecrire(ctx, String(membre.district || "").toUpperCase(), TEXTES.district);
-  ecrireDepartement(ctx, String(membre.departement || "").toUpperCase());
+  const decale = (cle) => (titreSeul ? { ...TEXTES[cle], base: TEXTES[cle].base + TITRE_SEUL.decalages[cle] } : TEXTES[cle]);
+  ecrire(ctx, String(membre.matricule || "").toUpperCase(), decale("matricule"));
+  ecrire(ctx, String(membre.district || "").toUpperCase(), decale("district"));
+  const departement = String(membre.departement || "").toUpperCase();
+  if (titreSeul) ecrireTitreSeul(ctx, departement);
+  else ecrireDepartement(ctx, departement);
   return canvas;
 }
 

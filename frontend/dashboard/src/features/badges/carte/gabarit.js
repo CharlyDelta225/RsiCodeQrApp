@@ -48,6 +48,30 @@ export const TEXTES = Object.freeze({
     deuxLignes: { seuil: 0.62, hauteurCap: 56, bases: [1360, 1428] } },
 });
 
+/**
+ * Variante « titre seul » (modèle PASTEUR) : pas de mot « Département », une
+ * bande en dégradé un peu plus basse, et le titre seul, centré dans la bande.
+ * Mesures relevées sur la carte « PASTEUR » (même échelle que le modèle).
+ */
+export const TITRE_SEUL = Object.freeze({
+  // Bande d'origine : liseré clair à 1172-1175, bord à 1176. La bande pasteur commence à 1198.
+  bandeOrigine: 1172,
+  ligneFond: 1171,
+  lisere: 6,
+  bande: 1198,
+  // Dégradé de la bande : couleur du département en haut, plus claire et un peu plus cyan vers le bas.
+  degrade: [
+    [0, 0, 0],
+    [0.24, -2, 0.035],
+    [0.47, -5, 0.085],
+    [0.69, -6, 0.1],
+    [1, -6, 0.085],
+  ],
+  titre: { x: CENTRE + 2, base: 1382, hauteurCap: 114, poids: 900, style: "italic", largeurMax: 830 },
+  // Le matricule et le district sont un peu plus bas que sur le modèle « Département ».
+  decalages: { matricule: 7, district: 14 },
+});
+
 /** Dégradé métallique du nom du département (relevé sur « HUISSIER »). */
 export const OR_DEPARTEMENT = Object.freeze([
   [0, "#E9AE2C"],

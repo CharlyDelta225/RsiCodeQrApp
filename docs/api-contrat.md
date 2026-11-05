@@ -103,7 +103,7 @@ Ouvriers actifs sans aucune carte faite : `{ ok, total, ouvriers: [{ id, matricu
 Ouvriers actifs du département (responsable, adjoint, secrétaire, puis par nom) avec l'état de leur carte pour ce département : `{ ok, departement: { id, nom, couleur }, ouvriers: [{ id, matricule, nom, prenom, role, fonction, aPhoto, confectionneLe }] }`. `404 DEPARTEMENT_INTROUVABLE`.
 
 ### Champs ajoutés
-- `PATCH /api/departements/:id` accepte `couleur` (`#RRGGBB`, `null` pour effacer ; `400 COULEUR_INVALIDE`) et `libelleCarte` (nom imprimé sur la carte, ex. `CHANTRE` pour TROMPETTE ; vide = le nom). `GET /api/badges/carte/:id` renvoie `nomCarte` par département.
+- `PATCH /api/departements/:id` accepte `couleur` (`#RRGGBB`, `null` pour effacer ; `400 COULEUR_INVALIDE`) et `libelleCarte` (nom imprimé sur la carte, ex. `CHANTRE` pour TROMPETTE ; vide = le nom). Il accepte aussi `modeleCarte` : `TITRE` (titre seul sur bande en dégradé, carte des pasteurs) ou vide ; `400 MODELE_INVALIDE` sinon. `GET /api/badges/carte/:id` renvoie `nomCarte` et `modeleCarte` par département.
 - `PATCH /api/eglises/:id` (SUPER_ADMIN) accepte `libelleCarte` (district imprimé, ex. `DISTRICT-SIÈGE`).
 
 ---
