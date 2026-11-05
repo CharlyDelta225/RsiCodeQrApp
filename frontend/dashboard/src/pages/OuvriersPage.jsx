@@ -504,12 +504,16 @@ export default function OuvriersPage() {
 
       {/* Modal modification d'un ouvrier */}
       {modification && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleModifier} className="bg-white rounded-xl p-6 w-full max-w-sm space-y-3">
-            <h2 className="font-bold text-slate-900" style={{ fontFamily: "Poppins,sans-serif" }}>
-              Modifier l'ouvrier
-            </h2>
-            <p className="text-sm text-slate-500">Vous modifiez le badge <b>{modification.matricule}</b>.</p>
+        <Modal
+          titre="Modifier l'ouvrier"
+          onClose={() => setModification(null)}
+          taille="lg"
+          bloquee={envoiModification}
+        >
+          <form onSubmit={handleModifier} className="p-6 space-y-3">
+            <p className="text-sm text-slate-500">
+              Vous modifiez le badge <b>{modification.matricule}</b>.
+            </p>
             <Field label="Matricule">
               <Input
                 required
@@ -606,7 +610,7 @@ export default function OuvriersPage() {
               Un changement de matricule génère un nouveau QR code : pensez à ré-imprimer le badge.
             </p>
             <div className="flex justify-end gap-2 pt-2">
-              <Btn variant="ghost" onClick={() => setModification(null)}>
+              <Btn variant="ghost" onClick={() => setModification(null)} disabled={envoiModification}>
                 Annuler
               </Btn>
               <Btn type="submit" loading={envoiModification}>
@@ -614,7 +618,7 @@ export default function OuvriersPage() {
               </Btn>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {/* Modal badge */}
