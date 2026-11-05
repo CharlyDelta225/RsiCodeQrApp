@@ -2,6 +2,7 @@ import logger from "../lib/logger.js";
 import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { requireRole } from "../middleware/auth.middleware.js";
+import { normaliserDistrict } from "./badges.routes.js";
 import { cleEglise, listerEglises } from "../lib/eglises.js";
 
 // Gestion des temples. Lecture : tout admin connecté. Écriture : SUPER_ADMIN.
@@ -131,7 +132,7 @@ router.patch("/:id", SUPER, async (req, res) => {
     }
     if (req.body?.actif !== undefined) donnees.actif = Boolean(req.body.actif);
     if (req.body?.libelleCarte !== undefined) {
-      donnees.libelleCarte = String(req.body.libelleCarte ?? "").trim().toUpperCase().slice(0, 40) || null;
+      donnees.libelleCarte = normaliserDistrict(req.body.libelleCarte) || null;
     }
     const devientSiege = req.body?.estSiege === true && !eglise.estSiege;
     const siegeFinal = devientSiege || (eglise.estSiege && req.body?.estSiege !== false);

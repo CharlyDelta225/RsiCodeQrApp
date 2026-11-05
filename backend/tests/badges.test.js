@@ -157,7 +157,7 @@ test("district du temple modifiable par le SUPER_ADMIN", async () => {
   try {
     const r = await fetch(`${baseURL}/api/eglises/eglise-adjahui`, { method: "PATCH", headers: json(sup), body: JSON.stringify({ libelleCarte: "district adjahui nord" }) });
     assert.strictEqual(r.status, 200);
-    assert.strictEqual((await r.json()).eglise.libelleCarte, "DISTRICT ADJAHUI NORD");
+    assert.strictEqual((await r.json()).eglise.libelleCarte, "DISTRICT-ADJAHUI NORD");
   } finally {
     await prisma.eglise.update({ where: { id: "eglise-adjahui" }, data: { libelleCarte: avant.libelleCarte } });
   }
