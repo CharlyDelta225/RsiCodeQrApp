@@ -127,14 +127,21 @@ test("confection : couleur obligatoire, puis l'ouvrier sort de « à confectionn
 
   const invalide = await fetch(`${baseURL}/api/departements/${dep.id}`, { method: "PATCH", headers: json(admin), body: JSON.stringify({ couleur: "rouge" }) });
   assert.strictEqual(invalide.status, 400);
-  const couleur = await fetch(`${baseURL}/api/departements/${dep.id}`, { method: "PATCH", headers: json(admin), body: JSON.stringify({ couleur: "1f4fa3" }) });
-  assert.strictEqual((await couleur.json()).departement.couleur, "#1F4FA3");
+  const couleur = await fetch(`${baseURL}/api/departements/${dep.id}`, { method: "PATCH", headers: json(admin), body: JSON.stringify({ couleur: "1f4fa3", libelleCarte: " chantre " }) });
+  const depMaj = (await couleur.json()).departement;
+  assert.strictEqual(depMaj.couleur, "#1F4FA3");
+  assert.strictEqual(depMaj.libelleCarte, "CHANTRE");
 
   const fait = await fetch(`${baseURL}/api/badges/confectionnes`, { method: "POST", headers: json(admin), body: corps });
   assert.strictEqual(fait.status, 201);
   assert.deepStrictEqual(await aFaire(), []);
   const carte = (await (await fetch(`${baseURL}/api/badges/carte/${o.id}`, { headers: admin })).json()).carte;
   assert.ok(carte.departements[0].confectionneLe);
+  assert.strictEqual(carte.departements[0].nomCarte, "CHANTRE");
+  // Nom imprimé vidé : la carte reprend le nom du département.
+  await fetch(`${baseURL}/api/departements/${dep.id}`, { method: "PATCH", headers: json(admin), body: JSON.stringify({ libelleCarte: "" }) });
+  const carte2 = (await (await fetch(`${baseURL}/api/badges/carte/${o.id}`, { headers: admin })).json()).carte;
+  assert.strictEqual(carte2.departements[0].nomCarte, carte2.departements[0].nom);
 });
 
 test("district du temple modifiable par le SUPER_ADMIN", async () => {
