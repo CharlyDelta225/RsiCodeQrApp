@@ -202,5 +202,38 @@ test("liste du département : responsables d'abord, état de la carte par dépar
       [membre.id, "MEMBRE", true],
     ]
   );
+  assert.strictEqual(corps.departement.district, "DISTRICT-SIÈGE");
+  assert.strictEqual(corps.departement.nomCarte, corps.departement.nom);
+  assert.ok("photoMaj" in corps.ouvriers[0]);
   assert.strictEqual((await fetch(`${baseURL}/api/badges/departement/inconnu`, { headers: admin })).status, 404);
+});
+
+test("confection en lot : couleur obligatoire, ouvriers hors département ignorés", async () => {
+  const admin = await session("ADMIN");
+  const lecteur = await session("LECTEUR");
+  const { o: a, dep } = await ouvrierDans("LOT TEST");
+  const b = await prisma.ouvrier.create({
+    data: {
+      matricule: `TEST-BDG-${suffixe}-${ouvriers.length}`,
+      nom: "LOT",
+      prenom: "Second",
+      departements: { create: { departementId: dep.id } },
+    },
+  });
+  ouvriers.push(b.id);
+  const { o: dehors } = await ouvrierDans("AUTRE LOT TEST");
+  const url = `${baseURL}/api/badges/confectionnes/lot`;
+  const corps = JSON.stringify({ departementId: dep.id, ouvrierIds: [a.id, b.id, dehors.id] });
+
+  assert.strictEqual((await fetch(url, { method: "POST", headers: json(lecteur), body: corps })).status, 403);
+  const sansCouleur = await fetch(url, { method: "POST", headers: json(admin), body: corps });
+  assert.strictEqual(sansCouleur.status, 409);
+  assert.strictEqual((await fetch(url, { method: "POST", headers: json(admin), body: JSON.stringify({ departementId: dep.id, ouvrierIds: [] }) })).status, 400);
+
+  await prisma.departement.update({ where: { id: dep.id }, data: { couleur: "#0269A3" } });
+  const r = await fetch(url, { method: "POST", headers: json(admin), body: corps });
+  assert.strictEqual(r.status, 201);
+  assert.deepStrictEqual(await r.json(), { ok: true, crees: 2, ignores: 1 });
+  const liste = await (await fetch(`${baseURL}/api/badges/departement/${dep.id}`, { headers: admin })).json();
+  assert.ok(liste.ouvriers.every((x) => x.confectionneLe));
 });

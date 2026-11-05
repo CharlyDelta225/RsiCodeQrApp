@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ArrowRight, Camera, Check, Download, Palette, Printer, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Camera, Check, Download, Layers, Palette, Printer, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { getAdmin } from "../lib/auth";
 import { useTemple, paramTemple, TemplePill } from "../lib/temple";
@@ -12,6 +12,7 @@ import { Field, Input, Select } from "../ui/inputs";
 import { genererCarte, couleurValide, nomCarte, COULEUR_MODELE } from "../features/badges/carte";
 import { preparerPhoto } from "../features/badges/carte/photo";
 import "../features/badges/carte/carte.css";
+import CreationEnMasse from "../features/badges/masse/CreationEnMasse";
 
 // ==============================
 // Atelier des cartes de badge
@@ -276,13 +277,13 @@ function ListeDepartement({ egliseId, ouvrierId, onChoisir, onListe, version }) 
 
 // ---------- Onglet Confectionner ----------
 
-function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, allerAuxCouleurs }) {
+function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, allerAuxCouleurs, departementInitial }) {
   const toast = useToast();
   const { egliseId } = useTemple();
   const ecriture = peutEcrire();
   const [carte, setCarte] = useState(null);
   const [chargement, setChargement] = useState(false);
-  const [departementId, setDepartementId] = useState("");
+  const [departementId, setDepartementId] = useState(departementInitial || "");
   const [fonction, setFonction] = useState("");
   const [photoUrl, setPhotoUrl] = useState(null);
   const [envoiPhoto, setEnvoiPhoto] = useState(false);
@@ -826,6 +827,7 @@ function Couleurs() {
 
 const ONGLETS = [
   { id: "confectionner", libelle: "Confectionner", icone: Printer },
+  { id: "masse", libelle: "Création en masse", icone: Layers },
   { id: "a-faire", libelle: "À confectionner", icone: Check },
   { id: "couleurs", libelle: "Couleurs des départements", icone: Palette },
 ];
@@ -834,6 +836,7 @@ export default function BadgeStudioPage() {
   const { egliseId } = useTemple();
   const [onglet, setOnglet] = useState("confectionner");
   const [ouvrierId, setOuvrierId] = useState(null);
+  const [departementInitial, setDepartementInitial] = useState("");
   const [aFaire, setAFaire] = useState({ ouvriers: [], total: 0, chargement: true });
 
   const rechargerAFaire = useCallback(
@@ -892,6 +895,17 @@ export default function BadgeStudioPage() {
           aFaire={aFaire.ouvriers}
           rechargerAFaire={rechargerAFaire}
           allerAuxCouleurs={() => setOnglet("couleurs")}
+          departementInitial={departementInitial}
+        />
+      )}
+      {onglet === "masse" && (
+        <CreationEnMasse
+          allerAuxCouleurs={() => setOnglet("couleurs")}
+          modifier={(id, depId) => {
+            setDepartementInitial(depId);
+            setOuvrierId(id);
+            setOnglet("confectionner");
+          }}
         />
       )}
       {onglet === "a-faire" && (
