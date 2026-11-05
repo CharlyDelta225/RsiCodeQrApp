@@ -49,9 +49,14 @@ export function normaliserCouleur(valeur) {
   return COULEUR.test(hex) ? hex : undefined;
 }
 
-/** Ligne « district » imprimée : libellé du temple, sinon « DISTRICT <NOM> ». */
+/**
+ * Ligne « district » imprimée : libellé du temple, sinon « DISTRICT-<NOM> ».
+ * Toujours un tiret entre DISTRICT et le lieu (« DISTRICT-ADJAHUI »).
+ */
+export const normaliserDistrict = (texte) =>
+  String(texte ?? "").trim().toUpperCase().replace(/\s+/g, " ").replace(/^DISTRICT[\s-]+/, "DISTRICT-").slice(0, 40);
 const districtDe = (eglise) =>
-  eglise.libelleCarte || `DISTRICT ${eglise.nom.replace(/^temple\s+(de\s+|du\s+)?/i, "").toUpperCase()}`;
+  normaliserDistrict(eglise.libelleCarte || `DISTRICT-${eglise.nom.replace(/^temple\s+(de\s+|du\s+)?/i, "")}`);
 
 async function emailAdmin(req) {
   if (!req.admin?.id) return null;

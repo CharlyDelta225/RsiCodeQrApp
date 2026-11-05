@@ -13,6 +13,7 @@ import { genererCarte, couleurValide, nomCarte, COULEUR_MODELE } from "../featur
 import { preparerPhoto } from "../features/badges/carte/photo";
 import "../features/badges/carte/carte.css";
 import CreationEnMasse from "../features/badges/masse/CreationEnMasse";
+import ChoixDepartement from "../features/badges/ChoixDepartement";
 
 // ==============================
 // Atelier des cartes de badge
@@ -201,17 +202,7 @@ function ListeDepartement({ egliseId, ouvrierId, onChoisir, onListe, version }) 
   return (
     <Card title="Ouvriers par département" description="Choisissez un département du temple sélectionné, puis un ouvrier.">
       <div className="space-y-3">
-        <Select value={departementId} onChange={(e) => setDepartementId(e.target.value)} aria-label="Département">
-          <option value="">— Choisir un département —</option>
-          {departements.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.nom}
-              {!egliseId && d.eglise ? ` · ${d.eglise.nom}` : ""}
-              {d._count ? ` (${d._count.membres})` : ""}
-              {d.couleur ? "" : " · couleur à définir"}
-            </option>
-          ))}
-        </Select>
+        <ChoixDepartement departements={departements} valeur={departementId} onChange={setDepartementId} avecTemple={!egliseId} />
 
         {chargement && !liste && <p className="text-xs text-slate-500">Chargement…</p>}
         {liste && (
