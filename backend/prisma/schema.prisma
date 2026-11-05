@@ -74,6 +74,8 @@ model Departement {
   description String?
   // Couleur de la carte de badge (#RRGGBB), fixée par un admin. Vide = carte non imprimable.
   couleur     String?
+  // Nom imprimé sur la carte, s'il diffère du nom (ex. TROMPETTE → « CHANTRE »). Vide = le nom.
+  libelleCarte String?
   egliseId    String  @default("eglise-shalom")
   createdAt   DateTime @default(now())
 

@@ -206,7 +206,8 @@ router.post("/", ECRITURE, async (req, res) => {
 /**
  * PATCH /api/departements/:id
  * Met à jour un département (tous champs optionnels). Body :
- *   { "nom": "...", "description": "..." }
+ *   { "nom": "...", "description": "...", "couleur": "#RRGGBB"|null, "libelleCarte": "..."|null }
+ * libelleCarte = nom imprimé sur la carte de badge (vide = le nom du département).
  */
 router.patch("/:id", ECRITURE, async (req, res) => {
   try {
@@ -219,6 +220,9 @@ router.patch("/:id", ECRITURE, async (req, res) => {
         return res.status(400).json({ ok: false, code: "COULEUR_INVALIDE", message: "Couleur attendue au format #RRGGBB" });
       }
       donnees.couleur = couleur;
+    }
+    if (req.body.libelleCarte !== undefined) {
+      donnees.libelleCarte = String(req.body.libelleCarte ?? "").trim().toUpperCase().slice(0, 40) || null;
     }
 
     if (Object.keys(donnees).length === 0) {

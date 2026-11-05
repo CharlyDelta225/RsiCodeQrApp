@@ -340,7 +340,7 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
             matricule: carte.ouvrier.matricule,
             fonction,
             district: carte.district,
-            departement: dep.nom,
+            departement: dep.nomCarte || dep.nom,
             // Sans couleur : carte grise (aperçu seulement, impression bloquée).
             couleur: couleur || "#8F8585",
             photo: photoUrl,
@@ -458,6 +458,7 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
                         {carte.departements.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.nom}
+                            {d.nomCarte && d.nomCarte !== d.nom ? ` · imprimé « ${d.nomCarte} »` : ""}
                             {d.confectionneLe ? ` · faite le ${dateCourte(d.confectionneLe)}` : ""}
                           </option>
                         ))}
@@ -696,7 +697,7 @@ function Couleurs() {
       .then((d) => {
         const liste = d.departements || [];
         setDepartements(liste);
-        setSaisies(Object.fromEntries(liste.map((x) => [x.id, x.couleur || ""])));
+        setSaisies(Object.fromEntries(liste.map((x) => [x.id, { couleur: x.couleur || "", libelle: x.libelleCarte || "" }])));
       })
       .catch(() => toast.error("Couleurs", "La liste des départements n'a pas pu être chargée."))
       .finally(() => setChargement(false));
@@ -706,17 +707,18 @@ function Couleurs() {
     charger();
   }, [charger]);
 
-  async function enregistrer(d, valeur) {
+  async function enregistrer(d, { couleur: valeur, libelle }) {
     const couleur = valeur === "" ? null : couleurValide(valeur);
     if (valeur !== "" && !couleur) {
       toast.error("Couleurs", "Saisissez une couleur au format #RRGGBB, par exemple #BD175C.");
       return;
     }
+    const libelleCarte = libelle.trim().toUpperCase() || null;
     setEnCours(d.id);
     try {
-      await api.updateDepartement(d.id, { couleur });
+      await api.updateDepartement(d.id, { couleur, libelleCarte });
       await charger();
-      toast.success("Couleurs", couleur ? `${d.nom} : ${couleur}` : `Couleur de ${d.nom} retirée.`);
+      toast.success("Couleurs", `${d.nom} : ${couleur || "sans couleur"} · imprimé « ${libelleCarte || d.nom} »`);
     } catch (err) {
       toast.error("Couleurs", message(err, "La couleur n'a pas pu être enregistrée."));
     } finally {
@@ -729,16 +731,22 @@ function Couleurs() {
   return (
     <Card
       title="Couleurs des départements"
-      description="La couleur teinte le fond et la bande de la carte. Tant qu'elle n'est pas définie, la carte du département ne s'imprime pas."
+      description="La couleur teinte le fond et la bande de la carte ; tant qu'elle n'est pas définie, la carte ne s'imprime pas. Le nom imprimé remplace le nom du département sur la carte (vide = le nom)."
     >
       {chargement ? (
         <p className="text-xs text-slate-500 py-6 text-center">Chargement…</p>
       ) : (
         <ul className="divide-y divide-slate-100">
           {departements.map((d) => {
-            const saisie = saisies[d.id] ?? "";
-            const valide = couleurValide(saisie);
-            const modifie = (valide || "") !== (d.couleur || "") || (saisie === "" && d.couleur);
+            const saisie = saisies[d.id] ?? { couleur: "", libelle: "" };
+            const valide = couleurValide(saisie.couleur);
+            const libelle = saisie.libelle.trim().toUpperCase();
+            const modifie =
+              (valide || "") !== (d.couleur || "") ||
+              (saisie.couleur === "" && d.couleur) ||
+              libelle !== (d.libelleCarte || "");
+            const maj = (champ) => (e) =>
+              setSaisies((x) => ({ ...x, [d.id]: { ...saisie, [champ]: e.target.value.toUpperCase() } }));
             return (
               <li key={d.id} className="flex flex-wrap items-center gap-3 py-2.5">
                 <span
@@ -751,20 +759,30 @@ function Couleurs() {
                   <span className="block text-[11px] text-slate-500">
                     {!egliseId && nomTemple(d.egliseId) ? `${nomTemple(d.egliseId)} · ` : ""}
                     {d.couleur ? d.couleur : "à définir"}
+                    {d.libelleCarte ? ` · imprimé « ${d.libelleCarte} »` : ""}
                   </span>
                 </span>
                 {ecriture ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      value={saisie.libelle}
+                      onChange={maj("libelle")}
+                      placeholder={d.nom}
+                      aria-label={`Nom imprimé sur la carte pour ${d.nom}`}
+                      title="Nom imprimé sur la carte. Vide = le nom du département."
+                      className="w-40"
+                      maxLength={40}
+                    />
                     <input
                       type="color"
                       aria-label={`Couleur de ${d.nom}`}
                       value={valide || "#8F8585"}
-                      onChange={(e) => setSaisies((s) => ({ ...s, [d.id]: e.target.value.toUpperCase() }))}
+                      onChange={maj("couleur")}
                       className="h-9 w-11 cursor-pointer rounded-md border border-slate-300 bg-white p-0.5"
                     />
                     <Input
-                      value={saisie}
-                      onChange={(e) => setSaisies((s) => ({ ...s, [d.id]: e.target.value.toUpperCase() }))}
+                      value={saisie.couleur}
+                      onChange={maj("couleur")}
                       placeholder="#RRGGBB"
                       aria-label={`Code couleur de ${d.nom}`}
                       className="w-28 font-mono"
