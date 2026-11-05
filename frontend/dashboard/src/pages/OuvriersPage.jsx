@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { filtrerOuvriers } from "../lib/recherche";
 import { Pencil, Plus, QrCode } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { libelleDepartement } from "../lib/departement";
@@ -55,9 +56,11 @@ export default function OuvriersPage() {
   const { egliseId, egliseCourante, actives: temples, siege } = useTemple();
   // Temple proposé par défaut à la création et à l'import : celui affiché, sinon le siège.
   const templeParDefaut = egliseId || siege?.id || "";
-  const [ouvriers, setOuvriers] = useState([]);
-  const [total, setTotal] = useState(0);
+  // Tous les ouvriers du temple, chargés une fois ; la recherche filtre localement.
+  const [tousOuvriers, setTousOuvriers] = useState([]);
   const [recherche, setRecherche] = useState("");
+  const ouvriers = useMemo(() => filtrerOuvriers(tousOuvriers, recherche), [tousOuvriers, recherche]);
+  const total = ouvriers.length;
   const [chargement, setChargement] = useState(true);
   const [alerte, setAlerte] = useState(null);
   const [succes, setSucces] = useState(null);
@@ -94,25 +97,28 @@ export default function OuvriersPage() {
     setAlerte(null);
   }, [alerte, toast]);
 
+  // Liste du temple : rechargée au changement de temple et après une modification,
+  // jamais à la frappe (la recherche est locale).
   const charger = useCallback(async () => {
     setChargement(true);
     setAlerte(null);
     try {
-      const params = { limit: 2000, ...paramTemple(egliseId) };
-      if (recherche) params.recherche = recherche;
-      const [data, dataDepts] = await Promise.all([
-        api.getOuvriers(params),
-        api.getDepartements({ limit: 100 }),
-      ]);
-      setOuvriers(data.ouvriers);
-      setTotal(data.total);
-      setDepartements(dataDepts.departements || []);
+      const data = await api.getOuvriers({ limit: 2000, ...paramTemple(egliseId) });
+      setTousOuvriers(data.ouvriers);
     } catch (err) {
       setAlerte({ titre: "Une erreur est survenue", message: err instanceof ApiError ? err.message : "Erreur de chargement" });
     } finally {
       setChargement(false);
     }
-  }, [recherche, egliseId]);
+  }, [egliseId]);
+
+  // Départements (tous temples, pour les formulaires) : chargés une seule fois.
+  useEffect(() => {
+    api
+      .getDepartements({ limit: 100 })
+      .then((d) => setDepartements(d.departements || []))
+      .catch(() => setAlerte({ titre: "Départements", message: "La liste des départements n'a pas pu être chargée." }));
+  }, []);
 
   // Départements proposés : uniquement ceux du temple de l'ouvrier.
   const departementsDuTemple = (id) => departements.filter((d) => d.egliseId === id);
