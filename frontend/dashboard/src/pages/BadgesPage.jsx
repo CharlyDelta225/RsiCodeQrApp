@@ -7,6 +7,7 @@ import { telechargerBlob } from "../lib/download";
 import { libelleDepartement } from "../lib/departement";
 import { getAdmin } from "../lib/auth";
 import { usePagination } from "../lib/pagination";
+import { filtrerOuvriers } from "../lib/recherche";
 import PaginationBar from "../components/PaginationBar";
 import TableShell from "../ui/TableShell";
 import Pill from "../ui/Pill";
@@ -64,9 +65,9 @@ function CarteBadgeImpression({ ouvrier }) {
 export default function BadgesPage() {
   const { egliseId, setEgliseId, actives, egliseCourante } = useTemple();
   const navigate = useNavigate();
-  const [ouvriers, setOuvriers] = useState([]);
+  // Ouvriers du temple chargés une fois ; recherche, état et département filtrent localement.
+  const [tousOuvriers, setTousOuvriers] = useState([]);
   const [departements, setDepartements] = useState([]);
-  const [total, setTotal] = useState(0);
   const [recherche, setRecherche] = useState("");
   const [filtreActif, setFiltreActif] = useState("tous"); // tous | actifs | desactives
   const [filtreDepartement, setFiltreDepartement] = useState("tous"); // "tous" | uuid
@@ -82,26 +83,31 @@ export default function BadgesPage() {
   const [badgeOuvrier, setBadgeOuvrier] = useState(null);
   const [telechargementUnite, setTelechargementUnite] = useState(false);
 
+  const ouvriers = useMemo(
+    () =>
+      filtrerOuvriers(tousOuvriers, recherche).filter(
+        (o) =>
+          (filtreActif === "tous" || (filtreActif === "actifs" ? o.actif : !o.actif)) &&
+          (filtreDepartement === "tous" || (o.departements || []).some((l) => (l.departement?.id || l.departementId) === filtreDepartement))
+      ),
+    [tousOuvriers, recherche, filtreActif, filtreDepartement]
+  );
+  const total = ouvriers.length;
+
   const pagination = usePagination(ouvriers);
 
   const charger = useCallback(async () => {
     setChargement(true);
     setErreur(null);
     try {
-      const params = { limit: 2000, ...paramTemple(egliseId) };
-      if (recherche) params.recherche = recherche;
-      if (filtreActif === "actifs") params.actif = "true";
-      if (filtreActif === "desactives") params.actif = "false";
-      if (filtreDepartement !== "tous") params.departementId = filtreDepartement;
-      const data = await api.getOuvriers(params);
-      setOuvriers(data.ouvriers);
-      setTotal(data.total);
+      const data = await api.getOuvriers({ limit: 2000, ...paramTemple(egliseId) });
+      setTousOuvriers(data.ouvriers);
     } catch (err) {
       setErreur(err instanceof ApiError ? err.message : "Erreur de chargement");
     } finally {
       setChargement(false);
     }
-  }, [recherche, filtreActif, filtreDepartement, egliseId]);
+  }, [egliseId]);
 
   useEffect(() => {
     setFiltreDepartement("tous");
