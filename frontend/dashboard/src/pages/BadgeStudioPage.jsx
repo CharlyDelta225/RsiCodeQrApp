@@ -682,6 +682,7 @@ function Couleurs() {
   const [saisies, setSaisies] = useState({});
   const [chargement, setChargement] = useState(true);
   const [enCours, setEnCours] = useState(null);
+  const [tousLesTemples, setTousLesTemples] = useState(true);
 
   const charger = useCallback(() => {
     setChargement(true);
@@ -707,11 +708,20 @@ function Couleurs() {
       return;
     }
     const libelleCarte = libelle.trim().toUpperCase() || null;
+    // La couleur ne se propage que si elle change : enregistrer seulement le
+    // nom imprimé ne doit pas toucher aux autres temples.
+    const propager = tousLesTemples && couleur !== (d.couleur || null);
     setEnCours(d.id);
     try {
-      await api.updateDepartement(d.id, { couleur, libelleCarte, modeleCarte: titre ? "TITRE" : null });
+      const r = await api.updateDepartement(d.id, {
+        couleur,
+        libelleCarte,
+        modeleCarte: titre ? "TITRE" : null,
+        ...(propager && { tousLesTemples: true }),
+      });
       await charger();
-      toast.success("Couleurs", `${d.nom} : ${couleur || "sans couleur"} · imprimé « ${libelleCarte || d.nom} »`);
+      const autres = r?.autresTemples ? ` · aussi appliquée à ${r.autresTemples} autre${r.autresTemples > 1 ? "s" : ""} temple${r.autresTemples > 1 ? "s" : ""}` : "";
+      toast.success("Couleurs", `${d.nom} : ${couleur || "sans couleur"} · imprimé « ${libelleCarte || d.nom} »${autres}`);
     } catch (err) {
       toast.error("Couleurs", message(err, "La couleur n'a pas pu être enregistrée."));
     } finally {
@@ -726,6 +736,22 @@ function Couleurs() {
       title="Couleurs des départements"
       description="La couleur teinte le fond et la bande de la carte ; tant qu'elle n'est pas définie, la carte ne s'imprime pas. Le nom imprimé remplace le nom du département sur la carte (vide = le nom)."
     >
+      {ecriture && (
+        <label className="mb-3 flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+          <input
+            type="checkbox"
+            checked={tousLesTemples}
+            onChange={(e) => setTousLesTemples(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-bordeaux-700"
+          />
+          <span>
+            <span className="font-semibold">Appliquer la couleur à tous les temples</span>
+            <span className="block text-slate-500">
+              Une nouvelle couleur s'applique aussi au département du même nom dans les autres temples. Décochez pour ne changer que ce temple.
+            </span>
+          </span>
+        </label>
+      )}
       {chargement ? (
         <p className="text-xs text-slate-500 py-6 text-center">Chargement…</p>
       ) : (

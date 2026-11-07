@@ -212,6 +212,8 @@ router.post("/", ECRITURE, async (req, res) => {
  *   { "nom": "...", "description": "...", "couleur": "#RRGGBB"|null, "libelleCarte": "..."|null }
  * libelleCarte = nom imprimé sur la carte de badge (vide = le nom du département).
  * modeleCarte = "TITRE" (titre seul, modèle PASTEUR) ou vide (« Département NOM »).
+ * tousLesTemples = true : la couleur est aussi posée sur les départements du
+ * même nom des autres temples. Réponse : { ok, departement, autresTemples }.
  */
 router.patch("/:id", ECRITURE, async (req, res) => {
   try {
@@ -260,7 +262,25 @@ router.patch("/:id", ECRITURE, async (req, res) => {
       data: donnees,
     });
 
-    return res.json({ ok: true, departement });
+    // tousLesTemples: true → la couleur s'applique aussi aux départements du
+    // même nom (casse et accents ignorés) dans les autres temples, pour qu'un
+    // département garde la même couleur partout.
+    let autresTemples = 0;
+    if (req.body.tousLesTemples === true && donnees.couleur !== undefined) {
+      const cible = normaliserNomDepartement(departement.nom);
+      const memesNoms = (
+        await prisma.departement.findMany({ where: { id: { not: departement.id } }, select: { id: true, nom: true } })
+      ).filter((d) => normaliserNomDepartement(d.nom) === cible);
+      if (memesNoms.length) {
+        const { count } = await prisma.departement.updateMany({
+          where: { id: { in: memesNoms.map((d) => d.id) } },
+          data: { couleur: donnees.couleur },
+        });
+        autresTemples = count;
+      }
+    }
+
+    return res.json({ ok: true, departement, autresTemples });
   } catch (err) {
     if (err.code === "P2025") {
       return res.status(404).json({ ok: false, code: "DEPARTEMENT_INCONNU", message: "Département introuvable" });

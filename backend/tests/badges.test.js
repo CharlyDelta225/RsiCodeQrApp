@@ -151,6 +151,36 @@ test("confection : couleur obligatoire, puis l'ouvrier sort de « à confectionn
   assert.strictEqual(carte3.departements[0].modeleCarte, "TITRE");
 });
 
+test("couleur appliquée au département du même nom dans tous les temples", async () => {
+  const admin = await session("ADMIN");
+  const creer = async (nom, egliseId, couleur = null) => {
+    const d = await prisma.departement.create({ data: { nom, egliseId, couleur } });
+    departements.push(d.id);
+    return d;
+  };
+  const siege = await creer(`COULEUR ${suffixe}`, "eglise-shalom", "#111111");
+  const adjahui = await creer(`COULÉUR ${suffixe}`, "eglise-adjahui"); // accent ignoré
+  const autre = await creer(`AUTRE ${suffixe}`, "eglise-adjahui", "#222222");
+  const url = `${baseURL}/api/departements/${siege.id}`;
+  const lire = async (id) => (await prisma.departement.findUnique({ where: { id }, select: { couleur: true } })).couleur;
+
+  // Sans le drapeau : seul ce temple change.
+  let r = await fetch(url, { method: "PATCH", headers: json(admin), body: JSON.stringify({ couleur: "#333333" }) });
+  assert.strictEqual((await r.json()).autresTemples, 0);
+  assert.strictEqual(await lire(adjahui.id), null);
+
+  r = await fetch(url, { method: "PATCH", headers: json(admin), body: JSON.stringify({ couleur: "1f4fa3", tousLesTemples: true }) });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual((await r.json()).autresTemples, 1);
+  assert.strictEqual(await lire(siege.id), "#1F4FA3");
+  assert.strictEqual(await lire(adjahui.id), "#1F4FA3");
+  assert.strictEqual(await lire(autre.id), "#222222");
+
+  // Sans couleur dans le corps, le drapeau ne touche à rien.
+  r = await fetch(url, { method: "PATCH", headers: json(admin), body: JSON.stringify({ libelleCarte: "x", tousLesTemples: true }) });
+  assert.strictEqual((await r.json()).autresTemples, 0);
+});
+
 test("district du temple modifiable par le SUPER_ADMIN", async () => {
   const sup = await session("SUPER_ADMIN");
   const avant = await prisma.eglise.findUnique({ where: { id: "eglise-adjahui" }, select: { libelleCarte: true } });

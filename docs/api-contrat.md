@@ -108,7 +108,7 @@ Body `{ departementId, ouvrierIds: [] }` (500 au plus) → `201 { ok, crees, ign
 `GET /api/badges/photo/:id?v=<photoMaj>` : avec `v`, la réponse peut être gardée en cache par le navigateur (`private, max-age=86400`).
 
 ### Champs ajoutés
-- `PATCH /api/departements/:id` accepte `couleur` (`#RRGGBB`, `null` pour effacer ; `400 COULEUR_INVALIDE`) et `libelleCarte` (nom imprimé sur la carte, ex. `CHANTRE` pour TROMPETTE ; vide = le nom). Il accepte aussi `modeleCarte` : `TITRE` (titre seul sur bande en dégradé, carte des pasteurs) ou vide ; `400 MODELE_INVALIDE` sinon. `GET /api/badges/carte/:id` renvoie `nomCarte` et `modeleCarte` par département.
+- `PATCH /api/departements/:id` accepte `couleur` (`#RRGGBB`, `null` pour effacer ; `400 COULEUR_INVALIDE`) ; avec `tousLesTemples: true`, la couleur est aussi posée sur les départements du même nom (casse et accents ignorés) des autres temples, et la réponse donne leur nombre dans `autresTemples`. Il accepte aussi `libelleCarte` (nom imprimé sur la carte, ex. `CHANTRE` pour TROMPETTE ; vide = le nom). Il accepte aussi `modeleCarte` : `TITRE` (titre seul sur bande en dégradé, carte des pasteurs) ou vide ; `400 MODELE_INVALIDE` sinon. `GET /api/badges/carte/:id` renvoie `nomCarte` et `modeleCarte` par département.
 - `PATCH /api/eglises/:id` (SUPER_ADMIN) accepte `libelleCarte` (district imprimé, ex. `DISTRICT-SIÈGE`).
 
 ---
