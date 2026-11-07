@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import {
+  COULEUR_FOND_MAQUETTE,
   COULEUR_MODELE,
   FORMAT_MM,
   HAUTEUR,
@@ -8,6 +9,7 @@ import {
   PHOTO,
   POLICE,
   TEXTES,
+  TEXTES_MAQUETTE,
   TITRE_SEUL,
   VARIANTES_POLICE,
   VERSO,
@@ -119,42 +121,69 @@ const ecartTeinte = (a, b) => {
   return d > 180 ? 360 - d : d;
 };
 
+const borne = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
 /**
- * Recolore le fond : chaque pixel de la teinte du modèle (magenta) prend la
- * teinte et la saturation de la couleur du département, en gardant ses
- * ombres et lumières. Le logo, le cadre photo, le doré et le blanc ne
- * bougent pas.
+ * Recolore le fond. Chaque pixel est vu comme « le même pixel dans la teinte
+ * de base » + un écart de couleur (le rose, le jaune, le cyan de l'emblème en
+ * filigrane). La partie de base prend la teinte, la saturation et la
+ * luminosité du département ; l'écart est gardé tel quel. Aucun seuil de
+ * teinte : les bords de l'emblème restent nets, ses couleurs d'origine aussi.
+ * Le logo, le liseré du cadre photo et les dorés ne bougent pas.
  */
-function teinterFond(ctx, couleur) {
+function teinterFond(ctx, couleur, base) {
   const cible = hexVersRvb(couleur);
-  if (!cible || couleurValide(couleur) === couleurValide(COULEUR_MODELE)) return;
-  const [tB, sB, lB] = rvbVersTsl(...hexVersRvb(COULEUR_MODELE));
+  if (!cible || couleurValide(couleur) === couleurValide(base)) return;
+  const [tB, sB, lB] = rvbVersTsl(...hexVersRvb(base));
   const [tC, sC, lC] = rvbVersTsl(...cible);
   const image = ctx.getImageData(0, 0, LARGEUR, HAUTEUR);
   const px = image.data;
   const protege = new Uint8Array(LARGEUR * HAUTEUR);
-  const { logo, cadre } = ZONES_PROTEGEES;
+  const { logo, cadre, traitDore, titreDore } = ZONES_PROTEGEES;
   for (let y = Math.floor(logo.cy - logo.r); y <= logo.cy + logo.r; y++) {
     const demi = Math.sqrt(Math.max(0, logo.r * logo.r - (y - logo.cy) ** 2));
     protege.fill(1, y * LARGEUR + Math.floor(logo.cx - demi), y * LARGEUR + Math.ceil(logo.cx + demi));
   }
-  // Autour du cadre : seul le fond magenta est recoloré, pas le liseré orangé.
+  // Autour du cadre : seul le fond est recoloré, pas le liseré.
   for (let y = cadre.y; y < cadre.y + cadre.h; y++) protege.fill(2, y * LARGEUR + cadre.x, y * LARGEUR + cadre.x + cadre.l);
+  for (const z of [traitDore, titreDore]) {
+    for (let y = z.y; y < z.y + z.h; y++) protege.fill(3, y * LARGEUR + z.x, y * LARGEUR + z.x + z.l);
+  }
   // Luminosité : la bande (lB) devient lC ; le noir et le blanc restent en place.
   const lum = (l) => (l <= lB ? (l * lC) / lB : lC + ((l - lB) * (1 - lC)) / (1 - lB));
   for (let i = 0, p = 0; i < px.length; i += 4, p++) {
-    if (protege[p] === 1) continue;
-    const [t, s, l] = rvbVersTsl(px[i], px[i + 1], px[i + 2]);
-    if (s < 0.08) continue;
-    const ecart = ecartTeinte(t, tB);
-    if (ecart > (protege[p] === 2 ? 22 : 45)) continue;
-    const poids = ecart <= 30 ? 1 : (45 - ecart) / 15;
-    const [r, v, b] = tslVersRvb(tC, Math.min(1, (s * sC) / sB), lum(l));
-    px[i] += (r - px[i]) * poids;
-    px[i + 1] += (v - px[i + 1]) * poids;
-    px[i + 2] += (b - px[i + 2]) * poids;
+    const zone = protege[p];
+    const r0 = px[i], v0 = px[i + 1], b0 = px[i + 2];
+    const [t, s, l] = rvbVersTsl(r0, v0, b0);
+    // Gris, noir et blanc : intacts (fondu progressif, pas de seuil net).
+    let poids = borne((s - 0.04) / 0.08);
+    if (poids === 0) continue;
+    if (zone === 1 || zone === 2) {
+      // Logo et liseré du cadre : seul le fond bleu qui les borde est recoloré.
+      if (ecartTeinte(t, tB) > 22) continue;
+    } else if (zone === 3) {
+      // Trait doré, « STABILITE » : l'or reste or.
+      const orange = borne((s - 0.3) / 0.15) * borne(1 - Math.max(0, ecartTeinte(t, 45) - 25) / 12);
+      poids *= 1 - orange;
+      if (poids === 0) continue;
+    }
+    const [rB, vB, bB] = tslVersRvb(tB, s, l); // ce pixel dans la teinte de base
+    const [rC, vC, bC] = tslVersRvb(tC, Math.min(1, (s * sC) / sB), lum(l));
+    // Nouveau = recoloré + écart d'origine (couleurs de l'emblème).
+    px[i] = r0 + (rC + (r0 - rB) - r0) * poids;
+    px[i + 1] = v0 + (vC + (v0 - vB) - v0) * poids;
+    px[i + 2] = b0 + (bC + (b0 - bB) - b0) * poids;
   }
   ctx.putImageData(image, 0, 0);
+}
+
+/** Ombre du nom du département : très sombre, dans la teinte du département. */
+function ombreDepartement(couleur) {
+  const rvb = hexVersRvb(couleur);
+  if (!rvb || couleurValide(couleur) === couleurValide(COULEUR_MODELE)) return "rgba(70, 0, 20, 0.55)";
+  const [t, s] = rvbVersTsl(...rvb);
+  const [r, v, b] = tslVersRvb(t, Math.min(1, s), 0.14);
+  return `rgba(${Math.round(r)}, ${Math.round(v)}, ${Math.round(b)}, 0.55)`;
 }
 
 // ---------- Texte ----------
@@ -193,6 +222,7 @@ function ecrire(ctx, texte, spec, remplissage) {
 function ecrireLigneDoree(ctx, texte, spec, hauteurCap, base) {
   let taille = tailleDepuisCap(ctx, { ...spec, hauteurCap });
   ctx.font = police(spec, taille);
+  ctx.letterSpacing = `${spec.espacement || 0}px`;
   let largeur = ctx.measureText(texte).width;
   if (largeur > spec.largeurMax) {
     taille *= spec.largeurMax / largeur;
@@ -204,7 +234,8 @@ function ecrireLigneDoree(ctx, texte, spec, hauteurCap, base) {
   const degrade = ctx.createLinearGradient(x0, base - taille * 0.75, x0 + largeur, base);
   for (const [pos, c] of OR_DEPARTEMENT) degrade.addColorStop(pos, c);
   ctx.fillStyle = degrade;
-  ctx.fillText(texte, spec.x, base);
+  ctx.fillText(texte, spec.x + (spec.espacement || 0) / 2, base);
+  ctx.letterSpacing = "0px";
 }
 
 /** Coupe un nom en deux lignes de longueurs proches. */
@@ -220,11 +251,11 @@ function couperEnDeux(texte) {
   return meilleur;
 }
 
-function ecrireDepartement(ctx, texte) {
+function ecrireDepartement(ctx, texte, couleur, textes = TEXTES) {
   if (!texte) return;
-  const spec = TEXTES.departement;
+  const spec = textes.departement;
   ctx.save();
-  ctx.shadowColor = "rgba(70, 0, 20, 0.55)";
+  ctx.shadowColor = ombreDepartement(couleur);
   ctx.shadowBlur = 7;
   ctx.shadowOffsetX = 3;
   ctx.shadowOffsetY = 4;
@@ -234,7 +265,9 @@ function ecrireDepartement(ctx, texte) {
   const reduction = spec.largeurMax / ctx.measureText(texte).width;
   const { deuxLignes } = spec;
   if (reduction < deuxLignes.seuil && texte.includes(" ")) {
-    couperEnDeux(texte).forEach((ligne, i) => ecrireLigneDoree(ctx, ligne, spec, deuxLignes.hauteurCap, deuxLignes.bases[i]));
+    // Resserrement proportionnel à la taille réduite (sinon les mots se collent).
+    const petit = { ...spec, espacement: ((spec.espacement || 0) * deuxLignes.hauteurCap) / spec.hauteurCap };
+    couperEnDeux(texte).forEach((ligne, i) => ecrireLigneDoree(ctx, ligne, petit, deuxLignes.hauteurCap, deuxLignes.bases[i]));
   } else {
     ecrireLigneDoree(ctx, texte, spec, spec.hauteurCap, spec.base);
   }
@@ -320,11 +353,17 @@ export function nomCarte(membre) {
 
 // ---------- Recto / verso ----------
 
-export async function dessinerRecto({ fond, membre }) {
+/**
+ * `fondMaquette` : maquette de référence (ACCUEIL, bande bleue), recolorée
+ * pour chaque département (HUISSIER compris) — seule la couleur change.
+ * `fond` : ancien fond (HUISSIER), utilisé seulement si la maquette manque.
+ */
+export async function dessinerRecto({ fond, fondMaquette, membre }) {
   const canvas = nouveauCanvas();
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(fond, 0, 0, LARGEUR, HAUTEUR);
-  teinterFond(ctx, membre.couleur);
+  const base = fondMaquette ? COULEUR_FOND_MAQUETTE : COULEUR_MODELE;
+  ctx.drawImage(fondMaquette || fond, 0, 0, LARGEUR, HAUTEUR);
+  teinterFond(ctx, membre.couleur, base);
   const titreSeul = membre.modele === "TITRE";
   if (titreSeul) dessinerBandeTitreSeul(ctx, membre.couleur);
 
@@ -338,14 +377,15 @@ export async function dessinerRecto({ fond, membre }) {
     dessinerSansPhoto(ctx, membre);
   }
 
-  ecrire(ctx, nomCarte(membre), TEXTES.nom);
-  ecrire(ctx, String(membre.fonction || "").toUpperCase(), TEXTES.fonction);
-  const decale = (cle) => (titreSeul ? { ...TEXTES[cle], base: TEXTES[cle].base + TITRE_SEUL.decalages[cle] } : TEXTES[cle]);
+  const textes = base === COULEUR_FOND_MAQUETTE ? TEXTES_MAQUETTE : TEXTES;
+  ecrire(ctx, nomCarte(membre), textes.nom);
+  ecrire(ctx, String(membre.fonction || "").toUpperCase(), textes.fonction);
+  const decale = (cle) => (titreSeul ? { ...textes[cle], base: textes[cle].base + TITRE_SEUL.decalages[cle] } : textes[cle]);
   ecrire(ctx, String(membre.matricule || "").toUpperCase(), decale("matricule"));
   ecrire(ctx, String(membre.district || "").toUpperCase(), decale("district"));
   const departement = String(membre.departement || "").toUpperCase();
   if (titreSeul) ecrireTitreSeul(ctx, departement);
-  else ecrireDepartement(ctx, departement);
+  else ecrireDepartement(ctx, departement, membre.couleur, textes);
   return canvas;
 }
 
