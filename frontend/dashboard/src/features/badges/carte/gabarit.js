@@ -1,9 +1,11 @@
 /**
- * Gabarit de la carte de badge RSI (modèle « Département HUISSIER »).
+ * Gabarit de la carte de badge RSI.
  *
- * Toutes les mesures sont relevées sur la maquette d'origine, dans l'espace
- * du fond `fond-recto.jpg` (915 × 1456 px, format CR80 portrait 54 × 85,6 mm,
- * soit environ 430 dpi). Le verso utilise le même espace.
+ * Fond de toutes les cartes : `fond-recto-maquette.png`, la maquette originale
+ * (carte ACCUEIL, bande bleue) agrandie à 915 × 1456 px (format CR80 portrait
+ * 54 × 85,6 mm, soit environ 430 dpi), recolorée selon le département.
+ * `fond-recto.jpg` (ancienne maquette HUISSIER) ne sert plus que de secours.
+ * Le verso utilise le même espace.
  *
  * Éléments FIXES (dans l'image de fond) : dégradé, portrait en filigrane,
  * sceau, logo, « ROYAUME DE STABILITE », déclaration, cadre de la photo,
@@ -20,6 +22,12 @@ export const FORMAT_MM = Object.freeze({ largeur: 54, hauteur: 85.6 });
 /** Couleur de la bande du modèle (département HUISSIER). Sert de référence au recoloriage. */
 export const COULEUR_MODELE = "#BD175C";
 
+/**
+ * Couleur de la bande de la maquette de référence (`fond-recto-maquette.png`,
+ * carte ACCUEIL) : base du recoloriage de toutes les cartes.
+ */
+export const COULEUR_FOND_MAQUETTE = "#0269A3";
+
 export const POLICE = '"Poppins RSI", "Poppins", "Segoe UI", sans-serif';
 
 /** Cadre photo : intérieur du liseré orangé/doré. */
@@ -27,8 +35,10 @@ export const PHOTO = Object.freeze({ x: 280, y: 312, l: 358, h: 438 });
 
 /** Zones protégées du recoloriage (leurs couleurs ne dépendent pas du département). */
 export const ZONES_PROTEGEES = Object.freeze({
-  logo: { cx: 157.5, cy: 126.5, r: 96 }, // disque du logo
-  cadre: { x: 267, y: 300, l: 384, h: 462 }, // liseré du cadre photo (l'intérieur est recouvert par la photo)
+  logo: { cx: 157.5, cy: 126.5, r: 88 }, // disque du logo (au-delà : halo du fond, recoloré)
+  cadre: { x: 267, y: 300, l: 379, h: 459 }, // liseré du cadre photo (l'intérieur est recouvert par la photo)
+  traitDore: { x: 150, y: 880, l: 620, h: 32 }, // trait doré sous le nom
+  titreDore: { x: 230, y: 112, l: 590, h: 108 }, // « STABILITE » doré de l'en-tête
 });
 
 const CENTRE = LARGEUR / 2;
@@ -46,6 +56,20 @@ export const TEXTES = Object.freeze({
   departement: { x: CENTRE + 2, base: 1406, hauteurCap: 103, poids: 900, style: "italic", largeurMax: 800,
     // Nom trop long pour une ligne lisible : deux lignes plus petites.
     deuxLignes: { seuil: 0.62, hauteurCap: 56, bases: [1360, 1428] } },
+});
+
+/**
+ * Textes des cartes faites sur la maquette de référence (tous les départements) : mesurés sur la carte originale « KOUASSI LOUKOU
+ * CHRISTELLE / ACCUEIL ». Nom serré, fonction en 500, matricule sans
+ * espacement, nom du département plus grand.
+ */
+export const TEXTES_MAQUETTE = Object.freeze({
+  ...TEXTES,
+  nom: { ...TEXTES.nom, base: 871, hauteurCap: 41, espacement: -1.8 },
+  fonction: { ...TEXTES.fonction, base: 968, poids: 500 },
+  matricule: { ...TEXTES.matricule, espacement: -0.5 },
+  district: { ...TEXTES.district, x: CENTRE - 1, base: 1162, hauteurCap: 36, espacement: 1.3 },
+  departement: { ...TEXTES.departement, x: CENTRE + 8, hauteurCap: 114, espacement: -3.6 },
 });
 
 /**
