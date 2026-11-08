@@ -73,12 +73,11 @@ export const TEXTES_MAQUETTE = Object.freeze({
 });
 
 /**
- * Mentions imprimées dans le fond de la maquette, à écrire par-dessus une créa
- * importée (vierge comme la maquette : ni « N° Matricule: » ni « Département »).
+ * Mention à écrire par-dessus une créa importée. La créa porte déjà
+ * « Département » et le nom du département, mais pas « N° Matricule: ».
  */
 export const MENTIONS_CREA = Object.freeze({
   matricule: { texte: "N° Matricule:", x: CENTRE + 1, base: 1031, hauteurCap: 36, poids: 500, style: "normal", couleur: "#050203", largeurMax: 420 },
-  departement: { texte: "Département", x: CENTRE - 2, base: 1261, hauteurCap: 58, poids: 600, style: "italic", couleur: "#FFFFFF", largeurMax: 700 },
 });
 
 /**

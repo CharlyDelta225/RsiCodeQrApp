@@ -183,7 +183,7 @@ export default function CreasDepartements() {
   return (
     <Card
       title="Créas des départements"
-      description="Importez la créa vierge du badge d'un département, au format de la carte : sans photo, sans nom, sans « N° Matricule: » ni « Département ». Elle remplace la maquette recolorée pour ce département ; les données se placent par-dessus."
+      description="Importez la créa du badge d'un département, au format de la carte, avec « Département » et le nom du département déjà dans l'image, et le cadre photo vide. Sans nom du membre ni « N° Matricule: » : la photo, le nom, la fonction, le matricule et le district se placent par-dessus."
     >
       <input ref={champ} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={fichierChoisi} />
 
