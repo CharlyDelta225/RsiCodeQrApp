@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ArrowRight, Camera, Check, Download, Layers, Palette, Printer, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Camera, Check, Download, ImagePlus, Layers, Palette, Printer, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { getAdmin } from "../lib/auth";
 import { useTemple, paramTemple, TemplePill } from "../lib/temple";
@@ -14,6 +14,8 @@ import { preparerPhoto } from "../features/badges/carte/photo";
 import "../features/badges/carte/carte.css";
 import CreationEnMasse from "../features/badges/masse/CreationEnMasse";
 import ChoixDepartement from "../features/badges/ChoixDepartement";
+import CreasDepartements from "../features/badges/creas/CreasDepartements";
+import { urlCrea } from "../features/badges/creas/urlCrea";
 
 // ==============================
 // Atelier des cartes de badge
@@ -349,7 +351,8 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
       setApercus(null);
       return undefined;
     }
-    genererCarte(membre)
+    urlCrea(dep?.id, dep?.creaMaj)
+      .then((crea) => genererCarte({ ...membre, crea }))
       .then((r) => {
         if (annule) return;
         setRendu(r);
@@ -359,7 +362,7 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
     return () => {
       annule = true;
     };
-  }, [membre, toast]);
+  }, [membre, dep?.id, dep?.creaMaj, toast]);
 
   async function enregistrerFonction() {
     if (!dep || !ecriture) return;
@@ -418,7 +421,7 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
     }
   }
 
-  const imprimable = Boolean(rendu && couleur && ecriture);
+  const imprimable = Boolean(rendu && (couleur || dep?.creaMaj) && ecriture);
   // Suivant : d'abord le prochain « à faire » du département parcouru, sinon la liste générale.
   const suivantDep = listeDep?.ouvriers.find((o) => !o.confectionneLe && o.id !== ouvrierId);
   const suivant = suivantDep || aFaire.find((o) => o.id !== ouvrierId);
@@ -479,6 +482,8 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
                             <span className="inline-block h-3.5 w-3.5 rounded-full border border-black/10" style={{ background: couleur }} />
                             {couleur}
                           </p>
+                        ) : dep.creaMaj ? (
+                          <p className="font-semibold text-slate-800">Créa importée</p>
                         ) : (
                           <button type="button" onClick={allerAuxCouleurs} className="font-semibold text-amber-700 underline underline-offset-2">
                             À définir
@@ -529,7 +534,7 @@ function Confectionner({ ouvrierId, setOuvrierId, aFaire, rechargerAFaire, aller
         {carte && dep && ecriture && (
           <Card title="Imprimer ou télécharger" description="Une face par page, au format carte 54 × 85,6 mm.">
             <div className="space-y-3">
-              {!couleur && (
+              {!couleur && !dep.creaMaj && (
                 <p className="flex items-start gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <span>
@@ -847,6 +852,7 @@ const ONGLETS = [
   { id: "masse", libelle: "Création en masse", icone: Layers },
   { id: "a-faire", libelle: "À confectionner", icone: Check },
   { id: "couleurs", libelle: "Couleurs des départements", icone: Palette },
+  { id: "creas", libelle: "Créas des départements", icone: ImagePlus },
 ];
 
 export default function BadgeStudioPage() {
@@ -929,6 +935,7 @@ export default function BadgeStudioPage() {
         <AConfectionner aFaire={aFaire.ouvriers} total={aFaire.total} chargement={aFaire.chargement} choisir={choisir} />
       )}
       {onglet === "couleurs" && <Couleurs />}
+      {onglet === "creas" && <CreasDepartements />}
     </div>
   );
 }

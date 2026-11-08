@@ -113,6 +113,41 @@ test("photo : envoi, lecture, refus d'un faux fichier, réservé aux admins", as
   assert.strictEqual((await fetch(url, { headers: admin })).status, 404);
 });
 
+test("créa : envoi, lecture, dispense de couleur, retrait", async () => {
+  const admin = await session("ADMIN");
+  const lecteur = await session("LECTEUR");
+  const { o, dep } = await ouvrierDans("CREA TEST");
+  const url = `${baseURL}/api/badges/crea/${dep.id}`;
+  const carte = async () => (await (await fetch(`${baseURL}/api/badges/carte/${o.id}`, { headers: lecteur })).json()).carte.departements[0];
+  const confection = () =>
+    fetch(`${baseURL}/api/badges/confectionnes`, { method: "POST", headers: json(admin), body: JSON.stringify({ ouvrierId: o.id, departementId: dep.id }) });
+
+  assert.strictEqual((await fetch(url, { headers: admin })).status, 404);
+  assert.strictEqual((await confection()).status, 409);
+
+  assert.strictEqual((await fetch(url, { method: "POST", headers: { ...lecteur, "Content-Type": "image/jpeg" }, body: JPEG })).status, 403);
+  const faux = await fetch(url, { method: "POST", headers: { ...admin, "Content-Type": "image/jpeg" }, body: Buffer.from("<script>alert(1)</script>") });
+  assert.strictEqual(faux.status, 400);
+  assert.strictEqual((await faux.json()).code, "CREA_INVALIDE");
+
+  const ok = await fetch(url, { method: "POST", headers: { ...admin, "Content-Type": "image/jpeg" }, body: JPEG });
+  assert.strictEqual(ok.status, 200);
+  const { creaMaj } = await ok.json();
+  assert.ok(creaMaj);
+  const lue = await fetch(url, { headers: lecteur });
+  assert.strictEqual(lue.headers.get("content-type"), "image/jpeg");
+  assert.ok(Buffer.from(await lue.arrayBuffer()).equals(JPEG));
+  assert.strictEqual((await carte()).creaMaj, creaMaj);
+  const liste = await (await fetch(`${baseURL}/api/badges/departement/${dep.id}`, { headers: lecteur })).json();
+  assert.strictEqual(liste.departement.creaMaj, creaMaj);
+  assert.strictEqual((await confection()).status, 201);
+
+  assert.strictEqual((await fetch(url, { method: "DELETE", headers: lecteur })).status, 403);
+  assert.strictEqual((await fetch(url, { method: "DELETE", headers: admin })).status, 200);
+  assert.strictEqual((await carte()).creaMaj, null);
+  assert.strictEqual((await confection()).status, 409);
+});
+
 test("confection : couleur obligatoire, puis l'ouvrier sort de « à confectionner »", async () => {
   const admin = await session("ADMIN");
   const { o, dep } = await ouvrierDans("SECURITE TEST");

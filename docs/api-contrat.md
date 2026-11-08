@@ -109,6 +109,7 @@ Body `{ departementId, ouvrierIds: [] }` (500 au plus) → `201 { ok, crees, ign
 
 ### Champs ajoutés
 - `PATCH /api/departements/:id` accepte `couleur` (`#RRGGBB`, `null` pour effacer ; `400 COULEUR_INVALIDE`) ; avec `tousLesTemples: true`, la couleur est aussi posée sur les départements du même nom (casse et accents ignorés) des autres temples, et la réponse donne leur nombre dans `autresTemples`. Il accepte aussi `libelleCarte` (nom imprimé sur la carte, ex. `CHANTRE` pour TROMPETTE ; vide = le nom). Il accepte aussi `modeleCarte` : `TITRE` (titre seul sur bande en dégradé, carte des pasteurs) ou vide ; `400 MODELE_INVALIDE` sinon. `GET /api/badges/carte/:id` renvoie `nomCarte` et `modeleCarte` par département.
+- `GET|POST|DELETE /api/badges/crea/:departementId` : créa importée du département (image brute JPG, PNG ou WebP, 3 Mo max ; `400 CREA_INVALIDE`, `404 AUCUNE_CREA` en lecture ; écriture ADMIN/SUPER_ADMIN). Elle sert de fond à ses cartes à la place de la maquette recolorée et dispense de couleur pour la confection. `creaMaj` (date ou `null`) est renvoyé par département dans `GET /api/departements`, `GET /api/badges/carte/:id` et `GET /api/badges/departement/:id`.
 - `PATCH /api/eglises/:id` (SUPER_ADMIN) accepte `libelleCarte` (district imprimé, ex. `DISTRICT-SIÈGE`).
 
 ---

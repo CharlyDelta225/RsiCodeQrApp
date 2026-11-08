@@ -5,6 +5,7 @@ import {
   FORMAT_MM,
   HAUTEUR,
   LARGEUR,
+  MENTIONS_CREA,
   OR_DEPARTEMENT,
   PHOTO,
   POLICE,
@@ -357,15 +358,22 @@ export function nomCarte(membre) {
  * `fondMaquette` : maquette de référence (ACCUEIL, bande bleue), recolorée
  * pour chaque département (HUISSIER compris) — seule la couleur change.
  * `fond` : ancien fond (HUISSIER), utilisé seulement si la maquette manque.
+ * `membre.crea` : créa importée du département, utilisée telle quelle à la place.
  */
 export async function dessinerRecto({ fond, fondMaquette, membre }) {
   const canvas = nouveauCanvas();
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  // Créa importée pour ce département : elle remplace le fond, sans recoloriage.
+  const crea = membre.crea ? await chargerImage(membre.crea).catch(() => null) : null;
   const base = fondMaquette ? COULEUR_FOND_MAQUETTE : COULEUR_MODELE;
-  ctx.drawImage(fondMaquette || fond, 0, 0, LARGEUR, HAUTEUR);
-  teinterFond(ctx, membre.couleur, base);
   const titreSeul = membre.modele === "TITRE";
-  if (titreSeul) dessinerBandeTitreSeul(ctx, membre.couleur);
+  if (crea) {
+    ctx.drawImage(crea, 0, 0, LARGEUR, HAUTEUR);
+  } else {
+    ctx.drawImage(fondMaquette || fond, 0, 0, LARGEUR, HAUTEUR);
+    teinterFond(ctx, membre.couleur, base);
+    if (titreSeul) dessinerBandeTitreSeul(ctx, membre.couleur);
+  }
 
   if (membre.photo) {
     try {
@@ -377,7 +385,11 @@ export async function dessinerRecto({ fond, fondMaquette, membre }) {
     dessinerSansPhoto(ctx, membre);
   }
 
-  const textes = base === COULEUR_FOND_MAQUETTE ? TEXTES_MAQUETTE : TEXTES;
+  const textes = crea || base === COULEUR_FOND_MAQUETTE ? TEXTES_MAQUETTE : TEXTES;
+  if (crea) {
+    ecrire(ctx, MENTIONS_CREA.matricule.texte, MENTIONS_CREA.matricule);
+    if (!titreSeul) ecrire(ctx, MENTIONS_CREA.departement.texte, MENTIONS_CREA.departement);
+  }
   ecrire(ctx, nomCarte(membre), textes.nom);
   ecrire(ctx, String(membre.fonction || "").toUpperCase(), textes.fonction);
   const decale = (cle) => (titreSeul ? { ...textes[cle], base: textes[cle].base + TITRE_SEUL.decalages[cle] } : textes[cle]);

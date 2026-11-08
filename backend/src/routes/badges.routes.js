@@ -16,6 +16,7 @@ const ECRITURE = requireRole("ADMIN", "SUPER_ADMIN");
 
 export const TAILLE_MAX_PHOTO = 1024 * 1024; // 1 Mo (la photo est compressée dans le navigateur)
 const TYPES_PHOTO = ["image/jpeg", "image/png", "image/webp"];
+export const TAILLE_MAX_CREA = 3 * 1024 * 1024; // 3 Mo (la créa est redimensionnée dans le navigateur)
 
 // Fonction imprimée par défaut, selon le rôle dans le département.
 export const FONCTION_PAR_ROLE = Object.freeze({
@@ -83,7 +84,12 @@ router.get("/carte/:ouvrierId", async (req, res) => {
           select: {
             roleDansDepartement: true,
             fonctionCarte: true,
-            departement: { select: { id: true, nom: true, couleur: true, libelleCarte: true, modeleCarte: true } },
+            departement: {
+              select: {
+                id: true, nom: true, couleur: true, libelleCarte: true, modeleCarte: true,
+                crea: { select: { updatedAt: true } },
+              },
+            },
           },
           orderBy: { departement: { nom: "asc" } },
         },
@@ -111,6 +117,7 @@ router.get("/carte/:ouvrierId", async (req, res) => {
           nomCarte: l.departement.libelleCarte || l.departement.nom,
           couleur: l.departement.couleur,
           modeleCarte: l.departement.modeleCarte,
+          creaMaj: l.departement.crea?.updatedAt ?? null,
           role: l.roleDansDepartement,
           fonctionCarte: l.fonctionCarte,
           fonction: l.fonctionCarte || FONCTION_PAR_ROLE[l.roleDansDepartement] || "MEMBRE",
@@ -182,6 +189,67 @@ router.delete("/photo/:ouvrierId", ECRITURE, async (req, res) => {
   }
 });
 
+/** GET /api/badges/crea/:departementId → la créa du département (404 si aucune). */
+router.get("/crea/:departementId", async (req, res) => {
+  try {
+    const crea = await prisma.creaBadge.findUnique({ where: { departementId: req.params.departementId } });
+    if (!crea) return res.status(404).json({ ok: false, code: "AUCUNE_CREA", message: "Ce département n'a pas de créa" });
+    res.setHeader("Content-Type", crea.type);
+    // ?v=<date de la créa> : l'URL change à chaque nouvelle créa, le navigateur peut la garder.
+    res.setHeader("Cache-Control", req.query.v ? "private, max-age=86400" : "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    return res.send(Buffer.from(crea.donnees));
+  } catch (err) {
+    logger.error("[BADGES/CREA/LECTURE]", err);
+    return erreurInterne(res);
+  }
+});
+
+/**
+ * POST /api/badges/crea/:departementId
+ * Corps : l'image brute (Content-Type image/jpeg, image/png ou image/webp), 3 Mo max.
+ * Remplace la créa existante. { ok, creaMaj }
+ */
+router.post(
+  "/crea/:departementId",
+  ECRITURE,
+  express.raw({ type: TYPES_PHOTO, limit: TAILLE_MAX_CREA }),
+  async (req, res) => {
+    try {
+      const octets = Buffer.isBuffer(req.body) ? req.body : null;
+      const type = typeImage(octets);
+      if (!type) {
+        return res.status(400).json({ ok: false, code: "CREA_INVALIDE", message: "Envoyez une image JPG, PNG ou WebP" });
+      }
+      const departement = await prisma.departement.findUnique({ where: { id: req.params.departementId }, select: { id: true } });
+      if (!departement) {
+        return res.status(404).json({ ok: false, code: "DEPARTEMENT_INTROUVABLE", message: "Département introuvable" });
+      }
+      const crea = await prisma.creaBadge.upsert({
+        where: { departementId: departement.id },
+        create: { departementId: departement.id, type, donnees: octets },
+        update: { type, donnees: octets },
+        select: { updatedAt: true },
+      });
+      return res.json({ ok: true, creaMaj: crea.updatedAt });
+    } catch (err) {
+      logger.error("[BADGES/CREA/ENVOI]", err);
+      return erreurInterne(res);
+    }
+  }
+);
+
+/** DELETE /api/badges/crea/:departementId — les cartes reviennent à la maquette recolorée. */
+router.delete("/crea/:departementId", ECRITURE, async (req, res) => {
+  try {
+    await prisma.creaBadge.deleteMany({ where: { departementId: req.params.departementId } });
+    return res.json({ ok: true });
+  } catch (err) {
+    logger.error("[BADGES/CREA/SUPPRESSION]", err);
+    return erreurInterne(res);
+  }
+});
+
 /**
  * PATCH /api/badges/fonction/:ouvrierId/:departementId
  * Body : { fonctionCarte: "RESPONSABLE ADJOINTE" | "" } — vide = revenir au rôle.
@@ -212,12 +280,12 @@ router.post("/confectionnes", ECRITURE, async (req, res) => {
     const { ouvrierId, departementId } = req.body ?? {};
     const lien = await prisma.ouvrierDepartement.findFirst({
       where: { ouvrierId: String(ouvrierId ?? ""), departementId: String(departementId ?? "") },
-      select: { departement: { select: { couleur: true } } },
+      select: { departement: { select: { couleur: true, crea: { select: { updatedAt: true } } } } },
     });
     if (!lien) {
       return res.status(404).json({ ok: false, code: "LIEN_INCONNU", message: "Cet ouvrier n'est pas dans ce département" });
     }
-    if (!lien.departement.couleur) {
+    if (!lien.departement.couleur && !lien.departement.crea) {
       return res.status(409).json({
         ok: false,
         code: "COULEUR_MANQUANTE",
@@ -248,11 +316,11 @@ router.post("/confectionnes/lot", ECRITURE, async (req, res) => {
     if (!departementId || ids.length === 0) {
       return res.status(400).json({ ok: false, code: "CHAMPS_MANQUANTS", message: "departementId et ouvrierIds sont requis" });
     }
-    const departement = await prisma.departement.findUnique({ where: { id: departementId }, select: { couleur: true } });
+    const departement = await prisma.departement.findUnique({ where: { id: departementId }, select: { couleur: true, crea: { select: { updatedAt: true } } } });
     if (!departement) {
       return res.status(404).json({ ok: false, code: "DEPARTEMENT_INTROUVABLE", message: "Département introuvable" });
     }
-    if (!departement.couleur) {
+    if (!departement.couleur && !departement.crea) {
       return res.status(409).json({ ok: false, code: "COULEUR_MANQUANTE", message: "Définissez d'abord la couleur de ce département" });
     }
     const liens = await prisma.ouvrierDepartement.findMany({
@@ -319,6 +387,7 @@ router.get("/departement/:departementId", async (req, res) => {
       where: { id: req.params.departementId },
       select: {
         id: true, nom: true, couleur: true, libelleCarte: true, modeleCarte: true,
+        crea: { select: { updatedAt: true } },
         eglise: { select: { id: true, nom: true, libelleCarte: true } },
       },
     });
@@ -362,10 +431,17 @@ router.get("/departement/:departementId", async (req, res) => {
           a.nom.localeCompare(b.nom, "fr") ||
           (a.prenom || "").localeCompare(b.prenom || "", "fr")
       );
-    const { eglise, libelleCarte, ...dep } = departement;
+    const { eglise, libelleCarte, crea, ...dep } = departement;
     return res.json({
       ok: true,
-      departement: { ...dep, libelleCarte, nomCarte: libelleCarte || dep.nom, egliseId: eglise.id, district: districtDe(eglise) },
+      departement: {
+        ...dep,
+        libelleCarte,
+        nomCarte: libelleCarte || dep.nom,
+        creaMaj: crea?.updatedAt ?? null,
+        egliseId: eglise.id,
+        district: districtDe(eglise),
+      },
       ouvriers,
     });
   } catch (err) {
