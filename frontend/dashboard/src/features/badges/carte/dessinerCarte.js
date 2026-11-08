@@ -366,7 +366,8 @@ export async function dessinerRecto({ fond, fondMaquette, membre }) {
   // Créa importée pour ce département : elle remplace le fond, sans recoloriage.
   const crea = membre.crea ? await chargerImage(membre.crea).catch(() => null) : null;
   const base = fondMaquette ? COULEUR_FOND_MAQUETTE : COULEUR_MODELE;
-  const titreSeul = membre.modele === "TITRE";
+  // La créa porte déjà sa bande : la variante « titre seul » ne la concerne pas.
+  const titreSeul = !crea && membre.modele === "TITRE";
   if (crea) {
     ctx.drawImage(crea, 0, 0, LARGEUR, HAUTEUR);
   } else {
@@ -386,15 +387,14 @@ export async function dessinerRecto({ fond, fondMaquette, membre }) {
   }
 
   const textes = crea || base === COULEUR_FOND_MAQUETTE ? TEXTES_MAQUETTE : TEXTES;
-  if (crea) {
-    ecrire(ctx, MENTIONS_CREA.matricule.texte, MENTIONS_CREA.matricule);
-    if (!titreSeul) ecrire(ctx, MENTIONS_CREA.departement.texte, MENTIONS_CREA.departement);
-  }
+  if (crea) ecrire(ctx, MENTIONS_CREA.matricule.texte, MENTIONS_CREA.matricule);
   ecrire(ctx, nomCarte(membre), textes.nom);
   ecrire(ctx, String(membre.fonction || "").toUpperCase(), textes.fonction);
   const decale = (cle) => (titreSeul ? { ...textes[cle], base: textes[cle].base + TITRE_SEUL.decalages[cle] } : textes[cle]);
   ecrire(ctx, String(membre.matricule || "").toUpperCase(), decale("matricule"));
   ecrire(ctx, String(membre.district || "").toUpperCase(), decale("district"));
+  // Sur une créa, « Département » et le nom du département sont déjà dans l'image.
+  if (crea) return canvas;
   const departement = String(membre.departement || "").toUpperCase();
   if (titreSeul) ecrireTitreSeul(ctx, departement);
   else ecrireDepartement(ctx, departement, membre.couleur, textes);
