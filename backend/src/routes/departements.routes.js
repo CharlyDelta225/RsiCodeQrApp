@@ -58,11 +58,21 @@ router.get("/", async (req, res) => {
         orderBy: [{ eglise: { estSiege: "desc" } }, { eglise: { nom: "asc" } }, { nom: "asc" }],
         skip: (page - 1) * limit,
         take: limit,
-        include: { _count: { select: { membres: true } }, eglise: { select: SELECT_EGLISE } },
+        include: {
+          _count: { select: { membres: true } },
+          eglise: { select: SELECT_EGLISE },
+          crea: { select: { updatedAt: true } },
+        },
       }),
     ]);
 
-    return res.json({ ok: true, total, page, limit, departements });
+    return res.json({
+      ok: true,
+      total,
+      page,
+      limit,
+      departements: departements.map(({ crea, ...d }) => ({ ...d, creaMaj: crea?.updatedAt ?? null })),
+    });
   } catch (err) {
     logger.error("[DEPARTEMENTS/LISTE]", err);
     return res.status(500).json({ ok: false, code: "ERREUR_INTERNE", message: "Une erreur interne est survenue" });

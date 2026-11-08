@@ -183,6 +183,12 @@ export const api = {
   envoyerBadgePhoto: (ouvrierId, blob) =>
     request(`/api/badges/photo/${ouvrierId}`, { method: "POST", body: blob, headers: { "Content-Type": blob.type } }),
   supprimerBadgePhoto: (ouvrierId) => request(`/api/badges/photo/${ouvrierId}`, { method: "DELETE" }),
+  // Créa importée d'un département (fond de ses cartes).
+  getBadgeCreaBlob: (departementId, version) =>
+    request(`/api/badges/crea/${departementId}${version ? `?v=${encodeURIComponent(version)}` : ""}`),
+  envoyerBadgeCrea: (departementId, blob) =>
+    request(`/api/badges/crea/${departementId}`, { method: "POST", body: blob, headers: { "Content-Type": blob.type } }),
+  supprimerBadgeCrea: (departementId) => request(`/api/badges/crea/${departementId}`, { method: "DELETE" }),
   majFonctionCarte: (ouvrierId, departementId, fonctionCarte) =>
     request(`/api/badges/fonction/${ouvrierId}/${departementId}`, {
       method: "PATCH",

@@ -14,6 +14,7 @@ import ChoixDepartement from "../ChoixDepartement";
 import { genererCarte, couleurValide } from "../carte";
 import { preparerPhoto } from "../carte/photo";
 import { associerPhotos } from "./associerPhotos";
+import { urlCrea } from "../creas/urlCrea";
 
 // ==============================
 // Création des cartes en masse : toutes les cartes d'un département, recto et
@@ -162,6 +163,7 @@ export default function CreationEnMasse({ modifier, allerAuxCouleurs }) {
       modele: dep.modeleCarte,
       couleur: couleur || GRIS,
       photo: await photoDe(o).catch(() => null),
+      crea: await urlCrea(dep.id, dep.creaMaj),
     }),
     [dep, couleur, photoDe]
   );
@@ -328,7 +330,7 @@ export default function CreationEnMasse({ modifier, allerAuxCouleurs }) {
   const avecPhoto = ouvriers.filter((o) => o.aPhoto).length;
   const faites = ouvriers.filter((o) => o.confectionneLe).length;
   const occupe = Boolean(travail);
-  const sortiePossible = ecriture && couleur && selection.length > 0 && !occupe;
+  const sortiePossible = ecriture && (couleur || dep?.creaMaj) && selection.length > 0 && !occupe;
 
   return (
     <div className="space-y-4">
@@ -388,11 +390,11 @@ export default function CreationEnMasse({ modifier, allerAuxCouleurs }) {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-3 w-3 rounded-full border border-black/10" style={{ background: couleur || GRIS }} />
-                  {couleur || "Couleur à définir"} · {dep.district}
+                  {couleur || (dep.creaMaj ? "Créa importée" : "Couleur à définir")} · {dep.district}
                 </span>
               </div>
 
-              {!couleur && (
+              {!couleur && !dep.creaMaj && (
                 <p className="flex items-start gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <span>

@@ -84,6 +84,7 @@ model Departement {
   eglise  Eglise @relation(fields: [egliseId], references: [id])
   membres OuvrierDepartement[]
   badges  BadgeConfectionne[]
+  crea    CreaBadge?
 
   @@unique([egliseId, nom])
   @@index([egliseId])
@@ -180,6 +181,18 @@ model PhotoOuvrier {
   ouvrier Ouvrier @relation(fields: [ouvrierId], references: [id], onDelete: Cascade)
 
   @@map("PhotoOuvrier")
+}
+
+// Créa importée pour un département : fond de ses cartes à la place de la maquette recolorée.
+model CreaBadge {
+  departementId String   @id
+  type          String // image/jpeg | image/png | image/webp
+  donnees       Bytes
+  updatedAt     DateTime @updatedAt
+
+  departement Departement @relation(fields: [departementId], references: [id], onDelete: Cascade)
+
+  @@map("CreaBadge")
 }
 
 // Carte de badge confectionnée (imprimée ou téléchargée) pour un ouvrier et un département.
