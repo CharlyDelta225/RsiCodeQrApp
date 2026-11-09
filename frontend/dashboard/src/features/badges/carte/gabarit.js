@@ -89,6 +89,7 @@ export const TITRE_SEUL = Object.freeze({
   // Bande d'origine : liseré clair à 1172-1175, bord à 1176. La bande pasteur commence à 1198.
   bandeOrigine: 1172,
   ligneFond: 1171,
+  etirementDepuis: 1100, // haut de la partie du fond étirée pour descendre jusqu'à la bande
   lisere: 6,
   bande: 1198,
   // Dégradé de la bande : couleur du département en haut, plus claire et un peu plus cyan vers le bas.
@@ -100,6 +101,8 @@ export const TITRE_SEUL = Object.freeze({
     [1, -6, 0.085],
   ],
   titre: { x: CENTRE + 2, base: 1382, hauteurCap: 114, poids: 900, style: "italic", largeurMax: 830 },
+  // Titre très court (DAF) : plus grand, toujours centré dans la bande.
+  titreCourt: { longueurMax: 3, base: 1395, hauteurCap: 140 },
   // Le matricule et le district sont un peu plus bas que sur le modèle « Département ».
   decalages: { matricule: 7, district: 14 },
 });
