@@ -2,6 +2,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert";
 import bcrypt from "bcryptjs";
 import prisma from "../src/lib/prisma.js";
+import { ecartCouleurs } from "../src/lib/couleurDepartement.js";
 
 process.env.AUTH_RATE_LIMIT_MAX = "200";
 process.env.SMTP_HOST = "";
@@ -87,6 +88,26 @@ test("fonction imprimée modifiable, vide = retour au rôle", async () => {
   await fetch(url, { method: "PATCH", headers: json(admin), body: JSON.stringify({ fonctionCarte: "" }) });
   carte = (await (await fetch(`${baseURL}/api/badges/carte/${o.id}`, { headers: admin })).json()).carte;
   assert.strictEqual(carte.departements[0].fonction, "MEMBRE");
+});
+
+test("nouveau département : couleur attribuée, distincte, la même d'un temple à l'autre", async () => {
+  const admin = await session("ADMIN");
+  const avant = (await prisma.departement.findMany({ where: { couleur: { not: null } }, select: { couleur: true } })).map((d) => d.couleur);
+  const creer = async (nom, egliseId) => {
+    const r = await fetch(`${baseURL}/api/departements`, { method: "POST", headers: json(admin), body: JSON.stringify({ nom, egliseId }) });
+    assert.strictEqual(r.status, 201);
+    const { departement } = await r.json();
+    departements.push(departement.id);
+    return departement.couleur;
+  };
+  const a = await creer(`COULEUR A ${suffixe}`, "eglise-shalom");
+  assert.match(a, /^#[0-9A-F]{6}$/);
+  for (const c of avant) assert.ok(ecartCouleurs(a, c) > 0.05, `${a} ressemble à ${c}`);
+
+  const b = await creer(`COULEUR B ${suffixe}`, "eglise-shalom");
+  assert.ok(ecartCouleurs(a, b) > 0.05, `${a} ressemble à ${b}`);
+
+  assert.strictEqual(await creer(`Couleur A ${suffixe}`, "eglise-adjahui"), a, "même département, même couleur");
 });
 
 test("département pasteur : postes propres, carte et poste par défaut", async () => {

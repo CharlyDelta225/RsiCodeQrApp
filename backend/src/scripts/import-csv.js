@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import prisma from "../lib/prisma.js";
 import { genererMatricule } from "../lib/matricule.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
+import { couleurNouveauDepartement } from "../lib/couleurDepartement.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -116,7 +117,7 @@ async function main() {
     const clef = normaliserNomDepartement(nom);
     const existant = departementsParClef.get(clef);
     if (existant) return existant;
-    const cree = await prisma.departement.create({ data: { nom: String(nom).trim().toUpperCase() } });
+    const cree = await prisma.departement.create({ data: { nom: String(nom).trim().toUpperCase(), couleur: await couleurNouveauDepartement(nom) } });
     departementsParClef.set(clef, cree);
     return cree;
   }

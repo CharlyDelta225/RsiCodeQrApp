@@ -592,6 +592,7 @@ Identique à `GET /:id` mais réponse allégée :
 // Réponse 201 : { "ok": true, "departement": { "id", "nom", "description", "createdAt" } }
 // Erreurs : 400 CHAMPS_MANQUANTS (nom requis), 409 DEPARTEMENT_EXISTANT
 ```
+`couleur` est attribuée à la création : celle du département de même nom d'un autre temple s'il existe, sinon la couleur la plus éloignée de toutes celles déjà attribuées. Elle reste modifiable par `PATCH /api/departements/:id`.
 
 ### `PATCH /api/departements/:id` (écriture — **ADMIN/SUPER_ADMIN**)
 Change `nom` et/ou `description`.
