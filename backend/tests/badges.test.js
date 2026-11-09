@@ -90,6 +90,15 @@ test("fonction imprimée modifiable, vide = retour au rôle", async () => {
   assert.strictEqual(carte.departements[0].fonction, "MEMBRE");
 });
 
+test("ouvrier : téléphone facultatif à la création", async () => {
+  const admin = await session("ADMIN");
+  const r = await fetch(`${baseURL}/api/ouvriers`, { method: "POST", headers: json(admin), body: JSON.stringify({ nom: "SANS", prenom: "Telephone", telephone: "" }) });
+  assert.strictEqual(r.status, 201);
+  const { ouvrier } = await r.json();
+  ouvriers.push(ouvrier.id);
+  assert.strictEqual(ouvrier.telephone, null);
+});
+
 test("nouveau département : couleur attribuée, distincte, la même d'un temple à l'autre", async () => {
   const admin = await session("ADMIN");
   const avant = (await prisma.departement.findMany({ where: { couleur: { not: null } }, select: { couleur: true } })).map((d) => d.couleur);
