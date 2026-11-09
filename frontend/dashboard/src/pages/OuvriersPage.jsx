@@ -214,7 +214,7 @@ export default function OuvriersPage() {
 
       for (const nom of aAjouter) {
         const id = idParNom.get(nom);
-        if (id) await api.ajouterMembre(id, modification.id, "MEMBRE");
+        if (id) await api.ajouterMembre(id, modification.id);
       }
       const liaisonsActuelles = modification.departements || [];
       for (const nom of aRetirer) {

@@ -140,6 +140,10 @@ export const FONCTION_PAR_ROLE = Object.freeze({
   ADJOINT: "RESPONSABLE ADJOINT",
   SECRETAIRE: "SECRÉTAIRE",
   MEMBRE: "MEMBRE",
+  PASTEUR: "PASTEUR",
+  PASTEUR_PRINCIPAL: "PASTEUR PRINCIPAL",
+  PASTEUR_RESIDENT: "PASTEUR RESIDENT",
+  APOTRE: "APÔTRE",
 });
 
 /** Polices utilisées (chargées explicitement : le canvas ne les déclenche pas seul). */

@@ -43,6 +43,11 @@ enum RoleDepartement {
   ADJOINT
   SECRETAIRE
   MEMBRE
+  // Postes du seul département PASTEUR (vérif côté back).
+  PASTEUR
+  PASTEUR_PRINCIPAL
+  PASTEUR_RESIDENT
+  APOTRE
 }
 
 // Temple (église locale). SHALOM est le siège. Identifiants fixes posés par la

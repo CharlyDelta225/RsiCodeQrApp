@@ -89,6 +89,39 @@ test("fonction imprimée modifiable, vide = retour au rôle", async () => {
   assert.strictEqual(carte.departements[0].fonction, "MEMBRE");
 });
 
+test("département pasteur : postes propres, carte et poste par défaut", async () => {
+  const admin = await session("ADMIN");
+  const dep = await prisma.departement.create({ data: { nom: "Pasteurs" } });
+  departements.push(dep.id);
+  const creer = async (liaison) => {
+    const o = await prisma.ouvrier.create({
+      data: { matricule: `TEST-BDG-${suffixe}-${ouvriers.length}`, nom: "PASTEUR", prenom: "Essai", ...(liaison && { departements: { create: liaison } }) },
+    });
+    ouvriers.push(o.id);
+    return o;
+  };
+  const o = await creer({ departementId: dep.id, roleDansDepartement: "MEMBRE", fonctionCarte: "ANCIENNE" });
+  const changer = (d, id, role) =>
+    fetch(`${baseURL}/api/departements/${d}/membres/${id}`, { method: "PATCH", headers: json(admin), body: JSON.stringify({ roleDansDepartement: role }) });
+
+  const refus = await changer(dep.id, o.id, "RESPONSABLE");
+  assert.strictEqual(refus.status, 400);
+  assert.strictEqual((await refus.json()).code, "ROLE_INVALIDE");
+
+  assert.strictEqual((await changer(dep.id, o.id, "PASTEUR_PRINCIPAL")).status, 200);
+  const carte = (await (await fetch(`${baseURL}/api/badges/carte/${o.id}`, { headers: admin })).json()).carte;
+  assert.strictEqual(carte.departements[0].fonction, "PASTEUR PRINCIPAL");
+
+  const nouveau = await creer();
+  const ajout = await fetch(`${baseURL}/api/departements/${dep.id}/membres`, { method: "POST", headers: json(admin), body: JSON.stringify({ ouvrierId: nouveau.id }) });
+  assert.strictEqual(ajout.status, 201);
+  assert.strictEqual((await ajout.json()).liaison.roleDansDepartement, "PASTEUR");
+
+  const autre = await ouvrierDans("ACCUEIL TEST");
+  assert.strictEqual((await changer(autre.dep.id, autre.o.id, "APOTRE")).status, 400);
+  assert.strictEqual((await changer(autre.dep.id, autre.o.id, "SECRETAIRE")).status, 200);
+});
+
 test("photo : envoi, lecture, refus d'un faux fichier, réservé aux admins", async () => {
   const admin = await session("ADMIN");
   const lecteur = await session("LECTEUR");
