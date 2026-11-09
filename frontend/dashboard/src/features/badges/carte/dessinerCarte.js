@@ -280,13 +280,13 @@ function ecrireDepartement(ctx, texte, couleur, textes = TEXTES) {
  * dégradé de la couleur du département et ne porte que le titre.
  */
 function dessinerBandeTitreSeul(ctx, couleur) {
-  const { bandeOrigine, ligneFond, lisere, bande, degrade } = TITRE_SEUL;
-  // 1. Le fond descend jusqu'à la nouvelle bande, liseré clair compris.
+  const { bandeOrigine, ligneFond, etirementDepuis, lisere, bande, degrade } = TITRE_SEUL;
+  // 1. Le fond descend jusqu'à la nouvelle bande, liseré clair compris :
+  // son bas est étiré (répéter une ligne laisserait des traînées sur l'emblème).
   const filet = ctx.getImageData(0, bandeOrigine, LARGEUR, lisere);
-  for (let y = bandeOrigine; y < bande - lisere + 4; y++) {
-    ctx.drawImage(ctx.canvas, 0, ligneFond, LARGEUR, 1, 0, y, LARGEUR, 1);
-  }
-  ctx.putImageData(filet, 0, bande - lisere + 4);
+  const finFond = bande - lisere + 4;
+  ctx.drawImage(ctx.canvas, 0, etirementDepuis, LARGEUR, ligneFond + 1 - etirementDepuis, 0, etirementDepuis, LARGEUR, finFond - etirementDepuis);
+  ctx.putImageData(filet, 0, finFond);
   // 2. Bande en dégradé (recouvre le mot « Département » du modèle).
   const rvb = hexVersRvb(couleur) || hexVersRvb("#8F8585");
   const [t, s, l] = rvbVersTsl(...rvb);
@@ -302,7 +302,8 @@ function dessinerBandeTitreSeul(ctx, couleur) {
 
 function ecrireTitreSeul(ctx, texte) {
   if (!texte) return;
-  const spec = TITRE_SEUL.titre;
+  const { titre, titreCourt } = TITRE_SEUL;
+  const spec = texte.length <= titreCourt.longueurMax ? { ...titre, ...titreCourt } : titre;
   ctx.save();
   ctx.shadowColor = "rgba(0, 20, 40, 0.5)";
   ctx.shadowBlur = 7;
