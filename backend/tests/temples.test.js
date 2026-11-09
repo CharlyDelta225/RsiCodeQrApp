@@ -189,6 +189,24 @@ test("badgeage : lieu = temple du terminal, visiteur signalé, temple inconnu re
   assert.ok(stats.visiteursAuj >= 1);
   assert.strictEqual(stats.parEglise.length, 3);
   const aujISO = new Date().toISOString().slice(0, 10);
+
+  // Compteurs par temple : mêmes valeurs que des comptages temple par temple.
+  const jour = new Date(`${aujISO}T00:00:00.000Z`);
+  const { eglises } = await (await appel("/api/eglises", lecteur)).json();
+  for (const e of eglises) {
+    assert.deepStrictEqual(
+      [e.ouvriers, e.ouvriersActifs, e.departements, e.presentsAuj],
+      await Promise.all([
+        prisma.ouvrier.count({ where: { egliseId: e.id } }),
+        prisma.ouvrier.count({ where: { egliseId: e.id, actif: true } }),
+        prisma.departement.count({ where: { egliseId: e.id } }),
+        prisma.pointage.count({ where: { jour, ouvrier: { egliseId: e.id } } }),
+      ])
+    );
+    const carte = stats.parEglise.find((x) => x.id === e.id);
+    if (carte) assert.deepStrictEqual([carte.ouvriersActifs, carte.presentsAuj], [e.ouvriersActifs, e.presentsAuj]);
+  }
+
   const lieux = await (await appel(`/api/pointages?du=${aujISO}&au=${aujISO}&lieuId=${ADJAHUI}`, lecteur)).json();
   assert.ok(lieux.pointages.some((p) => p.ouvrier.id === visiteur.id && p.visiteur && p.eglise.code === "ADJAHUI"));
 });

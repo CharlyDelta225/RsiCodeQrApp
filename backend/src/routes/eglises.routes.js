@@ -3,7 +3,7 @@ import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 import { normaliserDistrict } from "./badges.routes.js";
-import { cleEglise, listerEglises } from "../lib/eglises.js";
+import { cleEglise, compteursEglises, listerEglises } from "../lib/eglises.js";
 
 // Gestion des temples. Lecture : tout admin connecté. Écriture : SUPER_ADMIN.
 const router = Router();
@@ -40,24 +40,8 @@ router.get("/", async (_req, res) => {
   try {
     const aujISO = new Date().toISOString().slice(0, 10);
     const auj = new Date(`${aujISO}T00:00:00.000Z`);
-    const eglises = await listerEglises();
-    const compteurs = await Promise.all(
-      eglises.map((e) =>
-        Promise.all([
-          prisma.ouvrier.count({ where: { egliseId: e.id } }),
-          prisma.ouvrier.count({ where: { egliseId: e.id, actif: true } }),
-          prisma.departement.count({ where: { egliseId: e.id } }),
-          prisma.pointage.count({ where: { jour: auj, ouvrier: { egliseId: e.id } } }),
-        ])
-      )
-    );
-    return res.json({
-      ok: true,
-      eglises: eglises.map((e, i) => {
-        const [ouvriers, ouvriersActifs, departements, presentsAuj] = compteurs[i];
-        return { ...e, ouvriers, ouvriersActifs, departements, presentsAuj };
-      }),
-    });
+    const [eglises, compteurs] = await Promise.all([listerEglises(), compteursEglises(auj)]);
+    return res.json({ ok: true, eglises: eglises.map((e) => ({ ...e, ...compteurs(e.id) })) });
   } catch (err) {
     logger.error("[EGLISES/LISTE]", err);
     return erreurInterne(res);
