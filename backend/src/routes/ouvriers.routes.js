@@ -4,6 +4,7 @@ import archiver from "archiver";
 import prisma from "../lib/prisma.js";
 import { genererMatricule, creerAvecMatricule } from "../lib/matricule.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
+import { posteParDefaut } from "../lib/postesDepartement.js";
 import { genererBadgePng } from "../lib/badge.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 import {
@@ -23,6 +24,12 @@ const LIMITE_MAX = 2000;
 // Seuls ADMIN et SUPER_ADMIN peuvent modifier/supprimer des ouvriers.
 // La lecture (GET) reste ouverte à tous les rôles authentifiés (dont LECTEUR).
 const ECRITURE = requireRole("ADMIN", "SUPER_ADMIN");
+
+/** Poste d'un ouvrier à son rattachement à ce département. */
+async function posteInitial(departementId) {
+  const departement = await prisma.departement.findUnique({ where: { id: departementId }, select: { nom: true } });
+  return posteParDefaut(departement?.nom);
+}
 
 // Relations renvoyées avec chaque ouvrier : son temple et ses départements.
 const INCLUDE_OUVRIER = Object.freeze({
@@ -272,7 +279,7 @@ router.post("/", ECRITURE, async (req, res) => {
         data: {
           ouvrierId: ouvrier.id,
           departementId: departementIdFinal,
-          roleDansDepartement: "MEMBRE",
+          roleDansDepartement: await posteInitial(departementIdFinal),
         },
       });
     }
@@ -392,7 +399,7 @@ router.patch("/:id", ECRITURE, async (req, res) => {
           data: {
             ouvrierId: req.params.id,
             departementId: departementIdFinal,
-            roleDansDepartement: "MEMBRE",
+            roleDansDepartement: await posteInitial(departementIdFinal),
           },
         });
         departementModifie = true;

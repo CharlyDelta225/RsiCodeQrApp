@@ -16,6 +16,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { Field, Select, Input } from "../ui/inputs";
 import { C } from "../theme";
 import { useTemple, paramTemple } from "../lib/temple";
+import { TOUS_LES_POSTES, estDepartementPasteur, libellePoste, postesDuDepartement } from "../lib/postes";
 
 const ROLE_ECRITURE = ["ADMIN", "SUPER_ADMIN"];
 
@@ -53,13 +54,6 @@ function useNombreColonnes() {
   return colonnes;
 }
 
-const ROLES = [
-  { valeur: "RESPONSABLE", libelle: "Responsable" },
-  { valeur: "ADJOINT", libelle: "Adjoint du responsable" },
-  { valeur: "SECRETAIRE", libelle: "Secrétaire" },
-  { valeur: "MEMBRE", libelle: "Membre" },
-];
-
 const ACCENTS = [
   "linear-gradient(90deg,#7B1515,#B23A2B)",
   "linear-gradient(90deg,#B08612,#DCB23F)",
@@ -69,10 +63,6 @@ const ACCENTS = [
   "linear-gradient(90deg,#6B5110,#D4A017)",
 ];
 
-function libelleRole(role) {
-  return ROLES.find((r) => r.valeur === role)?.libelle || role;
-}
-
 function styleRole(role) {
   return (
     {
@@ -80,6 +70,10 @@ function styleRole(role) {
       ADJOINT: "text-bordeaux-700 bg-bordeaux-50 ring-1 ring-bordeaux-200",
       SECRETAIRE: "text-amber-800 bg-amber-50 ring-1 ring-amber-200",
       MEMBRE: "text-slate-600 bg-slate-100 ring-1 ring-slate-200",
+      APOTRE: "text-gold-800 bg-gold-50 ring-1 ring-gold-200",
+      PASTEUR_PRINCIPAL: "text-bordeaux-700 bg-bordeaux-50 ring-1 ring-bordeaux-200",
+      PASTEUR_RESIDENT: "text-amber-800 bg-amber-50 ring-1 ring-amber-200",
+      PASTEUR: "text-slate-600 bg-slate-100 ring-1 ring-slate-200",
     }[role] || "text-slate-600 bg-slate-100"
   );
 }
@@ -264,7 +258,7 @@ export default function DepartementsPage() {
     if (!selection || selection.membres.length === 0) return;
     const entete = ["Matricule", "Nom", "Prénom", "Téléphone", "Poste"];
     const lignes = selection.membres.map((m) =>
-      [m.ouvrier?.matricule, m.ouvrier?.nom, m.ouvrier?.prenom, m.ouvrier?.telephone || "", libelleRole(m.roleDansDepartement)]
+      [m.ouvrier?.matricule, m.ouvrier?.nom, m.ouvrier?.prenom, m.ouvrier?.telephone || "", libellePoste(m.roleDansDepartement)]
         .map(csvValeur)
         .join(";")
     );
@@ -276,10 +270,17 @@ export default function DepartementsPage() {
 
   const nbMembres = selection?.membres?.length ?? 0;
 
-  const repartitionRoles = ROLES.map((role) => ({
+  const repartitionRoles = TOUS_LES_POSTES.map((role) => ({
     ...role,
     nombre: (selection?.membres ?? []).filter((m) => m.roleDansDepartement === role.valeur).length,
   })).filter((role) => role.nombre > 0);
+
+  // Un membre encore sur un poste d'une autre liste le garde tant qu'on n'en choisit pas un autre.
+  const postesSelection = postesDuDepartement(selection?.nom);
+  const optionsPoste =
+    !edition || postesSelection.some((p) => p.valeur === edition.roleDansDepartement)
+      ? postesSelection
+      : [{ valeur: edition.roleDansDepartement, libelle: `${libellePoste(edition.roleDansDepartement)} (ancien poste)` }, ...postesSelection];
 
   const pagination = usePagination(selection?.membres ?? []);
 
@@ -326,7 +327,7 @@ export default function DepartementsPage() {
                 <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{m.ouvrier?.telephone || "—"}</td>
                 <td className="px-3 py-2.5">
                   <Pill tonalite="gris" className={styleRole(m.roleDansDepartement)}>
-                    {libelleRole(m.roleDansDepartement)}
+                    {libellePoste(m.roleDansDepartement)}
                   </Pill>
                 </td>
                 <td className="px-3 py-2.5 text-right">
@@ -544,9 +545,9 @@ export default function DepartementsPage() {
               <Input type="tel" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
             </Field>
 
-            <Field label="Poste dans le département" hint="Un seul responsable et un seul adjoint par département.">
+            <Field label="Poste dans le département" hint={estDepartementPasteur(selection?.nom) ? undefined : "Un seul responsable et un seul adjoint par département."}>
               <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                {ROLES.map((r) => (
+                {optionsPoste.map((r) => (
                   <option key={r.valeur} value={r.valeur}>
                     {r.libelle}
                   </option>

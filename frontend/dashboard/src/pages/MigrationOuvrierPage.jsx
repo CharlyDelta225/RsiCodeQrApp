@@ -9,17 +9,7 @@ import Btn from "../ui/Btn";
 import { Field, Input, Select } from "../ui/inputs";
 import { useTemple, paramTemple } from "../lib/temple";
 import { usePagination } from "../lib/pagination";
-
-const POSTES = [
-  { valeur: "RESPONSABLE", libelle: "Responsable" },
-  { valeur: "ADJOINT", libelle: "Adjoint du responsable" },
-  { valeur: "SECRETAIRE", libelle: "Secrétaire" },
-  { valeur: "MEMBRE", libelle: "Membre" },
-];
-
-function libellePoste(valeur) {
-  return POSTES.find((p) => p.valeur === valeur)?.libelle || valeur || "—";
-}
+import { libellePoste, posteParDefaut, postesDuDepartement } from "../lib/postes";
 
 export default function MigrationOuvrierPage() {
   const { egliseId } = useTemple();
@@ -295,7 +285,12 @@ export default function MigrationOuvrierPage() {
                 <Select
                   required
                   value={formMigration.departementId}
-                  onChange={(e) => setFormMigration({ ...formMigration, departementId: e.target.value })}
+                  onChange={(e) =>
+                    setFormMigration({
+                      departementId: e.target.value,
+                      roleDansDepartement: posteParDefaut(departements.find((d) => d.id === e.target.value)?.nom),
+                    })
+                  }
                 >
                   <option value="">Choisir un département…</option>
                   {/* Seulement les départements du temple de l'ouvrier. */}
@@ -311,7 +306,7 @@ export default function MigrationOuvrierPage() {
                   value={formMigration.roleDansDepartement}
                   onChange={(e) => setFormMigration({ ...formMigration, roleDansDepartement: e.target.value })}
                 >
-                  {POSTES.map((p) => (
+                  {postesDuDepartement(departements.find((d) => d.id === formMigration.departementId)?.nom).map((p) => (
                     <option key={p.valeur} value={p.valeur}>
                       {p.libelle}
                     </option>

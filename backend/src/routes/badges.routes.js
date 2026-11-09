@@ -24,6 +24,10 @@ export const FONCTION_PAR_ROLE = Object.freeze({
   ADJOINT: "RESPONSABLE ADJOINT",
   SECRETAIRE: "SECRÉTAIRE",
   MEMBRE: "MEMBRE",
+  PASTEUR: "PASTEUR",
+  PASTEUR_PRINCIPAL: "PASTEUR PRINCIPAL",
+  PASTEUR_RESIDENT: "PASTEUR RESIDENT",
+  APOTRE: "APÔTRE",
 });
 
 const COULEUR = /^#[0-9A-F]{6}$/;
@@ -379,7 +383,7 @@ router.get("/a-confectionner", async (req, res) => {
  * { ok, departement: { id, nom, nomCarte, libelleCarte, couleur, modeleCarte, egliseId, district },
  *   ouvriers: [{ id, matricule, nom, prenom, role, fonction, aPhoto, photoMaj, confectionneLe }] }
  */
-const ORDRE_ROLE = { RESPONSABLE: 0, ADJOINT: 1, SECRETAIRE: 2 };
+const ORDRE_ROLE = { RESPONSABLE: 0, ADJOINT: 1, SECRETAIRE: 2, APOTRE: 0, PASTEUR_PRINCIPAL: 1, PASTEUR_RESIDENT: 2, PASTEUR: 3 };
 
 router.get("/departement/:departementId", async (req, res) => {
   try {

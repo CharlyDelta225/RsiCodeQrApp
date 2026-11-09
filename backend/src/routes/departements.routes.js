@@ -3,6 +3,7 @@ import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { normaliserCouleur } from "./badges.routes.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
+import { estDepartementPasteur, posteParDefaut, postesDuDepartement } from "../lib/postesDepartement.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 import {
   SELECT_EGLISE,
@@ -17,6 +18,15 @@ const MODELES_CARTE = ["TITRE"];
 const router = Router();
 
 const ECRITURE = requireRole("ADMIN", "SUPER_ADMIN");
+
+/** Réponse 400 pour un poste qui n'existe pas dans ce département. */
+function refuserPoste(res, postes) {
+  return res.status(400).json({
+    ok: false,
+    code: "ROLE_INVALIDE",
+    message: `Rôle invalide pour ce département. Valeurs attendues : ${postes.join(", ")}`,
+  });
+}
 
 /**
  * Vérifie qu'un département a au plus un seul RESPONSABLE et un seul ADJOINT.
@@ -325,12 +335,12 @@ router.delete("/:id", ECRITURE, async (req, res) => {
  * Ajoute un ouvrier à un département (ou met à jour son poste s'il est déjà membre). Body :
  *   { "ouvrierId": "...", "roleDansDepartement": "MEMBRE" }
  * Champs requis : ouvrierId.
- * La valeur par défaut de roleDansDepartement est MEMBRE.
+ * La valeur par défaut de roleDansDepartement est MEMBRE (PASTEUR dans le département PASTEUR).
  * Contrainte : un seul RESPONSABLE et un seul ADJOINT par département.
  */
 router.post("/:id/membres", ECRITURE, async (req, res) => {
   try {
-    const { ouvrierId, roleDansDepartement = "MEMBRE" } = req.body ?? {};
+    const { ouvrierId } = req.body ?? {};
 
     if (!ouvrierId) {
       return res.status(400).json({
@@ -340,20 +350,15 @@ router.post("/:id/membres", ECRITURE, async (req, res) => {
       });
     }
 
-    const rolesValides = ["RESPONSABLE", "ADJOINT", "SECRETAIRE", "MEMBRE"];
-    if (!rolesValides.includes(roleDansDepartement)) {
-      return res.status(400).json({
-        ok: false,
-        code: "ROLE_INVALIDE",
-        message: `Rôle invalide. Valeurs attendues : ${rolesValides.join(", ")}`,
-      });
-    }
-
     // Vérifier que le département existe
     const departement = await prisma.departement.findUnique({ where: { id: req.params.id } });
     if (!departement) {
       return res.status(404).json({ ok: false, code: "DEPARTEMENT_INCONNU", message: "Département introuvable" });
     }
+
+    const roleDansDepartement = req.body.roleDansDepartement ?? posteParDefaut(departement.nom);
+    const postes = postesDuDepartement(departement.nom);
+    if (!postes.includes(roleDansDepartement)) return refuserPoste(res, postes);
 
     // Vérifier que l'ouvrier existe
     const ouvrier = await prisma.ouvrier.findUnique({ where: { id: ouvrierId } });
@@ -418,19 +423,13 @@ router.patch("/:id/membres/:ouvrierId", ECRITURE, async (req, res) => {
       });
     }
 
-    const rolesValides = ["RESPONSABLE", "ADJOINT", "SECRETAIRE", "MEMBRE"];
-    if (!rolesValides.includes(roleDansDepartement)) {
-      return res.status(400).json({
-        ok: false,
-        code: "ROLE_INVALIDE",
-        message: `Rôle invalide. Valeurs attendues : ${rolesValides.join(", ")}`,
-      });
-    }
-
     const departement = await prisma.departement.findUnique({ where: { id: req.params.id } });
     if (!departement) {
       return res.status(404).json({ ok: false, code: "DEPARTEMENT_INCONNU", message: "Département introuvable" });
     }
+
+    const postes = postesDuDepartement(departement.nom);
+    if (!postes.includes(roleDansDepartement)) return refuserPoste(res, postes);
 
     // Vérifier que la liaison existe
     const liaisonExistante = await prisma.ouvrierDepartement.findUnique({
@@ -459,7 +458,8 @@ router.patch("/:id/membres/:ouvrierId", ECRITURE, async (req, res) => {
 
     const liaison = await prisma.ouvrierDepartement.update({
       where: { id: liaisonExistante.id },
-      data: { roleDansDepartement },
+      // Pasteurs : le poste choisi fait foi sur la carte, l'ancienne fonction saisie est oubliée.
+      data: { roleDansDepartement, ...(estDepartementPasteur(departement.nom) && { fonctionCarte: null }) },
       include: { ouvrier: true, departement: true },
     });
 

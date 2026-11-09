@@ -7,6 +7,7 @@ import path from "node:path";
 import prisma from "../lib/prisma.js";
 import { creerAvecMatricule } from "../lib/matricule.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
+import { posteParDefaut } from "../lib/postesDepartement.js";
 import { genererBadgePng } from "../lib/badge.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 import { listerEglises, trouverEglise, resoudreEgliseEcriture } from "../lib/eglises.js";
@@ -332,7 +333,7 @@ router.post(
           data: {
             ouvrierId: ouvrierExistant.id,
             departementId: deptExistant.id,
-            roleDansDepartement: "MEMBRE",
+            roleDansDepartement: posteParDefaut(deptExistant.nom),
           },
         });
 
@@ -377,7 +378,7 @@ router.post(
         data: {
           ouvrierId: ouvrier.id,
           departementId: departement.id,
-          roleDansDepartement: "MEMBRE",
+          roleDansDepartement: posteParDefaut(departement.nom),
         },
       });
 

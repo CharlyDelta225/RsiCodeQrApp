@@ -533,6 +533,17 @@ par département (`roleDansDepartement`) :
 | Secrétaire | `SECRETAIRE` |
 | Simple membre | `MEMBRE` (défaut) |
 
+Dans le département `PASTEUR`, seuls ces postes sont acceptés (sinon `400 ROLE_INVALIDE`, et ils sont refusés ailleurs) :
+
+| Poste | Nom (enum `RoleDepartement`) |
+|---|---|
+| Pasteur | `PASTEUR` (défaut) |
+| Pasteur principal | `PASTEUR_PRINCIPAL` |
+| Pasteur résident | `PASTEUR_RESIDENT` |
+| Apôtre | `APOTRE` |
+
+Un changement de poste dans ce département efface la fonction saisie à la main : la carte suit le poste.
+
 **Contraintes** :
 - Un seul `RESPONSABLE` et un seul `ADJOINT` par département → `409 POSTE_DEJA_PRIS`.
 - Un ouvrier ne peut pas être deux fois dans le même département (unicité `ouvrierId + departementId`).
