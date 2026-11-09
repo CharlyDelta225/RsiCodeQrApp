@@ -2,7 +2,7 @@ import logger from "../lib/logger.js";
 import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { requireRole } from "../middleware/auth.middleware.js";
-import { SELECT_EGLISE, listerEglises } from "../lib/eglises.js";
+import { SELECT_EGLISE, compteursEglises, listerEglises } from "../lib/eglises.js";
 
 const router = Router();
 
@@ -163,18 +163,13 @@ router.get("/stats", async (req, res) => {
 
     // Une ligne par temple actif (le filtre egliseId ne s'applique pas ici :
     // les cartes du tableau de bord montrent toujours les trois temples).
-    const parEglise = await Promise.all(
-      eglises
-        .filter((e) => e.actif)
-        .map(async (e) => {
-          const [ouvriersActifs, nbDepartements, presentsAuj] = await Promise.all([
-            prisma.ouvrier.count({ where: { egliseId: e.id, actif: true } }),
-            prisma.departement.count({ where: { egliseId: e.id } }),
-            prisma.pointage.count({ where: { jour: auj, ouvrier: { egliseId: e.id } } }),
-          ]);
-          return { id: e.id, code: e.code, nom: e.nom, estSiege: e.estSiege, ouvriersActifs, departements: nbDepartements, presentsAuj };
-        })
-    );
+    const compteurs = await compteursEglises(auj);
+    const parEglise = eglises
+      .filter((e) => e.actif)
+      .map((e) => {
+        const { ouvriersActifs, departements: nbDepartements, presentsAuj } = compteurs(e.id);
+        return { id: e.id, code: e.code, nom: e.nom, estSiege: e.estSiege, ouvriersActifs, departements: nbDepartements, presentsAuj };
+      });
 
     const parDate = new Map(
       groupes.map((g) => [g.jour.toISOString().slice(0, 10), g._count._all])

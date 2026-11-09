@@ -52,6 +52,28 @@ export function listerEglises() {
 }
 
 /**
+ * Compteurs de chaque temple pour un jour donné, en trois requêtes quel que
+ * soit le nombre de temples : en prod, Prisma n'a qu'une connexion
+ * (connection_limit=1) et les requêtes en attente échouent au bout de 10 s.
+ * Renvoie (egliseId) => { ouvriers, ouvriersActifs, departements, presentsAuj }.
+ * presentsAuj = ouvriers DU temple ayant badgé ce jour (où qu'ils aient badgé).
+ */
+export async function compteursEglises(jour) {
+  const [ouvriers, departements, presents] = await Promise.all([
+    prisma.ouvrier.groupBy({ by: ["egliseId", "actif"], _count: { _all: true } }),
+    prisma.departement.groupBy({ by: ["egliseId"], _count: { _all: true } }),
+    prisma.ouvrier.groupBy({ by: ["egliseId"], where: { pointages: { some: { jour } } }, _count: { _all: true } }),
+  ]);
+  const nombre = (lignes, id) => lignes.filter((l) => l.egliseId === id).reduce((n, l) => n + l._count._all, 0);
+  return (id) => ({
+    ouvriers: nombre(ouvriers, id),
+    ouvriersActifs: nombre(ouvriers.filter((l) => l.actif), id),
+    departements: nombre(departements, id),
+    presentsAuj: nombre(presents, id),
+  });
+}
+
+/**
  * Résout le temple demandé dans une requête d'écriture.
  *   - valeur absente / vide → siège (compatibilité)
  *   - valeur inconnue ou temple désactivé → null (l'appelant répond 400)
