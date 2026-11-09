@@ -101,8 +101,8 @@ export const TITRE_SEUL = Object.freeze({
     [1, -6, 0.085],
   ],
   titre: { x: CENTRE + 2, base: 1382, hauteurCap: 114, poids: 900, style: "italic", largeurMax: 830 },
-  // Titre très court (DAF) : plus grand, toujours centré dans la bande.
-  titreCourt: { longueurMax: 3, base: 1395, hauteurCap: 140 },
+  // Titre très court (DAAF) : plus grand, toujours centré dans la bande.
+  titreCourt: { longueurMax: 4, base: 1395, hauteurCap: 140 },
   // Le matricule et le district sont un peu plus bas que sur le modèle « Département ».
   decalages: { matricule: 7, district: 14 },
 });
