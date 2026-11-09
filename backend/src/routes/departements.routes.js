@@ -4,6 +4,7 @@ import prisma from "../lib/prisma.js";
 import { normaliserCouleur } from "./badges.routes.js";
 import { normaliserNomDepartement } from "../lib/normaliserDepartement.js";
 import { estDepartementPasteur, posteParDefaut, postesDuDepartement } from "../lib/postesDepartement.js";
+import { couleurNouveauDepartement } from "../lib/couleurDepartement.js";
 import { requireRole } from "../middleware/auth.middleware.js";
 import {
   SELECT_EGLISE,
@@ -212,6 +213,7 @@ router.post("/", ECRITURE, async (req, res) => {
         nom: normaliserNom(nom),
         description: description ? String(description).trim() : null,
         egliseId: eglise.id,
+        couleur: await couleurNouveauDepartement(nom),
       },
       include: { eglise: { select: SELECT_EGLISE } },
     });
