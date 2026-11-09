@@ -137,10 +137,6 @@ export default function OuvriersPage() {
     setEnvoi(true);
     setAlerte(null);
     try {
-      if (!form.telephone.trim()) {
-        setAlerte({ titre: "Champ manquant", message: "Le téléphone est obligatoire." });
-        return;
-      }
       await api.createOuvrier({
         nom: form.nom,
         prenom: form.prenom,
@@ -453,8 +449,8 @@ export default function OuvriersPage() {
             <Field label="Prénom">
               <Input required placeholder="Prénom" value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
             </Field>
-            <Field label="Téléphone">
-              <Input type="tel" required placeholder="Téléphone" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
+            <Field label="Téléphone (optionnel)">
+              <Input type="tel" placeholder="Téléphone" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
             </Field>
             <Field label="Temple">
               <Select
